@@ -1,5 +1,6 @@
 // 덱 AI 패널의 「Claude Code」 엔진 — 서버(server/deckagent.py)가 Claude Code 를 돌려 덱 사본을 고치고, 여기서는 진행 · 결과 카드 · [적용]을 그린다.
-// AI PPT(2026-09-30 이전 프로토타입 에서 옮김): **Claude Code 만** 쓴다(로컬 gemma 는 부탁 종류 판단 · 없으면 건너뜀). 구독 토큰은 계정에 묶여 서버에 있고
+// AI PPT(2026-09-30 이전 프로토타입 에서 옮김): 엔진은 이전 프로토타입 와 같이 gemma 26b · Claude Code 둘 — **새 덱 만들기만 Claude Code**(사용자 지정).
+//   (옮길 때 '클로드 코드만'을 패널 전체로 잘못 읽어 gemma 를 뺐다가 되살림 — 사용자 지적 2026-09-30 "로컬 llm 으로 사용하기 있지 않았나"). 구독 토큰은 계정에 묶여 서버에 있고
 //   (브라우저는 연결 여부만 /api/me 로 안다), 새 덱(?new=1)은 열리자마자 받은 정보(brief.json)로 Claude Code 가 처음부터 만든다(A.build).
 // 사용자 지정(2026-09-30): "클로드 코드 도구를 연결 · 구독 계정으로, 클로드 계정 있으면 그걸로". js/deckkit.js 가 고칠 수 있는 덱(editable)에서만 불러온다.
 // 엔진 두 가지(사용자 지정 2026-09-30 "설명은 빠른 답, 수정은 gemma 26b thinking, Claude Code 는 연결 안 되면 못 보내게, 모델 선택도"):
@@ -96,7 +97,8 @@
   #ka-login a.cl { margin-right: auto; align-self: center; font: 800 13px 'Noto Sans KR', sans-serif; color: #416AF0; text-decoration: none; }
   `;
   const A = {
-    get engine() { return 'claude'; }, set engine(v) { /* Claude Code 만 */ },
+    // 엔진 — 고른 적 없으면 구독이 연결돼 있으면 Claude Code, 아니면 gemma
+    get engine() { const e = ls.get('deckagent.engine'); return e === 'claude' || e === 'gemma' ? e : (A.me?.claude ? 'claude' : 'gemma'); }, set engine(v) { ls.set('deckagent.engine', v); },
     get model() { return ls.get('deckagent.model') ?? 'auto'; }, set model(v) { ls.set('deckagent.model', v); },
     // 노력(effort) — Claude Code --effort. 자동 = 작은 수정 medium · 큰 수정 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
     get effort() { return ls.get('deckagent.effort') ?? 'auto'; }, set effort(v) { ls.set('deckagent.effort', v); },
@@ -222,7 +224,7 @@
       const sub = !!A.token; const cc = A.engine === 'claude';
       const MODELS = [['auto', '자동(추천)'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5'], ['haiku', 'Haiku 4.5'], ['', '계정 기본']];
       const bar = document.createElement('div'); bar.className = 'ka-bar';
-      bar.innerHTML = '<span class="ka-seg"><button class="on" title="Claude Code — 내 Claude 구독으로">Claude Code</button></span>'
+      bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma 26b</button><button data-e="claude" class="${cc ? 'on' : ''}" title="Claude Code — 내 Claude 구독으로">Claude Code</button></span>`
         + (cc && sub ? `<select class="ka-model" title="Claude 모델 — 구독 등급에 따라 못 쓰는 것이 있을 수 있다">${MODELS.map(([v, n]) => `<option value="${v}" ${A.model === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
           + `<select class="ka-model ka-effort" title="노력(effort) — 높을수록 오래 생각하고 사용량이 는다">${[['auto', '노력 자동'], ['low', '노력 low'], ['medium', '노력 medium'], ['high', '노력 high'], ['xhigh', '노력 xhigh'], ['max', '노력 max']].map(([v, n]) => `<option value="${v}" ${A.effort === v ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '')
         + (cc ? `<button class="ka-acct${sub ? ' on' : ''}">${sub ? '✓ 구독 연결됨' : 'Claude 구독 연결'}</button>` : '')
@@ -289,7 +291,13 @@
       // gemma 로 여러 장 · 레이아웃(큰 수정)은 바로 돌리지 않고 묻는다 — 벤치에서 레이아웃 과제는 거의 실패, 여러 장은 계획부터 어긋났다
       // (사용자 지정 2026-09-30 "로컬 llm 으로는 안 될 것 같다, Claude Code 로 돌리기 · 무시하고 진행 버튼으로")
       if (!o2.forceGemma && (kind === '여러 장' || kind === '큰 수정')) return A.warn(q, att, kind);
-      if (kind === '설명') { await ask0(q, { noEdit: true, userImages: att.map((f) => f.data), thumbs: att.map((f) => f.thumb) }); const m = K.chat[K.chat.length - 1]; if (m?.role === 'assistant') { m.model = '빠른 답 · gemma-4-26b'; K.updateMsg(K.chat.length - 1); } return; }
+      if (kind === '설명') {
+        await ask0(q, { noEdit: true, userImages: att.map((f) => f.data), thumbs: att.map((f) => f.thumb) }); const m = K.chat[K.chat.length - 1];
+        if (m?.role === 'assistant') { m.model = '빠른 답 · gemma-4-26b'; K.updateMsg(K.chat.length - 1);
+          // 빠른 답은 Claude Code 작업이 아니라 서버 기록이 없다 — 대화방에 따로 남겨 다시 열 때 같이 보이게
+          if (m.text && !m.err && !m.stopped) K.post('/api/agent/note', { file: location.pathname, thread: A.thread || (A.thread = A.newId()), prompt: q, slide: m.slide, text: m.text, model: 'gemma-4-26b' }).then(() => A.refreshThreads()).catch(() => {}); }
+        return;
+      }
       return A.ask(q, { att, plan, kind, noUser: o2.noUser });
     },
     // gemma 안내 카드 — [Claude Code 로 하기] · [무시하고 진행] · [취소]. 떠 있는 동안은 수정안 카드처럼 새 부탁을 막는다
@@ -326,7 +334,7 @@
           files = []; for (const f of att) { const j = await K.post('/api/asset', { file: location.pathname, name: f.name, data: f.data.split(',')[1] }); files.push(j.src); } }
         a.agent.files = files;
         const r = await fetch('/api/agent/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: K.ctrl.signal,
-          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.id, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
+          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), engine: a.agent.engine === 'sub' ? 'claude' : 'gemma', slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.e === a.agent.engine ? A.sess.id : undefined, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
             effort: (A.effort === 'auto' ? o.effort : A.effort) || undefined }) });
         await A.read(r, a, ai);
       } catch (e) {
@@ -337,7 +345,8 @@
       A.finish(a, ai, t0, true);
     },
     // 새 답 말풍선 — o: 모델 · 노력 · 종류 · 계획 여부(대화를 다시 그릴 때는 서버 메타에서)
-    newMsg(slide, q, o = {}) { return { _gen: A.gen, role: 'assistant', text: '', slide, streaming: true, agent: { steps: [], engine: 'sub', plan: !!o.plan, build: !!o.build, o: { model: o.model, effort: o.effort, kind: o.kind } }, root: q }; },
+    newMsg(slide, q, o = {}) { const eng = o.engine ? (o.engine === 'gemma' ? 'gemma' : 'sub') : (o.build || A.engine === 'claude' ? 'sub' : 'gemma');
+      return { _gen: A.gen, role: 'assistant', text: '', slide, streaming: true, agent: { steps: [], engine: eng, quick: !!o.quick, plan: !!o.plan, build: !!o.build, o: { model: o.model, effort: o.effort, kind: o.kind } }, root: q }; },
     // 서버가 흘리는 줄(NDJSON)을 읽어 말풍선에 쌓는다 — 새 부탁 · 다시 열어 따라 보기 · 지난 대화 다시 그리기가 같은 길
     async read(r, a, ai) {
       if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
@@ -355,7 +364,7 @@
     feed(a, j) {
       if (j.ping) return;
       if (j.rid && !a.agent.rid) a.agent.rid = j.rid;
-      if (j.session) A.sess = { e: 'sub', id: j.session };
+      if (j.session) A.sess = { e: a.agent.engine, id: j.session };
       if (j.step) a.agent.steps.push({ t: j.step });
       if (j.stepErr) a.agent.steps.push({ t: j.stepErr.replace(/<\/?tool_use_error>/g, '').slice(0, 120), bad: true });
       if (j.think) a.think = (a.think || 0) + j.think;
@@ -382,9 +391,10 @@
       const ef = A.effort === 'auto' ? o.effort : A.effort;
       // 실제 모델 ID(Claude Code 결과의 modelUsage) — 보조 호출용 작은 모델(haiku)이 같이 찍히면 둘 다
       const used = (a.agent.models || []).join(', ');
-      a.model = `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${used ? ` · 실제: ${used}` : ''}`;
+      a.model = a.agent.quick ? '빠른 답 · gemma-4-26b' : a.agent.engine === 'gemma' ? `gemma 26b 생각 · 수정${o.kind ? ` (${String(o.kind).replace(/장/g, '페이지')})` : ''}`
+        : `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${used ? ` · 실제: ${used}` : ''}`;
       // 구독 인증 실패 — 연결을 지우고 다시 연결하게(잘못된 토큰으로 계속 401 이 나지 않게). 지난 대화를 다시 그릴 때는 건드리지 않는다
-      if (live && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
+      if (live && a.agent.engine === 'sub' && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
       K.busy = false; K.ctrl = null; if (ai >= 0) K.updateMsg(ai); K.setSend();
       if (live && a.agent.applied && a.agent.build) { K.keepChat(); location.reload(); }
     },

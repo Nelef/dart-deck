@@ -430,13 +430,21 @@ class H(http.server.BaseHTTPRequestHandler):
         req.pop('token', None)
         if path == '/api/agent/run':
             self.deck_access(u, req.get('file'))
-            tok = STORE.claude_token(u['id'])
-            if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
-            req.update({'token': tok, '_cfg': f"cfg-{u['id']}", 'display': req.get('prompt')})
+            # 엔진 — Claude Code(내 구독) 또는 로컬 gemma(LiteLLM 경유). 새 덱 만들기는 Claude Code 만(사용자 지정 2026-09-30)
+            req['display'] = req.get('prompt')
+            if req.get('engine') == 'gemma' and not req.get('build'):
+                req['model'] = req['effort'] = None
+            else:
+                tok = STORE.claude_token(u['id'])
+                if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
+                req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
             if req.get('build'):
                 req.update({'prompt': build_prompt(os.path.dirname(edit_target(req.get('file')))), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'high'})
             return self.agent_stream(req, u)
         # 대화 기록 — 이 계정이 이 덱에 한 부탁들 · 따라 보기 · 멈춤 · 상태(진행 · 취소 · 버림) · 새 대화(숨기기)
+        if path == '/api/agent/note':
+            self.deck_access(u, req.get('file'))
+            return self.reply(200, deckagent.note(edit_target(req.get('file')), u['id'], req.get('thread'), req.get('prompt') or '', req.get('slide'), req.get('text') or '', str(req.get('model') or '')[:60]))
         if path in ('/api/agent/jobs', '/api/agent/threads', '/api/agent/attach', '/api/agent/stop', '/api/agent/mark', '/api/agent/clear', '/api/agent/apply', '/api/agent/discard'):
             self.deck_access(u, req.get('file')); deck = edit_target(req.get('file')); rid = str(req.get('rid') or '')
             if rid:

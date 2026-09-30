@@ -22,6 +22,7 @@ CLAUDE = shutil.which('claude') or next((p for p in ('/opt/homebrew/bin/claude',
 LITE = os.environ.get('DECK_LITE_URL', 'http://127.0.0.1:4011')
 LITE_BIN = os.path.expanduser(os.environ.get('DECK_LITE_BIN', '~/.venvs/litellm/bin/litellm'))
 LITE_CFG = os.path.join(HERE, 'litellm.yaml')
+LLM_BASE = os.environ.get('DECK_LLM_BASE', 'http://gpu-server:8002/v1')   # gemma(vLLM) 주소 — litellm.yaml 의 api_base 를 이 값으로
 NODE_PATH = os.path.join(ROOT, 'node_modules')                 # 덱 사본 폴더의 tools/deck_shot.cjs 가 playwright 를 찾게
 RUN_SEC = 15 * 60                                             # 한 번 부탁의 상한(생각 켠 gemma 는 몇 분 걸린다 — 벤치 중앙 70초, 긴 것 10분)
 BUILD_SEC = 40 * 60                                            # 새 덱 처음 만들기(10페이지 안팎을 Opus 가 쓰고 찍어 보며 고친다)
@@ -60,12 +61,19 @@ class Job:
     def emit(self, o):
         with self.cv:
             self.ev.append(o)
-            try:
-                with open(self.log, 'a', encoding='utf-8') as f: f.write(json.dumps(o, ensure_ascii=False) + '\n')
-            except OSError: pass
+            # 생각 표시({'think': n})는 파일에 한 줄로 합친다 — gemma 는 생각 토큰마다 한 줄이라 부탁 하나에 수천 줄이 쌓였다(실측 2026-09-30).
+            # 따라 보는 창에는 그대로 흘린다(메모리) — '생각 중'이 살아 움직이게
+            if set(o) == {'think'}: self.think = getattr(self, 'think', 0) + int(o['think'] or 0)
+            else: self._write(o)
             self.cv.notify_all()
+    def _write(self, o):
+        try:
+            with open(self.log, 'a', encoding='utf-8') as f:
+                if getattr(self, 'think', 0): f.write(json.dumps({'think': self.think}) + '\n'); self.think = 0
+                if o is not None: f.write(json.dumps(o, ensure_ascii=False) + '\n')
+        except OSError: pass
     def finish(self):
-        with self.cv: self.done = True; self.cv.notify_all()
+        with self.cv: self._write(None); self.done = True; self.cv.notify_all()
         meta_update(self.meta_f, {'done': True, 'end': int(time.time())})
 
 def meta_update(f, patch):
@@ -93,16 +101,18 @@ def ensure_lite():
     try:
         urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
     except Exception: pass
-    if not os.path.exists(LITE_BIN): raise ValueError(f'gemma 로 돌리려면 LiteLLM 이 필요합니다({LITE_BIN} 없음) — research/tools/litellm.yaml 참고')
+    if not os.path.exists(LITE_BIN): raise ValueError(f'gemma 로 돌리려면 LiteLLM 이 필요합니다({LITE_BIN} 없음) — server/litellm.yaml 참고')
     os.makedirs(ADIR, exist_ok=True)
+    cfg = os.path.join(ADIR, 'litellm.yaml')
+    open(cfg, 'w', encoding='utf-8').write(open(LITE_CFG, encoding='utf-8').read().replace('http://gpu-server:8002/v1', LLM_BASE))
     port = LITE.rsplit(':', 1)[-1]
-    subprocess.Popen([LITE_BIN, '--config', LITE_CFG, '--host', '127.0.0.1', '--port', port, '--num_workers', '4'],
+    subprocess.Popen([LITE_BIN, '--config', cfg, '--host', '127.0.0.1', '--port', port, '--num_workers', '4'],
                      stdout=open(os.path.join(ADIR, 'litellm.log'), 'a'), stderr=subprocess.STDOUT, start_new_session=True)
     for _ in range(40):
         time.sleep(0.5)
         try: urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
         except Exception: pass
-    raise ValueError('LiteLLM 이 뜨지 않았습니다(.deck-agent/litellm.log)')
+    raise ValueError('LiteLLM 이 뜨지 않았습니다(data/.agent/litellm.log)')
 
 # 긴 줄 나누기 — 굳힌 장은 마크업이 한 줄 수천 자(격자 200칸)인데 Claude Code 의 Read 가 긴 줄을 잘라 보여 줘서, gemma 가 찾을 글을 짐작하다
 # Edit 이 16번 실패했다(실측 2026-09-30). 작업 사본에서만 <script> 밖의 긴 줄을 태그 경계(><)마다 주석 줄바꿈으로 나눈다 — 주석 안의 줄바꿈이라
@@ -201,8 +211,8 @@ def start(req, port, edit_target, slide_parts, shot, url_of, backup_name, owner)
     # 메타 — 대화를 다시 그릴 재료(부탁 글 · 페이지 · 그림 · 모델 선택)와 [적용]을 서버를 다시 켠 뒤에도 할 수 있게 사본 정보
     tid = str(req.get('thread') or ''); tid = tid if THREAD_RE.fullmatch(tid) else uuid.uuid4().hex[:12]
     json.dump({'rid': rid, 'owner': owner, 'thread': tid, 'prompt': str(req.get('display') or req.get('prompt') or '')[:8000], 'slide': str(req.get('slide') or ''),
-               'files': [f for f in (req.get('files') or []) if isinstance(f, str)][:3], 't': int(time.time()), 'done': False, 'state': {},
-               'o': {k: req.get(k) for k in ('model', 'effort', 'kind', 'plan', 'build')}, 'work': r['work'], 'sha0': r['sha0']},
+               'files': [f for f in (req.get('files') or []) if isinstance(f, str)][:3], 't': round(time.time(), 3),   # 소수 셋째 자리 — 같은 초에 남긴 빠른 답과 순서가 뒤집혔다 'done': False, 'state': {},
+               'o': {**{k: req.get(k) for k in ('model', 'effort', 'kind', 'plan', 'build')}, 'engine': r['engine']}, 'work': r['work'], 'sha0': r['sha0']},
               open(job.meta_f, 'w', encoding='utf-8'), ensure_ascii=False)
     # 오래된 부탁 정리 — 이 계정 것만, 끝난 것만
     olds = sorted((m for m in (_read(f) for f in glob.glob(os.path.join(ld, '*.json'))) if m and m.get('owner') == owner and m.get('done')), key=lambda m: m['t'])[:-LOG_KEEP]
@@ -289,6 +299,16 @@ def hide_thread(path, owner, thread):
         if m and m.get('owner') == owner and (m.get('thread') or 'old') == thread and not m.get('hidden'):
             stop(m['rid']); meta_update(f, {'hidden': True})
     return {'ok': True}
+
+def note(path, owner, thread, prompt, slide, text, model=''):
+    """빠른 답(gemma 설명 — Claude Code 를 거치지 않는 한 번 묻고 답하기)도 대화방에 남긴다 — 다시 열면 같이 보이게"""
+    ld = logdir_of(path); os.makedirs(ld, exist_ok=True); rid = uuid.uuid4().hex[:10]
+    tid = thread if THREAD_RE.fullmatch(str(thread or '')) else uuid.uuid4().hex[:12]
+    with open(os.path.join(ld, f'{rid}.jsonl'), 'w', encoding='utf-8') as f:
+        f.write(json.dumps({'rid': rid, 'engine': 'gemma'}) + '\n' + json.dumps({'done': True, 'rid': rid, 'result': str(text)[:40000], 'changed': False, 'engine': 'gemma', 'quick': True}, ensure_ascii=False) + '\n')
+    json.dump({'rid': rid, 'owner': owner, 'thread': tid, 'prompt': str(prompt)[:8000], 'slide': str(slide or ''), 'files': [], 't': round(time.time(), 3), 'done': True, 'state': {},
+               'o': {'engine': 'gemma', 'kind': '설명', 'quick': True, 'model': model}}, open(os.path.join(ld, f'{rid}.json'), 'w', encoding='utf-8'), ensure_ascii=False)
+    return {'ok': True, 'rid': rid, 'thread': tid}
 
 def busy_files():
     return {r['file'] for r in RUNS.values() if r.get('busy')}
