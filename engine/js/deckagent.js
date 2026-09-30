@@ -15,6 +15,12 @@
   const K = window.DeckKit; if (!K || window.DeckAgent) return;
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* 저장소 없음 */ } } };
+  // 선 아이콘 — 글자색(currentColor)을 따른다. 대화 목록 = 말풍선 여럿 · 새 대화 = 연필 · 웹 = 지구
+  const IC = {
+    list: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/><path d="M8 8h9M8 12h6"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+    web: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+  };
   const CSS = `
   /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
      탭이 AI 하나뿐인 덱(noCode)은 「AI 에게 묻기」 알약과 따로 한 줄 먹던 페이지 이름 줄(kstage)을 없애고 윗줄에 합친다 */
@@ -23,9 +29,14 @@
   #kpanel.ka-solo .kstage { display: none; }
   #kpanel .ka-ctx { flex: 1; min-width: 0; font: 800 13.5px 'Noto Sans KR', sans-serif; color: #2b3038; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #kpanel .ka-ctx small { color: #9aa1ab; font-weight: 700; margin-right: 6px; }
-  #kpanel .khead .ka-ic { flex: none; width: 34px; height: 34px; padding: 0; border-radius: 10px; background: transparent; color: #545b66; font-size: 17px; line-height: 34px; position: relative; transition: background .15s, transform .08s; }
-  #kpanel .khead .ka-ic:hover { background: #f2f3f6; } #kpanel .khead .ka-ic:active { transform: scale(0.96); }
-  #kpanel .khead .ka-ic .dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 99px; background: #7c3aed; }
+  #kpanel .khead .ka-ic { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 10px; border-radius: 99px; background: #f2f3f6; color: #2b3038; font: 800 12.5px 'Noto Sans KR', sans-serif; position: relative; transition: background .15s, transform .08s; }
+  #kpanel .khead .ka-ic svg { flex: none; }
+  #kpanel .khead .ka-ic:hover { background: #e6e8ec; } #kpanel .khead .ka-ic:active { transform: scale(0.96); }
+  #kpanel .khead .ka-ic .dot { position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 99px; background: #416AF0; box-shadow: 0 0 0 2px #fff; }
+  /* 웹 검색 — 입력창 안, 보내기 단추 왼쪽(사용자 지정 2026-09-30). 켜면 파랑 */
+  .ka-webin { flex: none; align-self: center; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 99px; border: 0; background: #f2f3f6; color: #545b66; font: 800 12px 'Noto Sans KR', sans-serif; cursor: pointer; transition: background .15s, color .15s, transform .08s; }
+  .ka-webin:hover { background: #e6e8ec; } .ka-webin:active { transform: scale(0.98); }
+  .ka-webin.on { background: #E8EEFD; color: #416AF0; }
   #kpanel.ka-solo .khead .kx { margin-left: 0; width: 34px; height: 34px; padding: 0; border-radius: 10px; }
   .ka-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #eceef1; font: 700 12px 'Noto Sans KR', sans-serif; color: #545b66; flex-wrap: nowrap; min-width: 0; position: relative; }
   .ka-bar .ka-model { min-width: 0; flex: 0 1 auto; padding-right: 2px; }
@@ -214,6 +225,14 @@
       inp.onchange = () => { A.addFiles(inp.files); inp.value = ''; }; comp.appendChild(inp);
       const bt = document.createElement('button'); bt.className = 'ka-att'; bt.type = 'button'; bt.textContent = '+'; bt.title = '그림 첨부 — 붙여넣기(Ctrl/⌘+V) · 채팅창에 끌어 놓기도 됨, 3장까지';
       bt.onclick = () => inp.click(); box.insertBefore(bt, box.firstChild);
+      // 웹 검색 켜기 — Claude 구독 엔진에서만 된다(gemma 는 LiteLLM 경유라 검색 도구가 없다)
+      const send = box.querySelector('.kc-send');
+      if (A.engine === 'claude' && A.token && send) {
+        const wb = document.createElement('button'); wb.type = 'button'; wb.className = `ka-webin${A.web ? ' on' : ''}`; wb.innerHTML = `${IC.web}웹`;
+        wb.title = '켜면 AI 가 웹에서 찾아 넣는다 — 가져온 사실엔 출처를 달고, 검색 결과에 나온 주소만 연다';
+        wb.onclick = () => { A.web = !A.web; wb.classList.toggle('on', A.web); A.toast(A.web ? '웹 검색 켬 — 필요하면 웹에서 찾아 출처와 함께 넣어요' : '웹 검색 끔'); };
+        box.insertBefore(wb, send);
+      }
       box.querySelector('textarea')?.addEventListener('paste', (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); A.addFiles(fs); } });
       A.drawFiles();
     },
@@ -253,7 +272,6 @@
       bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
         + (cc && sub ? `<select class="ka-model" title="Claude 모델 — 구독 등급에 따라 못 쓰는 것이 있을 수 있다">${MODELS.map(([v, n]) => `<option value="${v}" ${A.model === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
           + `<select class="ka-model ka-effort" title="노력(effort) — 높을수록 오래 생각하고 사용량이 는다">${[['auto', '노력 자동'], ['low', '노력 low'], ['medium', '노력 med'], ['high', '노력 high'], ['xhigh', '노력 xhigh'], ['max', '노력 max']].map(([v, n]) => `<option value="${v}" ${A.effort === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
-          + `<button class="ka-web${A.web ? ' on' : ''}" title="켜면 AI 가 웹에서 찾아 넣는다 — 가져온 사실엔 출처를 달고, 검색 결과에 나온 주소만 연다">${A.web ? '✓ 웹' : '웹'}</button>`
           + `<button class="ka-more" title="사용량 · 구독 연결">⋯</button><div class="ka-menu"><button data-m="use">남은 사용량 보기</button><button data-m="acct">구독 연결 끊기</button><div class="sub">Claude 구독 연결됨</div></div>` : '')
         + (cc && !sub ? '<button class="ka-connect ka-acct">Claude 구독 연결</button>' : '');
       top.after(bar);
@@ -267,14 +285,13 @@
         ctx.innerHTML = `<small>AI</small>${esc(cur)}`; ctx.title = `${K.cfg.deck} · ${cur}`;
         const ic = (t, title, fn, dot) => { const x = document.createElement('button'); x.className = 'ka-ic'; x.title = title; x.innerHTML = t + (dot ? '<span class="dot"></span>' : ''); x.onclick = fn; return x; };
         if (K.cfg.noCode) head.insertBefore(ctx, kx);
-        const th = ic('☰', '대화 목록 — 지난 대화 보기 · 바꾸기', () => A.showThreads(), A.otherRunning); th.classList.add('ka-th'); head.insertBefore(th, kx);
-        head.insertBefore(ic('＋', '새 대화', () => A.newThread()), kx);
+        const th = ic(`${IC.list}대화 목록`, '지난 대화 보기 · 바꾸기', () => A.showThreads(), A.otherRunning); th.classList.add('ka-th'); head.insertBefore(th, kx);
+        head.insertBefore(ic(`${IC.edit}새 대화`, '새 대화 시작', () => A.newThread()), kx);
       }
       top.style.display = 'none';
       bar.querySelectorAll('[data-e]').forEach((b) => { b.onclick = () => { A.engine = b.dataset.e; K.render(); }; });
       const ms = bar.querySelector('.ka-model:not(.ka-effort)'); if (ms) ms.onchange = () => { A.model = ms.value; };
       const es = bar.querySelector('.ka-effort'); if (es) es.onchange = () => { A.effort = es.value; };
-      const wb = bar.querySelector('.ka-web'); if (wb) wb.onclick = () => { A.web = !A.web; wb.classList.toggle('on', A.web); wb.textContent = A.web ? '✓ 웹' : '웹'; A.toast(A.web ? '웹 검색 켬 — 필요하면 웹에서 찾아 출처와 함께 넣어요' : '웹 검색 끔'); };
       const mn = bar.querySelector('.ka-menu'); const mb = bar.querySelector('.ka-more');
       if (mb && mn) { mb.onclick = (e) => { e.stopPropagation(); mn.classList.toggle('on'); }; document.addEventListener('click', () => mn.classList.remove('on'), { once: true });
         mn.querySelector('[data-m="use"]').onclick = () => { mn.classList.remove('on'); A.usage(); };
