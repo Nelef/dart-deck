@@ -54,6 +54,45 @@
   .ka-att:disabled { opacity: .4; cursor: default; }
   .ka-uthumbs { display: flex; gap: 4px; justify-content: flex-end; margin-top: 6px; } .ka-uthumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
   .ka-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; } .ka-shots img { width: 100%; display: block; border-radius: 6px; }
+  /* 대화 목록(대화방) — 패널 위로 왼쪽에서 밀려 나오는 서랍. TOSS: 행 높이 64 · hover 틴트 · 누르면 scale(0.98) · 뜨는 효과 없음 */
+  .ka-hist { position: relative; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; transition: transform .08s, background .15s; }
+  .ka-hist:hover { background: #f2f3f6; } .ka-hist:active, .ka-new:active, .ka-acct:active { transform: scale(0.98); }
+  .ka-hist .dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 99px; background: #416AF0; box-shadow: 0 0 0 2px #fff; animation: ka-pulse 1.4s ease-in-out infinite; }
+  /* 닫힌 서랍은 패널 왼쪽 밖(무대 위)에 걸려 보이지 않게 — 밀려 나간 뒤 숨긴다 */
+  #ka-th { position: absolute; inset: 0; z-index: 5; background: #fff; display: flex; flex-direction: column; transform: translateX(-104%); opacity: 0; visibility: hidden; transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .2s, visibility 0s linear .28s; box-shadow: 8px 0 30px rgba(0,0,0,.08); }
+  #ka-th.on { transform: none; opacity: 1; visibility: visible; transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .2s; }
+  #ka-th .hd { display: flex; align-items: center; gap: 8px; padding: 16px 16px 10px; }
+  #ka-th .hd h4 { margin: 0; font: 900 18px 'Noto Sans KR', sans-serif; letter-spacing: -.02em; margin-right: auto; }
+  #ka-th .hd button { border: 0; border-radius: 99px; height: 34px; padding: 0 14px; font: 800 13px 'Noto Sans KR', sans-serif; cursor: pointer; background: #f2f3f6; color: #16181d; transition: transform .08s, background .15s; }
+  #ka-th .hd button.go { background: #16181d; color: #fff; } #ka-th .hd button:active { transform: scale(0.98); }
+  #ka-th .hd .x { width: 34px; padding: 0; font-size: 16px; background: none; }
+  #ka-th .ls { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }
+  #ka-th .row { position: relative; display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 40px 10px 12px; border-radius: 14px; cursor: pointer; transition: background .15s, transform .08s; animation: ka-in .32s cubic-bezier(.2,.8,.2,1) both; }
+  #ka-th .row:hover { background: #f2f3f6; } #ka-th .row:active { transform: scale(0.98); }
+  #ka-th .row.cur { background: #E8EEFD; }
+  #ka-th .row .tx { flex: 1; min-width: 0; }
+  #ka-th .row .tt { font: 800 15px/1.4 'Noto Sans KR', sans-serif; color: #16181d; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #ka-th .row .sb { font: 600 12.5px 'Noto Sans KR', sans-serif; color: #8b929c; margin-top: 2px; display: flex; gap: 6px; align-items: center; }
+  #ka-th .row .run { color: #416AF0; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
+  #ka-th .row .pd { color: #92400e; background: #fffbeb; border-radius: 99px; padding: 0 7px; font-weight: 800; }
+  #ka-th .row .run i { width: 7px; height: 7px; border-radius: 99px; background: #416AF0; animation: ka-pulse 1.4s ease-in-out infinite; }
+  #ka-th .row .del { position: absolute; right: 8px; top: 50%; margin-top: -15px; width: 30px; height: 30px; border: 0; border-radius: 99px; background: transparent; color: #8b929c; font-size: 13px; cursor: pointer; opacity: 0; transition: opacity .15s, background .15s; }
+  #ka-th .row:hover .del { opacity: 1; } #ka-th .row .del:hover { background: #e6e8ec; color: #b91c1c; }
+  @media (hover: none) { #ka-th .row .del { opacity: 1; } }
+  #ka-th .row.gone { animation: ka-out .22s ease both; }
+  #ka-th .em { text-align: center; color: #545b66; padding: 60px 16px; font: 600 14px/1.6 'Noto Sans KR', sans-serif; } #ka-th .em b { display: block; font-size: 16px; color: #16181d; margin-bottom: 4px; }
+  #ka-th .sk { height: 52px; margin: 8px 12px; border-radius: 12px; background: linear-gradient(90deg, #f2f3f6 25%, #e9ebef 50%, #f2f3f6 75%); background-size: 200% 100%; animation: ka-sk 1.1s linear infinite; }
+  /* 대화방을 바꾸면 말풍선이 살짝 올라오며 나타난다 · 새 말풍선도 */
+  #kpanel .kc-list.ka-swap > * { animation: ka-in .3s cubic-bezier(.2,.8,.2,1) both; }
+  #kpanel .ka-pop { animation: ka-in .28s cubic-bezier(.2,.8,.2,1) both; }
+  .ka-live::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 99px; background: #7c3aed; margin-right: 6px; vertical-align: middle; animation: ka-pulse 1.4s ease-in-out infinite; }
+  .ka-toast { position: absolute; left: 50%; bottom: 96px; z-index: 6; transform: translateX(-50%); background: #16181d; color: #fff; border-radius: 99px; padding: 8px 16px; font: 700 13px 'Noto Sans KR', sans-serif; white-space: nowrap; animation: ka-toast 2.4s ease both; pointer-events: none; }
+  @keyframes ka-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes ka-out { to { opacity: 0; transform: translateX(-24px); height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; } }
+  @keyframes ka-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+  @keyframes ka-sk { to { background-position: -200% 0; } }
+  @keyframes ka-toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #ka-th, #ka-th .row, #kpanel .kc-list.ka-swap > *, #kpanel .ka-pop { transition: none; animation: none; } }
   #ka-login a.cl { margin-right: auto; align-self: center; font: 800 13px 'Noto Sans KR', sans-serif; color: #416AF0; text-decoration: none; }
   `;
   const A = {
@@ -65,6 +104,10 @@
     me: null,
     get token() { return A.me?.claude ? 'server' : ''; },
     set token(v) { if (!A.me) return; if (v) { A.me.claude = true; return; } if (A.me.claude) K.post('/api/me/claude/disconnect', {}).catch(() => {}); A.me.claude = false; },
+    // 지금 대화방 — 덱마다 이 브라우저가 마지막으로 연 방(다른 기기에서는 가장 최근 방이 열린다)
+    get thread() { return ls.get(`deckagent.thread:${location.pathname}`) || ''; }, set thread(v) { ls.set(`deckagent.thread:${location.pathname}`, v || null); },
+    newId() { const b = new Uint8Array(6); crypto.getRandomValues(b); return [...b].map((x) => x.toString(16).padStart(2, '0')).join(''); },
+    gen: 0,      // 대화방을 바꿀 때마다 +1 — 앞 방의 따라 보기가 새 방 화면을 건드리지 않게
     sess: null,  // 이어 묻기 — 대화 기억(Claude Code 세션)만 잇는다 {e: 엔진, id}. 사본은 부탁마다 지금 파일에서 새로(사용자 지정 2026-09-30 "심플하게")
     init() {
       const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
@@ -82,14 +125,14 @@
       K.ansHtml = (m) => (m.agent ? A.html(m, ans0) : ans0(m));
       // 패널 머리 — 엔진 고르기 · 계정
       const rc0 = K.renderChat.bind(K);
-      K.renderChat = (body) => { rc0(body); A.bar(body); A.attachUI(body); A.decorate(body); A.lock(); body.querySelector('.kc-new')?.addEventListener('click', () => { A.sess = null; K.chat.forEach((m, i) => { if (A.isPending(m)) A.discard(i); }); }); };
+      K.renderChat = (body) => { rc0(body); A.bar(body); A.attachUI(body); A.decorate(body); A.lock(); A.popNew(body);  };
       const um0 = K.updateMsg.bind(K); K.updateMsg = (i) => { um0(i); A.lock(); };
       document.addEventListener('click', (e) => {
         const b = e.target.closest('[data-ka]'); if (!b) return;
         const i = Number(b.dataset.mi); const m = K.chat[i];
         if (b.dataset.ka === 'apply') A.apply(i, b); else if (b.dataset.ka === 'discard') { A.discard(i); K.updateMsg(i); K.render(); }
-        else if (b.dataset.ka === 'go') { m.agent.go = true; K.updateMsg(i); const g = m.agent.o || {}; A.ask('계획대로 진행해 주세요. 끝나면 고친 페이지마다 화면을 찍어 확인해 주세요.', { files: m.agent.files, model: g.model, effort: g.effort, kind: '여러 장 · 진행' }); }
-        else if (b.dataset.ka === 'cancel') { m.agent.cancelled = true; K.updateMsg(i); K.render(); }
+        else if (b.dataset.ka === 'go') { m.agent.go = true; A.mark(i, { go: true }); K.updateMsg(i); const g = m.agent.o || {}; A.ask('계획대로 진행해 주세요. 끝나면 고친 페이지마다 화면을 찍어 확인해 주세요.', { files: m.agent.files, model: g.model, effort: g.effort, kind: '여러 장 · 진행' }); }
+        else if (b.dataset.ka === 'cancel') { m.agent.cancelled = true; A.mark(i, { cancelled: true }); K.updateMsg(i); K.render(); }
         else if (b.dataset.ka === 'w-claude' || b.dataset.ka === 'w-gemma' || b.dataset.ka === 'w-cancel') A.decide(i, b.dataset.ka.slice(2));
       });
       // 그림 끌어 놓기 — 패널 어디에 놓아도 첨부
@@ -99,7 +142,9 @@
       kp?.addEventListener('dragleave', (e) => { if (!kp.contains(e.relatedTarget)) kp.classList.remove('ka-drop'); });
       kp?.addEventListener('drop', (e) => { kp.classList.remove('ka-drop'); const fs = e.dataTransfer?.files; if (fs?.length) { e.preventDefault(); A.addFiles(fs); } });
       if (document.body.classList.contains('kchatmode')) K.render();
-      fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then((j) => { A.me = j.user; K.render(); if (/[?&]new=1\b/.test(location.search)) A.build(); }).catch(() => {});
+      // 캡처용 사본(.deckpreview-* · .deckagent-*)에서는 계정 · 지난 대화를 부르지 않는다 — 서버 안 크롬이 여는 숨김 파일이다
+      if (/\/\.[^/]*$/.test(location.pathname)) return;
+      fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then(async (j) => { A.me = j.user; K.render(); if (/[?&]new=1\b/.test(location.search)) A.build(); else await A.resume(); }).catch(() => {});
     },
     // ── 새 덱 처음 만들기 — 목록에서 받은 정보(brief.json)를 서버가 부탁으로 만든다(Opus · 노력 high). 끝나면 곧바로 적용(빈 표지뿐이라 잃을 것이 없고, 백업은 남는다)
     async build() {
@@ -107,7 +152,8 @@
       let b = {}; try { b = await (await fetch('brief.json', { cache: 'no-store' })).json(); } catch (e) { /* 없으면 제목만 */ }
       K.open('ai');
       const q = `받은 정보로 새 발표 자료를 만들어 주세요${b.audience ? ` — 보는 사람: ${b.audience}` : ''}${b.key ? ` · 핵심: ${b.key}` : ''}`;
-      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'high', kind: '새로 만들기', autoApply: true });
+      A.thread = A.newId();
+      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'high', kind: '새로 만들기' });
       if (A.token) go(); else { A.afterLogin = go; A.login(); }
     },
     // ── 그림 첨부(사용자 지정 2026-09-30) — [그림] 버튼 · 붙여넣기(Ctrl/⌘+V) · 끌어 놓기, 3장까지. 폰 사진이 커서 긴 변 1600px 로 줄인다
@@ -184,7 +230,8 @@
         ;
       top.after(bar);
       // 윗줄(새 대화 버튼만 남음)을 엔진 줄 오른쪽으로 합친다 — 설명 문구를 뺀 뒤 한 줄을 통째로 먹었다(사용자 지정 2026-09-30 설명 문구 삭제)
-      const nw = top.querySelector('.kc-new'); if (nw) { nw.classList.add('ka-new'); nw.textContent = '＋'; nw.title = '새 대화'; bar.appendChild(nw); top.style.display = 'none'; }
+      const hs = document.createElement('button'); hs.className = 'ka-hist'; hs.title = '지난 대화 보기 · 바꾸기'; hs.innerHTML = `대화 목록${A.otherRunning ? '<span class="dot"></span>' : ''}`; hs.onclick = () => A.showThreads(); bar.appendChild(hs);
+      const nw = top.querySelector('.kc-new'); if (nw) { nw.classList.add('ka-new'); nw.textContent = '＋'; nw.title = '새 대화'; nw.onclick = () => A.newThread(); bar.appendChild(nw); top.style.display = 'none'; }
       bar.querySelectorAll('[data-e]').forEach((b) => { b.onclick = () => { A.engine = b.dataset.e; K.render(); }; });
       const ms = bar.querySelector('.ka-model:not(.ka-effort)'); if (ms) ms.onchange = () => { A.model = ms.value; };
       const es = bar.querySelector('.ka-effort'); if (es) es.onchange = () => { A.effort = es.value; };
@@ -269,59 +316,175 @@
       const slide = K.cfg.current().dataset.name;
       const att = o.att || [];
       if (!o.noUser) K.chat.push({ role: 'user', text: q, slide, ...(att.length ? { thumbs: att.map((f) => f.thumb) } : {}) });
-      const a = { role: 'assistant', text: '', slide, streaming: true, agent: { steps: [], engine: A.engine === 'claude' ? 'sub' : 'gemma', plan: !!o.plan, o: { model: o.model, effort: o.effort, kind: o.kind } }, root: q }; K.chat.push(a); const ai = K.chat.length - 1;
+      const a = A.newMsg(slide, q, o); K.chat.push(a); const ai = K.chat.length - 1;
       K.draft = ''; K.tab = 'ai'; document.body.classList.add('kside'); K.follow = 'pin'; K.render(); K.relayout();
       K.busy = true; K.ctrl = new AbortController(); K.setSend(); const t0 = performance.now();
       try {
-        const cc = A.engine === 'claude';
         // 첨부 그림을 덱 폴더(img/uploads/)에 올린다 — Claude Code 가 작업 폴더 안에서 Read 로 연다. [진행] 차례는 계획 때 올린 경로를 그대로
         let files = o.files || [];
         if (att.length) { a.agent.steps.push({ t: `그림 ${att.length}장 올리기` }); K.updateMsg(ai);
           files = []; for (const f of att) { const j = await K.post('/api/asset', { file: location.pathname, name: f.name, data: f.data.split(',')[1] }); files.push(j.src); } }
         a.agent.files = files;
         const r = await fetch('/api/agent/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: K.ctrl.signal,
-          body: JSON.stringify({ file: location.pathname, slide, prompt: q, files, plan: !!o.plan, build: !!o.build, session: A.sess?.e === (cc ? 'sub' : 'gemma') ? A.sess.id : undefined, token: cc ? A.token : undefined, model: cc ? (o.model || (A.model === 'auto' ? '' : A.model) || undefined) : undefined,
-            effort: cc ? ((A.effort === 'auto' ? o.effort : A.effort) || undefined) : undefined }) });
-        if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
-        const rd = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
-        for (;;) {
-          const { value, done } = await rd.read(); if (done) break;
-          buf += dec.decode(value, { stream: true }); let k;
-          while ((k = buf.indexOf('\n')) >= 0) {
-            const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1); if (!line) continue;
-            const j = JSON.parse(line);
-            if (j.session) A.sess = { e: a.agent.engine, id: j.session };
-            if (j.step) a.agent.steps.push({ t: j.step });
-            if (j.stepErr) a.agent.steps.push({ t: j.stepErr.replace(/<\/?tool_use_error>/g, '').slice(0, 120), bad: true });
-            if (j.think) a.think = (a.think || 0) + j.think;
-            if (j.d) a.text = a.text ? `${a.text}\n\n${j.d}` : j.d;
-            if (j.error) a.err = j.error;
-            if (j.done) {
-              Object.assign(a.agent, { done: true, rid: j.rid, changed: j.changed, slides: j.slides || [], other: j.other, sec: j.sec, turns: j.turns, models: j.models || [] });
-              if (j.result) a.text = j.result;   // 마지막 답만 남긴다(중간 설명은 단계로 충분)
-              if (j.shots?.length > 1) a.shots = j.shots;
-              if (j.changed && j.before && j.after) {
-                const d = window.DeckCheck ? window.DeckCheck.diff(j.before, j.after) : { problems: [], errors: [] };
-                a.state = { jpg: j.after.jpg, base: j.before.jpg, problems: d.problems, errors: d.errors };
-              }
-            }
-            K.updateMsg(ai);
-          }
-        }
-        if (!a.text && !a.err && !a.agent.done) a.err = '답을 받지 못했습니다';
+          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.id, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
+            effort: (A.effort === 'auto' ? o.effort : A.effort) || undefined }) });
+        await A.read(r, a, ai);
       } catch (e) {
-        if (e.name === 'AbortError') a.stopped = true; else a.err = e.message;
+        // 멈춤 — 연결만 끊으면 서버가 계속 돌린다(창을 닫아도 계속되게 바꿨다) → 멈춤은 서버에 따로 알린다
+        // 대화방을 바꿔 떠난 것(a._gen 이 옛것)은 멈춤이 아니다 — 서버는 계속 돌리고, 그 방에 돌아오면 이어서 보인다
+        if (e.name === 'AbortError') { if (a._gen !== A.gen) return; a.stopped = true; if (a.agent.rid) K.post('/api/agent/stop', { file: location.pathname, rid: a.agent.rid }).catch(() => {}); } else a.err = e.message;
       }
-      a.streaming = false; a.ms = performance.now() - t0; const mm = o.model || (A.model === 'auto' ? '' : A.model); const NM = { opus: 'Opus 5.5', sonnet: 'Sonnet 5', haiku: 'Haiku 4.5' };
+      A.finish(a, ai, t0, true);
+    },
+    // 새 답 말풍선 — o: 모델 · 노력 · 종류 · 계획 여부(대화를 다시 그릴 때는 서버 메타에서)
+    newMsg(slide, q, o = {}) { return { _gen: A.gen, role: 'assistant', text: '', slide, streaming: true, agent: { steps: [], engine: 'sub', plan: !!o.plan, build: !!o.build, o: { model: o.model, effort: o.effort, kind: o.kind } }, root: q }; },
+    // 서버가 흘리는 줄(NDJSON)을 읽어 말풍선에 쌓는다 — 새 부탁 · 다시 열어 따라 보기 · 지난 대화 다시 그리기가 같은 길
+    async read(r, a, ai) {
+      if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
+      const rd = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const { value, done } = await rd.read(); if (done) break;
+        buf += dec.decode(value, { stream: true }); let k;
+        while ((k = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1); if (!line) continue;
+          A.feed(a, JSON.parse(line)); a.agent.n = (a.agent.n || 0) + 1; if (ai >= 0 && a._gen === A.gen) K.updateMsg(ai);
+        }
+      }
+      if (!a.text && !a.err && !a.stopped && !a.agent.done) a.err = '답을 받지 못했습니다';
+    },
+    feed(a, j) {
+      if (j.ping) return;
+      if (j.rid && !a.agent.rid) a.agent.rid = j.rid;
+      if (j.session) A.sess = { e: 'sub', id: j.session };
+      if (j.step) a.agent.steps.push({ t: j.step });
+      if (j.stepErr) a.agent.steps.push({ t: j.stepErr.replace(/<\/?tool_use_error>/g, '').slice(0, 120), bad: true });
+      if (j.think) a.think = (a.think || 0) + j.think;
+      if (j.d) a.text = a.text ? `${a.text}\n\n${j.d}` : j.d;
+      if (j.error) a.err = j.error;
+      if (j.stopped) a.stopped = true;
+      if (j.done) {
+        Object.assign(a.agent, { done: true, rid: j.rid, changed: j.changed, slides: j.slides || [], other: j.other, sec: j.sec, turns: j.turns, models: j.models || [] });
+        if (j.result) a.text = j.result;   // 마지막 답만 남긴다(중간 설명은 단계로 충분)
+        if (j.shots?.length > 1) a.shots = j.shots;
+        if (j.changed && j.before && j.after) {
+          const d = window.DeckCheck ? window.DeckCheck.diff(j.before, j.after) : { problems: [], errors: [] };
+          a.state = { jpg: j.after.jpg, base: j.before.jpg, problems: d.problems, errors: d.errors };
+        }
+        if (j.applied) { a.agent.applied = j.applied; a.applied = j.applied; a.edit = { file: location.pathname, sha: '', slide: a.slide }; }   // 새 덱 만들기 — 서버가 적용
+        if (j.applyErr) a.agent.applyErr = `저장 못 함: ${j.applyErr}`;
+      }
+    },
+    // 끝 — 모델 표시 · 바쁨 풀기. live = 이 창에서 지켜본 작업(새 덱이 서버에서 적용됐으면 새로고침해 완성본을 보인다)
+    finish(a, ai, t0, live) {
+      if (a._gen !== A.gen) { a.streaming = false; return; }   // 다른 방으로 옮긴 뒤 끝난 것 — 새 방 화면 · 바쁨 표시는 건드리지 않는다
+      const o = a.agent.o || {};
+      a.streaming = false; if (t0) a.ms = performance.now() - t0; const mm = o.model || (A.model === 'auto' ? '' : A.model); const NM = { opus: 'Opus 5.5', sonnet: 'Sonnet 5', haiku: 'Haiku 4.5' };
       const ef = A.effort === 'auto' ? o.effort : A.effort;
       // 실제 모델 ID(Claude Code 결과의 modelUsage) — 보조 호출용 작은 모델(haiku)이 같이 찍히면 둘 다
       const used = (a.agent.models || []).join(', ');
-      a.model = a.agent.engine === 'sub' ? `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${o.kind.replace(/장/g, '페이지')})` : ''}${used ? ` · 실제: ${used}` : ''}` : 'gemma 26b 생각 · 수정';
-      // 구독 인증 실패 — 저장한 토큰을 지우고 다시 연결하게(잘못 잡은 토큰으로 계속 401 이 나지 않게)
-      if (a.agent.engine === 'sub' && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
-      K.busy = false; K.ctrl = null; K.updateMsg(ai); K.setSend();
-      if (o.autoApply && a.agent.done && a.agent.changed && !a.err) { const b = document.querySelector(`#kpanel [data-ka="apply"][data-mi="${ai}"]`); if (b) A.apply(ai, b); }
+      a.model = `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${used ? ` · 실제: ${used}` : ''}`;
+      // 구독 인증 실패 — 연결을 지우고 다시 연결하게(잘못된 토큰으로 계속 401 이 나지 않게). 지난 대화를 다시 그릴 때는 건드리지 않는다
+      if (live && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
+      K.busy = false; K.ctrl = null; if (ai >= 0) K.updateMsg(ai); K.setSend();
+      if (live && a.agent.applied && a.agent.build) { K.keepChat(); location.reload(); }
     },
+    // 다시 열었을 때 — 이 계정이 이 덱에 한 부탁들을 서버에서 받아 대화를 다시 그리고, 아직 도는 작업은 이어서 따라 본다
+    // (사용자 지정 2026-09-30 "시켜 놓고 나가도 서버가 계속 · 나중에 들어오면 대화 내용을 볼 수 있게"). 방금 적용하고 새로고침한 참이면
+    // deckkit 이 되살린 대화(점검 결과 포함)를 그대로 쓴다
+    async resume(force) {
+      if (K.chat.length && !force) return;
+      const gen = A.gen; let jobs = [];
+      try {
+        let j = await K.post('/api/agent/jobs', { file: location.pathname, thread: A.thread || undefined });
+        if (!j.jobs.length && A.thread && !force) j = await K.post('/api/agent/jobs', { file: location.pathname });   // 기억한 방이 비었으면(지웠거나 새 방만 열고 떠남) 가장 최근 방
+        jobs = j.jobs || []; if (gen !== A.gen) return; if (j.thread && jobs.length) A.thread = j.thread;
+      } catch (e) { return; }
+      A.refreshThreads();
+      if (!jobs.length || (K.chat.length && !force)) return;
+      const live = [];
+      for (const g of jobs) {
+        K.chat.push({ role: 'user', text: g.prompt, slide: g.slide, ...(g.files?.length ? { thumbs: g.files } : {}) });
+        if (gen !== A.gen) return;
+        const a = A.newMsg(g.slide, g.prompt, g.o || {}); a.agent.rid = g.rid; a.agent.files = g.files || []; K.chat.push(a);
+        const st = g.state || {}; if (st.go) a.agent.go = true; if (st.cancelled) a.agent.cancelled = true; if (st.discarded) a.agent.discarded = true;
+        if (st.applied) { a.agent.applied = st.applied; a.applied = st.applied; a.edit = { file: location.pathname, sha: '', slide: g.slide }; }
+        if (st.undone) a.undone = true;
+        if (g.running) { live.push(a); continue; }
+        try { await A.read(await fetch('/api/agent/attach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: location.pathname, rid: g.rid }) }), a, -1); } catch (e) { a.err = e.message; }
+        if (st.applied) { a.agent.applied = st.applied; a.applied = st.applied; }
+        A.finish(a, -1, 0, false);
+      }
+      if (gen !== A.gen) return;
+      K.open('ai'); K.render(); A.swap();
+      // 도는 중인 작업(보통 마지막 하나) — 이 창에서 이어서 지켜본다. 멈춤도 된다
+      for (const a of live) {
+        const ai = K.chat.indexOf(a); K.busy = true; K.ctrl = new AbortController(); K.setSend(); K.updateMsg(ai);
+        try { await A.read(await fetch('/api/agent/attach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: K.ctrl.signal, body: JSON.stringify({ file: location.pathname, rid: a.agent.rid }) }), a, ai); }
+        catch (e) { if (e.name === 'AbortError') { if (a._gen !== A.gen) return; a.stopped = true; K.post('/api/agent/stop', { file: location.pathname, rid: a.agent.rid }).catch(() => {}); } else a.err = e.message; }
+        A.finish(a, ai, 0, true); A.refreshThreads();
+      }
+    },
+    // ── 대화방 — 목록 서랍 · 바꾸기 · 새 방 · 지우기 ──
+    leave() {   // 지금 방에서 떠난다 — 도는 작업은 멈추지 않고(서버가 계속) 따라 보기만 끊는다
+      A.gen++; if (K.busy && K.ctrl) K.ctrl.abort(); K.busy = false; K.ctrl = null;
+      A.sess = null; K.chat = []; A.files = []; A.drawFiles(); K.setSend?.();
+    },
+    newThread() {
+      const pend = A.pendingIdx() >= 0;   // 고르지 않은 수정안은 그 방에 그대로 남는다(서버 기록) — 막지 않고 알려만 준다
+      A.leave(); A.thread = A.newId(); A.closeThreads(); K.render(); A.swap(); A.toast(pend ? '새 대화 — 고르지 않은 수정안은 앞 대화에 남아 있어요' : '새 대화');
+    },
+    async openThread(id) {
+      if (id === A.thread && K.chat.length) { A.closeThreads(); return; }
+      A.leave(); A.thread = id; A.closeThreads(); K.render(); await A.resume(true);
+    },
+    async refreshThreads() {
+      try { A.threads = (await K.post('/api/agent/threads', { file: location.pathname })).threads || []; } catch (e) { return; }
+      const other = A.threads.some((t) => t.running && t.id !== A.thread);
+      // 다른 방에서 작업 중이면 [대화 목록]에 점 — 패널을 다시 그리지 않고 단추만 고친다(도는 중에 다시 그리면 입력이 끊긴다)
+      A.otherRunning = other; const hb = document.querySelector('#kpanel .ka-hist');
+      if (hb) { const d = hb.querySelector('.dot'); if (other && !d) hb.insertAdjacentHTML('beforeend', '<span class="dot"></span>'); if (!other && d) d.remove(); }
+      if (document.querySelector('#ka-th.on')) A.drawThreads();
+    },
+    showThreads() {
+      const kp = document.querySelector('#kpanel'); if (!kp) return;
+      let d = kp.querySelector('#ka-th');
+      if (!d) { d = document.createElement('div'); d.id = 'ka-th'; kp.appendChild(d); }
+      d.innerHTML = '<div class="hd"><h4>대화 목록</h4><button class="go" data-th="new">＋ 새 대화</button><button class="x" data-th="x" title="닫기">✕</button></div><div class="ls"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>';
+      d.onclick = (e) => {
+        const b = e.target.closest('[data-th]'); const row = e.target.closest('[data-tid]');
+        if (b?.dataset.th === 'x') return A.closeThreads();
+        if (b?.dataset.th === 'new') return A.newThread();
+        if (b?.dataset.th === 'del' && row) { e.stopPropagation(); return A.delThread(row.dataset.tid, row); }
+        if (row) A.openThread(row.dataset.tid);
+      };
+      requestAnimationFrame(() => d.classList.add('on'));
+      A.refreshThreads().then(() => A.drawThreads());
+    },
+    closeThreads() { document.querySelector('#ka-th')?.classList.remove('on'); },
+    drawThreads() {
+      const ls2 = document.querySelector('#ka-th .ls'); if (!ls2) return;
+      const ago = (t) => { const s2 = Date.now() / 1000 - t; if (s2 < 60) return '방금'; if (s2 < 3600) return `${Math.floor(s2 / 60)}분 전`; if (s2 < 86400) return `${Math.floor(s2 / 3600)}시간 전`; const d = new Date(t * 1000); return `${d.getMonth() + 1}월 ${d.getDate()}일`; };
+      const ts = A.threads || [];
+      ls2.innerHTML = ts.length ? ts.map((t, k) => `<div class="row${t.id === A.thread ? ' cur' : ''}" data-tid="${esc(t.id)}" style="animation-delay:${Math.min(k, 10) * 30}ms"><div class="tx"><div class="tt">${esc(t.title || '(제목 없음)')}</div>`
+        + `<div class="sb">${t.running ? '<span class="run"><i></i>작업 중</span> · ' : t.pending ? '<span class="pd">수정안 대기</span> · ' : ''}부탁 ${t.n}개 · ${ago(t.t)}</div></div><button class="del" data-th="del" title="이 대화 지우기">✕</button></div>`).join('')
+        : '<div class="em"><b>아직 대화가 없어요</b>AI 에게 부탁하면 대화가 여기에 모입니다. 창을 닫아도 서버가 계속 일하고, 다시 열면 이어서 보입니다.</div>';
+    },
+    async delThread(id, row) {
+      const t = (A.threads || []).find((x) => x.id === id);
+      if (!confirm(`「${(t?.title || '').slice(0, 30)}」 대화를 지울까요?${t?.running ? '\n작업 중인 부탁도 멈춥니다.' : ''}`)) return;
+      row.classList.add('gone');
+      try { await K.post('/api/agent/clear', { file: location.pathname, thread: id }); } catch (e) { row.classList.remove('gone'); alert(e.message); return; }
+      if (id === A.thread) { A.leave(); A.thread = ''; K.render(); }
+      setTimeout(() => A.refreshThreads().then(() => A.drawThreads()), 220);
+    },
+    swap() { const l = document.querySelector('#kpanel .kc-list'); if (!l) return; l.classList.remove('ka-swap'); void l.offsetWidth; l.classList.add('ka-swap'); setTimeout(() => l.classList.remove('ka-swap'), 700); },
+    // 새로 생긴 말풍선만 살짝 올라오게 — 패널은 매번 통째로 다시 그려서, 늘어난 수만큼만 표시한다
+    popNew(body) {
+      const n = K.chat.length; const was = A._n ?? n; A._n = n; if (n <= was) return;
+      const els = body.querySelectorAll('.kc-list > .kc-u, .kc-list > .kc-a'); [...els].slice(-(n - was)).forEach((el) => el.classList.add('ka-pop'));
+    },
+    toast(t) { const kp = document.querySelector('#kpanel'); if (!kp) return; kp.querySelector('.ka-toast')?.remove(); const e2 = document.createElement('div'); e2.className = 'ka-toast'; e2.textContent = t; kp.appendChild(e2); setTimeout(() => e2.remove(), 2500); },
+    mark(i, state) { const m = K.chat[i]; if (m?.agent?.rid) K.post('/api/agent/mark', { file: location.pathname, rid: m.agent.rid, state }).catch(() => {}); },
     html(m, ans0) {
       const g = m.agent; const i = K.chat.indexOf(m);
       if (g.warn) {
@@ -356,10 +519,10 @@
     async apply(i, btn) {
       const m = K.chat[i]; btn.disabled = true; m.agent.applyErr = '';
       try { try { if (window.DeckEdit?.on) sessionStorage.setItem('deckedit.resume', '1'); } catch (e2) { /* 저장소 없음 */ }   // 적용 뒤 새로고침하면 편집 화면으로 돌아온다
-        const j = await K.post('/api/agent/apply', { rid: m.agent.rid }); m.agent.applied = j.backup; m.applied = j.backup; m.edit = { file: location.pathname, sha: '', slide: m.slide }; K.keepChat(); location.reload(); }   // m.edit — [되돌리기](K.undoEdit)가 m.edit.file 을 본다
+        const j = await K.post('/api/agent/apply', { file: location.pathname, rid: m.agent.rid }); m.agent.applied = j.backup; m.applied = j.backup; m.edit = { file: location.pathname, sha: '', slide: m.slide }; K.keepChat(); location.reload(); }   // m.edit — [되돌리기](K.undoEdit)가 m.edit.file 을 본다
       catch (e) { m.agent.applyErr = `저장 못 함: ${e.message}`; btn.disabled = false; K.updateMsg(i); }
     },
-    discard(i) { const m = K.chat[i]; if (!m?.agent) { if (m) m.cancelled = true; return; } m.agent.discarded = true; if (m.agent.rid) K.post('/api/agent/discard', { rid: m.agent.rid }).catch(() => {}); },
+    discard(i) { const m = K.chat[i]; if (!m?.agent) { if (m) m.cancelled = true; return; } m.agent.discarded = true; if (m.agent.rid) K.post('/api/agent/discard', { file: location.pathname, rid: m.agent.rid }).catch(() => {}); },
 
     // ── 구독 계정 연결 — 서버가 `claude setup-token` 을 대신 돌리고, 로그인은 이 사람이 자기 브라우저에서 ──
     async login() {

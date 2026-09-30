@@ -255,6 +255,8 @@ def build_prompt(deck_dir):
           '마지막 답: 만든 페이지 목록(번호. 제목)과, 자료가 부족해 자리표시로 둔 곳.']
     return '\n'.join(L)
 
+MAX_BODY = 40_000_000   # 새 덱(그림 6장)이 가장 크다
+
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
     timeout = 30
@@ -267,9 +269,9 @@ class H(http.server.BaseHTTPRequestHandler):
         for k, v in headers: self.send_header(k, v)
         self.end_headers(); self.wfile.write(payload)
     def body(self, limit):
-        n = int(self.headers.get('Content-Length') or 0)
+        n = len(self._raw)
         if n <= 0 or n > limit: raise ValueError('본문 크기')
-        return json.loads(self.rfile.read(n).decode('utf-8'))
+        return json.loads(self._raw.decode('utf-8'))
     def sid(self):
         for part in (self.headers.get('Cookie') or '').split(';'):
             k, _, v = part.strip().partition('=')
@@ -315,7 +317,10 @@ class H(http.server.BaseHTTPRequestHandler):
             if not u: return self.reply(401, {'error': '로그인이 필요합니다'})
             names = {x['id']: x.get('name') or x['id'] for x in STORE.users}
             ds = STORE.decks(None if u['role'] == 'admin' else u['id'])
-            for x in ds: x['ownerName'] = names.get(x['owner'], x['owner'])
+            busy = deckagent.busy_files()
+            for x in ds:
+                x['ownerName'] = names.get(x['owner'], x['owner'])
+                x['busy'] = os.path.join(STORE.deck_dir(x['owner'], x['id']), 'index.html') in busy   # Claude 가 고치거나 만드는 중
             return self.reply(200, {'decks': ds})
         if path == '/api/users':
             u = self.me()
@@ -360,6 +365,11 @@ class H(http.server.BaseHTTPRequestHandler):
     # ── POST ──
     def do_POST(self):
         path = urllib.parse.urlsplit(self.path).path
+        # 본문은 늘 먼저 다 읽는다 — 로그인 전(401)처럼 읽지 않고 답하면 남은 본문이 같은 연결의 다음 요청 앞에 붙어
+        # 'Unsupported method ({"file":…}GET)' 501 로 깨졌다(캡처용 크롬이 덱 사본을 열 때 실측 2026-09-30)
+        n = int(self.headers.get('Content-Length') or 0)
+        if n > MAX_BODY: self.close_connection = True; return self.reply(413, {'error': '본문이 너무 큽니다'})
+        self._raw = self.rfile.read(n) if n > 0 else b''
         try:
             if path == '/api/login':
                 req = self.body(10_000); sid = STORE.login(req.get('id'), req.get('pw'))
@@ -422,17 +432,27 @@ class H(http.server.BaseHTTPRequestHandler):
             self.deck_access(u, req.get('file'))
             tok = STORE.claude_token(u['id'])
             if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
-            req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
+            req.update({'token': tok, '_cfg': f"cfg-{u['id']}", 'display': req.get('prompt')})
             if req.get('build'):
                 req.update({'prompt': build_prompt(os.path.dirname(edit_target(req.get('file')))), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'high'})
             return self.agent_stream(req, u)
-        if path in ('/api/agent/apply', '/api/agent/discard'):
-            r = deckagent.RUNS.get(str(req.get('rid') or ''))
-            if r:
-                self.deck_access(u, url_of(r['file']))
-            if path == '/api/agent/discard': return self.reply(200, deckagent.discard(req))
-            if not r: raise ValueError('이 수정안이 서버에 없습니다(서버를 다시 켰거나 오래됨) — 다시 부탁해 주세요')
-            return self.reply(200, deckagent.apply(req, backup_name, os.path.dirname(backup_name(r['file']))))
+        # 대화 기록 — 이 계정이 이 덱에 한 부탁들 · 따라 보기 · 멈춤 · 상태(진행 · 취소 · 버림) · 새 대화(숨기기)
+        if path in ('/api/agent/jobs', '/api/agent/threads', '/api/agent/attach', '/api/agent/stop', '/api/agent/mark', '/api/agent/clear', '/api/agent/apply', '/api/agent/discard'):
+            self.deck_access(u, req.get('file')); deck = edit_target(req.get('file')); rid = str(req.get('rid') or '')
+            if rid:
+                m = deckagent.meta_of(deck, rid)
+                if not re.fullmatch(r'[0-9a-f]{10}', rid) or not m or m.get('owner') != u['id']: raise PermissionError('이 부탁을 볼 권한이 없습니다')
+            th = str(req.get('thread') or '')
+            if th and th != 'old' and not deckagent.THREAD_RE.fullmatch(th): raise ValueError('대화방 이름이 이상합니다')
+            if path == '/api/agent/threads': return self.reply(200, {'ok': True, 'threads': deckagent.threads(deck, u['id'])})
+            if path == '/api/agent/jobs':
+                t, js = deckagent.jobs(deck, u['id'], th); return self.reply(200, {'ok': True, 'thread': t, 'jobs': js})
+            if path == '/api/agent/attach': return self.attach_stream(rid, int(req.get('from') or 0), deck)
+            if path == '/api/agent/stop': return self.reply(200, deckagent.stop(rid))
+            if path == '/api/agent/mark': return self.reply(200, deckagent.mark(deck, u['id'], rid, req.get('state') or {}))
+            if path == '/api/agent/clear': return self.reply(200, deckagent.hide_thread(deck, u['id'], th))
+            if path == '/api/agent/discard': return self.reply(200, deckagent.discard(req, mark_it=True))
+            return self.reply(200, deckagent.apply(req, backup_name, deck))
         if path == '/api/agent/login/start':
             j = deckagent.login_start(req); deckagent.LOGINS[j['id']]['uid'] = u['id']; return self.reply(200, j)
         if path in ('/api/agent/login/finish', '/api/agent/login/poll'):
@@ -456,13 +476,24 @@ class H(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         send = lambda o: (self.wfile.write((json.dumps(o, ensure_ascii=False) + '\n').encode('utf-8')), self.wfile.flush())
         try:
-            deckagent.run(req, send, PORT, edit_target, slide_parts, lambda q, _p: shot(q, PORT), url_of)
+            # 서버 스레드가 돌리고 여기서는 따라 보기만 — 창을 닫아도(연결이 끊겨도) 작업은 계속된다
+            rid = deckagent.start(req, PORT, edit_target, slide_parts, lambda q, _p: shot(q, PORT), url_of, backup_name, u['id'])
+            deckagent.follow(rid, send)
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             try: send({'error': str(e)})
             except Exception: pass
         sys.stderr.write(f"{datetime.datetime.now().strftime('%H:%M:%S')} {u['id']} agent {req.get('file')} {req.get('slide')}{' 새로 만들기' if req.get('build') else ''}\n"); sys.stderr.flush()
+
+    def attach_stream(self, rid, frm, deck):
+        self.close_connection = True
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/x-ndjson; charset=utf-8'); self.send_header('Cache-Control', 'no-cache'); self.send_header('Connection', 'close')
+        self.end_headers()
+        send = lambda o: (self.wfile.write((json.dumps(o, ensure_ascii=False) + '\n').encode('utf-8')), self.wfile.flush())
+        try: deckagent.follow(rid, send, frm, deck)
+        except (BrokenPipeError, ConnectionResetError): pass
 
     # ── LLM(gemma) — 부탁 종류 판단 · 빠른 설명. 없는 환경이면 판단은 '작은 수정'으로 떨어지고 패널이 Claude 로 간다 ──
     def classify(self, req):

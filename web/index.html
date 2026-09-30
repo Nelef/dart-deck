@@ -157,7 +157,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
     <input type="file" id="nFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
     <div class="thumbs" id="nThumbs"></div>
     <div class="cc" id="nCC" hidden><span style="flex:1">새 발표 자료는 Claude Code 가 만듭니다 — 먼저 내 Claude 구독을 연결해 주세요.</span><button class="btn sm go" id="nConnect">Claude 구독 연결</button></div>
-    <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분</span><span class="bad" id="nErr"></span></div>
+    <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분 · 창을 닫아도 계속 만듭니다</span><span class="bad" id="nErr"></span></div>
   </div>
 </div>
 
@@ -189,7 +189,7 @@ $('#logo').onclick = () => { history.pushState(null, '', '/'); route(); };
 // 로그인 여부에 따라 화면을 고른다
 const show = () => {
   $('#login').hidden = !!ME; $('#app').hidden = !ME;
-  if (!ME) { setTimeout(() => $('#lid').focus(), 50); return; }
+  if (!ME) { setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) $('#lid').focus(); }, 50); return; }   // 이미 입력 중이면 커서를 뺏지 않는다
   $('#who').textContent = `${ME.name}${ME.role === 'admin' ? ' · 관리자' : ''}`; $('#bUsers').hidden = ME.role !== 'admin';
   route();
 };
@@ -207,12 +207,14 @@ const loadDecks = async () => {
   $('#cnt').textContent = ds.length ? ds.length : '';
   if (!ds.length) { $('#decks').innerHTML = '<div class="empty"><h3>아직 발표 자료가 없어요</h3><div>누구에게 무엇을 알려 줄지 알려 주면 AI 가 첫 판을 만들어 드려요</div><button class="btn blue" onclick="goNew()">＋ 새 발표 자료</button></div>'; return; }
   const card = (d) => `<div class="card" data-u="${esc(d.url)}"><div class="th"><div class="bd"></div><div class="tt">${esc(d.title)}</div></div>`
-    + `<div class="meta"><b>${esc(d.title)}</b><span>${d.pages}페이지 · ${ago(d.updated)}</span></div><button class="mn" data-o="${esc(d.owner)}" data-i="${esc(d.id)}" data-t="${esc(d.title)}" title="더 보기">⋯</button></div>`;
+    + `<div class="meta"><b>${esc(d.title)}</b>${d.busy ? '<span class="pill on">AI 작업 중</span>' : `<span>${d.pages}페이지 · ${ago(d.updated)}</span>`}</div><button class="mn" data-o="${esc(d.owner)}" data-i="${esc(d.id)}" data-t="${esc(d.title)}" title="더 보기">⋯</button></div>`;
   if (ME.role === 'admin') {
     const by = {}; ds.forEach((d) => (by[d.owner] ||= []).push(d));
     const keys = Object.keys(by).sort((a, b) => (a === ME.id ? -1 : b === ME.id ? 1 : a.localeCompare(b)));
     $('#decks').innerHTML = keys.map((k) => `<div class="owner">${esc(by[k][0].ownerName)}${k === ME.id ? ' (나)' : ''}<span>${by[k].length}개</span></div><div class="grid">${by[k].map(card).join('')}</div>`).join('');
   } else $('#decks').innerHTML = `<div class="grid">${ds.map(card).join('')}</div>`;
+  // AI 가 만들거나 고치는 중인 자료가 있으면 20초마다 다시 본다 — 창을 닫았다 와도 서버는 계속 일하고, 끝나면 목록에 반영된다
+  clearTimeout(loadDecks.t); if (ds.some((d) => d.busy)) loadDecks.t = setTimeout(() => { if (!$('#list').hidden) loadDecks(); }, 20000);
 };
 document.addEventListener('click', (e) => {
   const mn = e.target.closest('.mn'); const m0 = $('.menu');
@@ -240,7 +242,7 @@ const NW = { mode: 'survey', files: [] };
 const goNew = () => { location.hash = 'new'; };
 $('#bNew').onclick = goNew; $('#nBack').onclick = () => { history.pushState(null, '', '/'); route(); };
 // 새 발표 자료 화면을 연다 — Claude 미연결이면 안내
-const openNew = () => { $('#nCC').hidden = !!ME.claude; $('#nGo').disabled = !ME.claude; $('#nErr').textContent = ''; setTimeout(() => $('#nTitle').focus(), 50); };
+const openNew = () => { $('#nCC').hidden = !!ME.claude; $('#nGo').disabled = !ME.claude; $('#nErr').textContent = ''; setTimeout(() => { if (document.activeElement === document.body) $('#nTitle').focus(); }, 50); };
 $('#nTabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; NW.mode = b.dataset.m; $('#nTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); $('#mSurvey').hidden = NW.mode !== 'survey'; $('#mPaste').hidden = NW.mode !== 'paste'; };
 document.querySelectorAll('.chips').forEach((g) => { g.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; g.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
 // 고른 칩 글자(알아서 = 빈 값)

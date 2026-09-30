@@ -10,7 +10,7 @@
 # 안전: Tailscale 로 들어온 누구든 이 Mac 에서 돌리는 것이라 도구를 좁힌다 — 쓰기는 사본 한 파일만(Edit/Write(./사본)), 명령은 캡처 도구만
 #   (Bash(node tools/deck_shot.cjs:*)), 읽기는 작업 폴더(deck) 안만(Claude Code 기본: 폴더 밖은 허락을 물어 -p 에서는 거부).
 #   실측(2026-09-30): 다른 파일 고치기 · 폴더 밖 파일 읽기 · 'ls /' 전부 거부됨. 사용자 ~/.claude 의 훅 · 스킬이 안 끼게 설정 폴더를 따로 둔다.
-import os, re, json, uuid, time, hashlib, shutil, subprocess, threading, pty, select, signal, tempfile, fcntl, termios, struct, urllib.request, urllib.error
+import os, re, json, glob, uuid, time, hashlib, shutil, subprocess, threading, pty, select, signal, tempfile, fcntl, termios, struct, urllib.request, urllib.error
 
 # 경로 — ai-ppt(2026-09-30 이전 프로토타입 research/deckagent.py 에서 옮김). 덱은 DATA_DIR/decks/<계정>/<덱>/, 엔진은 engine/
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,10 +43,48 @@ def _limit(tok, info):
 
 def _sha(t): return hashlib.sha256(t.encode('utf-8')).hexdigest()
 
+# ── 작업은 서버가 끝까지(사용자 지정 2026-09-30 "시켜 놓고 나가도 서버가 계속 · 나중에 들어오면 대화를 볼 수 있게") ──
+# 예전엔 부탁 한 번 = 요청 한 번이라, 창을 닫거나 새로고침하면 연결이 끊겨(BrokenPipe) Claude Code 를 죽였다 — 새 덱 만들기(10~20분)는
+# 창을 계속 띄워 둬야 했다. 이제 부탁은 서버 스레드(Job)가 돌리고, 나오는 줄(NDJSON)을 덱 폴더 .agent-log/<rid>.jsonl 에 쌓는다.
+# 브라우저는 그 줄을 처음부터 다시 받아(따라 보기) 대화를 그린다 — 끊겨도 작업은 계속, 다시 열면(다른 기기여도) 이어서 보인다.
+# 멈춤은 명시적으로만(/api/agent/stop). 부탁 하나 = <rid>.json 메타(부탁 · 페이지 · 선택 · 적용/버림 상태) + <rid>.jsonl 줄들.
+# 대화방(thread) — 부탁들을 묶는 이름표(사용자 지정 2026-09-30 "대화방 세션을 만들어 서버에 보관"). 한 덱에 대화방 여럿, [＋ 새 대화]가 새 방을 연다.
+#   방 이름은 첫 부탁 글. 방을 지우면 숨기기만 한다(기록 파일은 남아 LOG_KEEP 에 밀려 지워진다)
+JOBS = {}                                                      # rid → Job(이 서버가 켜진 뒤 시작한 것)
+LOG_KEEP = 300                                                 # 덱 · 계정마다 남길 부탁 수(오래된 것부터 지운다) — 대화방 여럿을 두려고 넉넉히
+THREAD_RE = re.compile(r'[0-9a-f]{8,16}')
+class Job:
+    def __init__(self, rid, logdir):
+        self.rid = rid; self.ev = []; self.done = False; self.proc = None; self.stopped = False
+        self.cv = threading.Condition(); self.log = os.path.join(logdir, f'{rid}.jsonl'); self.meta_f = os.path.join(logdir, f'{rid}.json')
+    def emit(self, o):
+        with self.cv:
+            self.ev.append(o)
+            try:
+                with open(self.log, 'a', encoding='utf-8') as f: f.write(json.dumps(o, ensure_ascii=False) + '\n')
+            except OSError: pass
+            self.cv.notify_all()
+    def finish(self):
+        with self.cv: self.done = True; self.cv.notify_all()
+        meta_update(self.meta_f, {'done': True, 'end': int(time.time())})
+
+def meta_update(f, patch):
+    with LOCK:
+        try: m = json.load(open(f, encoding='utf-8'))
+        except (OSError, ValueError): return None
+        m.update(patch); tmp = f + '.tmp'; open(tmp, 'w', encoding='utf-8').write(json.dumps(m, ensure_ascii=False)); os.replace(tmp, f)
+        return m
+
+def logdir_of(path): return os.path.join(os.path.dirname(path), '.agent-log')
+def meta_of(path, rid):
+    try: return json.load(open(os.path.join(logdir_of(path), f'{rid}.json'), encoding='utf-8'))
+    except (OSError, ValueError): return None
+
 def _gc():
     now = time.time()
+    # 수정안(작업 사본)은 7일 — 시켜 놓고 나간 사람이 다음 날 와서 [적용]할 수 있게(예전 3시간)
     for rid, r in list(RUNS.items()):
-        if now - r['t'] > 3 * 3600: discard({'rid': rid})
+        if not r.get('busy') and now - r['t'] > 7 * 86400: discard({'rid': rid})
     for lid, l in list(LOGINS.items()):
         if now - l['t'] > 600: _login_kill(lid)
 
@@ -137,9 +175,9 @@ def _step(name, inp):
     if name == 'TodoWrite': return '할 일 정리'
     return name
 
-def run(req, send, port, edit_target, slide_parts, shot, url_of):
-    """url_of(파일 경로) → 그 파일의 웹 주소(/d/<계정>/<덱>/…) — 캡처 도구가 덱 사본을 여는 주소"""
-    """부탁 하나 — send(obj) 로 NDJSON 을 흘린다. 끊기면(BrokenPipe) Claude Code 를 죽인다"""
+def start(req, port, edit_target, slide_parts, shot, url_of, backup_name, owner):
+    """부탁 하나를 서버 스레드로 시작하고 rid 를 돌려준다 — 따라 보기는 follow(rid, send).
+    url_of(파일 경로) → 그 파일의 웹 주소(/d/<계정>/<덱>/…) — 캡처 도구가 덱 사본을 여는 주소"""
     _gc()
     engine = 'sub' if req.get('token') else 'gemma'
     rid = str(req.get('rid') or '')
@@ -158,7 +196,106 @@ def run(req, send, port, edit_target, slide_parts, shot, url_of):
             sess = str(req.get('session') or '')
             r = RUNS[rid] = {'file': path, 'work': work, 'sha0': _sha(text), 'session': sess if re.fullmatch(r'[0-9a-f-]{36}', sess) else '', 't': time.time(), 'engine': engine}
         r['busy'] = True; r['t'] = time.time()
-    try:
+    path = r['file']; ld = logdir_of(path); os.makedirs(ld, exist_ok=True)
+    job = JOBS[rid] = Job(rid, ld)
+    # 메타 — 대화를 다시 그릴 재료(부탁 글 · 페이지 · 그림 · 모델 선택)와 [적용]을 서버를 다시 켠 뒤에도 할 수 있게 사본 정보
+    tid = str(req.get('thread') or ''); tid = tid if THREAD_RE.fullmatch(tid) else uuid.uuid4().hex[:12]
+    json.dump({'rid': rid, 'owner': owner, 'thread': tid, 'prompt': str(req.get('display') or req.get('prompt') or '')[:8000], 'slide': str(req.get('slide') or ''),
+               'files': [f for f in (req.get('files') or []) if isinstance(f, str)][:3], 't': int(time.time()), 'done': False, 'state': {},
+               'o': {k: req.get(k) for k in ('model', 'effort', 'kind', 'plan', 'build')}, 'work': r['work'], 'sha0': r['sha0']},
+              open(job.meta_f, 'w', encoding='utf-8'), ensure_ascii=False)
+    # 오래된 부탁 정리 — 이 계정 것만, 끝난 것만
+    olds = sorted((m for m in (_read(f) for f in glob.glob(os.path.join(ld, '*.json'))) if m and m.get('owner') == owner and m.get('done')), key=lambda m: m['t'])[:-LOG_KEEP]
+    for m in olds:
+        for ext in ('.json', '.jsonl'):
+            try: os.remove(os.path.join(ld, m['rid'] + ext))
+            except OSError: pass
+    def body():
+        try: _work(req, job.emit, port, slide_parts, shot, url_of, backup_name, r, rid, job)
+        except Exception as e: job.emit({'error': str(e)[:600]})
+        finally: r['busy'] = False; r['t'] = time.time(); job.finish()
+    threading.Thread(target=body, daemon=True).start()
+    return rid
+
+def _read(f):
+    try: return json.load(open(f, encoding='utf-8'))
+    except (OSError, ValueError): return None
+
+def follow(rid, send, frm=0, path=None):
+    """그 부탁의 줄을 frm 번째부터 흘리고, 아직 도는 중이면 끝날 때까지 따라간다. 끊기면(BrokenPipe) 그냥 돌아온다 — 작업은 계속.
+    이 서버가 모르는 부탁(서버를 다시 켰음)은 기록 파일에서 읽는다"""
+    job = JOBS.get(rid)
+    if not job:
+        f = os.path.join(logdir_of(path), f'{rid}.jsonl') if path else ''
+        try: lines = open(f, encoding='utf-8').read().splitlines()
+        except OSError: lines = []
+        evs = [json.loads(x) for x in lines if x.strip()]
+        for o in evs[frm:]: send(o)
+        m = meta_of(path, rid) if path else None
+        if m and not m.get('done') and not any(o.get('done') or o.get('error') or o.get('stopped') for o in evs):
+            send({'error': '서버가 다시 켜져 이 작업이 멈췄습니다 — 다시 부탁해 주세요'})
+        return
+    i = frm
+    while True:
+        with job.cv:
+            while i >= len(job.ev) and not job.done: job.cv.wait(15)
+            chunk = job.ev[i:]; fin = job.done
+        for o in chunk: send(o)
+        i += len(chunk)
+        if fin and i >= len(job.ev): return
+        if not chunk: send({'ping': 1})   # 오래 조용할 때(생각 중) 연결이 살아 있는지 — 끊겼으면 여기서 BrokenPipe
+
+def stop(rid):
+    job = JOBS.get(rid)
+    if not job or job.done or not job.proc: return {'ok': True}
+    job.stopped = True
+    try: os.killpg(job.proc.pid, signal.SIGKILL)
+    except OSError: pass
+    return {'ok': True}
+
+def _metas(path, owner):
+    ms = [m for m in (_read(f) for f in glob.glob(os.path.join(logdir_of(path), '*.json'))) if m and m.get('owner') == owner and not m.get('hidden')]
+    for m in ms: m['thread'] = m.get('thread') or 'old'   # 대화방 전 기록은 한 방으로
+    return sorted(ms, key=lambda m: (m['t'], m['rid']))
+def _running(rid): return bool(JOBS.get(rid) and not JOBS[rid].done)
+
+def threads(path, owner):
+    """이 계정의 이 덱 대화방 목록(최근 것부터) — 이름(첫 부탁) · 부탁 수 · 마지막 시각 · 작업 중 여부 · 기다리는 수정안"""
+    by = {}
+    for m in _metas(path, owner): by.setdefault(m['thread'], []).append(m)
+    def pend(m):   # 적용 · 버리기 · 진행 · 취소를 아직 안 고른 수정안 / 계획
+        st = m.get('state') or {}
+        return m.get('done') and not st.get('applied') and not st.get('discarded') and ((m.get('changed') and not (m.get('o') or {}).get('plan')) or ((m.get('o') or {}).get('plan') and not st.get('go') and not st.get('cancelled')))
+    out = [{'id': t, 'title': ms[0]['prompt'][:80], 'n': len(ms), 't': ms[-1]['t'], 't0': ms[0]['t'], 'running': any(_running(m['rid']) for m in ms), 'pending': bool(pend(ms[-1]))} for t, ms in by.items()]
+    return sorted(out, key=lambda x: -x['t'])
+
+def jobs(path, owner, thread=''):
+    """한 대화방의 부탁들(오래된 것부터) — 대화 다시 그리기용. 방을 안 주면 가장 최근 방"""
+    ms = _metas(path, owner)
+    if not thread and ms: thread = ms[-1]['thread']
+    ms = [m for m in ms if m['thread'] == thread]
+    return thread, [{k: m.get(k) for k in ('rid', 'prompt', 'slide', 'files', 't', 'done', 'state', 'o')} | {'running': _running(m['rid'])} for m in ms[-40:]]
+
+def mark(path, owner, rid, patch):
+    m = meta_of(path, rid)
+    if not m or m.get('owner') != owner: raise ValueError('없는 부탁')
+    st = {**(m.get('state') or {}), **{k: v for k, v in patch.items() if k in ('go', 'cancelled', 'discarded', 'applied', 'undone')}}
+    meta_update(os.path.join(logdir_of(path), f'{rid}.json'), {'state': st}); return {'ok': True}
+
+def hide_thread(path, owner, thread):
+    """대화방 지우기 — 숨긴다. 그 방에서 도는 작업은 멈춘다"""
+    for f in glob.glob(os.path.join(logdir_of(path), '*.json')):
+        m = _read(f)
+        if m and m.get('owner') == owner and (m.get('thread') or 'old') == thread and not m.get('hidden'):
+            stop(m['rid']); meta_update(f, {'hidden': True})
+    return {'ok': True}
+
+def busy_files():
+    return {r['file'] for r in RUNS.values() if r.get('busy')}
+
+def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
+    engine = r['engine']
+    if True:
         path = r['file']; cwd = os.path.dirname(path); workp = os.path.join(cwd, r['work'])
         slide = str(req.get('slide') or ''); names = slide_names(open(path, encoding='utf-8').read())
         n = names.index(slide) + 1 if slide in names else 1
@@ -190,6 +327,7 @@ def run(req, send, port, edit_target, slide_parts, shot, url_of):
         if r['session']: args += ['--resume', r['session']]
         os.makedirs(env['CLAUDE_CONFIG_DIR'], exist_ok=True)
         p = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        job.proc = p
         err = []; threading.Thread(target=lambda: err.extend(p.stderr.readlines()), daemon=True).start()
         timed = []
         sec = BUILD_SEC if req.get('build') else RUN_SEC
@@ -200,7 +338,7 @@ def run(req, send, port, edit_target, slide_parts, shot, url_of):
                 try: j = json.loads(line)
                 except ValueError: continue
                 t = j.get('type')
-                if t == 'system' and j.get('subtype') == 'init': r['session'] = j.get('session_id') or r['session']; send({'session': r['session']})
+                if t == 'system' and j.get('subtype') == 'init': r['session'] = j.get('session_id') or r['session']; send({'session': r['session']}); meta_update(job.meta_f, {'sess': r['session']})
                 elif t == 'system' and j.get('subtype') == 'thinking_tokens': send({'think': 1})
                 elif t == 'assistant':
                     for c in (j.get('message') or {}).get('content') or []:
@@ -216,6 +354,7 @@ def run(req, send, port, edit_target, slide_parts, shot, url_of):
             os.killpg(p.pid, signal.SIGKILL); raise
         finally:
             killer.cancel(); p.wait()
+        if job.stopped: send({'stopped': True}); return
         if not result or result.get('is_error'):
             # 시간 초과면 그렇게 말한다 — stderr 끝줄(모르는 모델 이름 안내 등)이 까닭처럼 보였다(gemma 여러 장 진행 실측: 15분 뒤 엉뚱한 줄)
             msg = (f'{sec // 60}분 안에 끝나지 않아 멈췄습니다' + (' — gemma 로는 여러 장 · 레이아웃이 어렵습니다. Claude Code 로 해 보세요' if engine == 'gemma' else '')) if timed \
@@ -237,26 +376,39 @@ def run(req, send, port, edit_target, slide_parts, shot, url_of):
             out['before'] = {k: v for k, v in b.items() if k != 'jpgs'}; out['after'] = {k: v for k, v in a2.items() if k != 'jpgs'}; out['shotSlide'] = ks[0]
             if len(ks) > 1:
                 out['shots'] = [{'n': k, 'name': names[k - 1], 'before': (b.get('jpgs') or {}).get(str(k), ''), 'after': (a2.get('jpgs') or {}).get(str(k), '')} for k in ks]
+            # 새 덱 만들기는 서버가 곧바로 적용한다 — 만드는 사이 사람이 나가 있어도 다시 열면 완성된 덱이 보이게(빈 표지뿐이라 잃을 것이 없고 백업은 남는다)
+            if req.get('build'):
+                r['busy'] = False
+                try: out['applied'] = apply({'rid': rid}, backup_name)['backup']
+                except Exception as e: out['applyErr'] = str(e)[:300]
+        meta_update(job.meta_f, {'changed': bool(out['changed'])})   # 대화 목록의 '수정안 대기' 표시 재료
         send(out)
-    finally:
-        r['busy'] = False; r['t'] = time.time()
 
-def apply(req, backup_name, edit_dir):
-    r = RUNS.get(str(req.get('rid') or ''))
-    if not r: raise ValueError('이 수정안이 서버에 없습니다(서버를 다시 켰거나 오래됨) — 다시 부탁해 주세요')
+def restore(rid, path):
+    """서버를 다시 켜 RUNS 에 없는 수정안 — 메타 · 작업 사본이 남아 있으면 되살린다(다음 날 와서 [적용])"""
+    m = meta_of(path, rid) if path else None
+    if m and m.get('work') and os.path.exists(os.path.join(os.path.dirname(path), m['work'])):
+        RUNS[rid] = {'file': path, 'work': m['work'], 'sha0': m.get('sha0'), 'session': m.get('sess') or '', 't': time.time(), 'engine': 'sub'}
+    return RUNS.get(rid)
+
+def apply(req, backup_name, path=None):
+    rid = str(req.get('rid') or ''); r = RUNS.get(rid) or restore(rid, path)
+    if not r: raise ValueError('이 수정안이 서버에 없습니다(오래됨) — 다시 부탁해 주세요')
     if r.get('busy'): raise ValueError('아직 작업 중입니다')
     path = r['file']; text = open(path, encoding='utf-8').read()
     if _sha(text) != r['sha0']: raise ValueError('그 사이 원본이 바뀌었습니다(다른 편집 · 저장) — 다시 부탁해 주세요')
     workp = os.path.join(os.path.dirname(path), r['work']); new = fold(open(workp, encoding='utf-8').read())
     import datetime
-    os.makedirs(edit_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(backup_name(path)), exist_ok=True)
     bak = f"{backup_name(path)}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
     open(bak, 'w', encoding='utf-8').write(text); open(path, 'w', encoding='utf-8').write(new)
     discard(req)
+    meta_update(os.path.join(logdir_of(path), f'{rid}.json'), {'state': {**((meta_of(path, rid) or {}).get('state') or {}), 'applied': os.path.basename(bak)}})
     return {'ok': True, 'backup': os.path.basename(bak)}
 
-def discard(req):
+def discard(req, mark_it=False):
     r = RUNS.pop(str(req.get('rid') or ''), None)
+    if r and mark_it: meta_update(os.path.join(logdir_of(r['file']), f"{req.get('rid')}.json"), {'state': {**((meta_of(r['file'], req.get('rid')) or {}).get('state') or {}), 'discarded': True}})
     if r:
         for f in (r['work'], r['work'].replace('.html', '.jpg')):
             try: os.remove(os.path.join(os.path.dirname(r['file']), f))
