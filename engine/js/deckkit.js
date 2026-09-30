@@ -196,11 +196,22 @@
   }
   @media (max-height: 500px) { #kpanel .khead { padding: 6px 10px; } #kpanel .kstage { display: none; } .kc-empty p { display: none; } }
   @media (pointer: coarse) { .kc-hint { display: none; } }
+  .kc-tb { border-collapse: collapse; margin: 8px 0; font-size: .95em; width: 100%; }
+  .kc-tb th, .kc-tb td { padding: 6px 10px; border-bottom: 1px solid #e6e8ec; text-align: left; vertical-align: top; }
+  .kc-tb th { font-weight: 800; color: #6b7280; border-bottom-width: 2px; white-space: nowrap; }
   `;
-  // 간단한 마크다운 → HTML (굵게 · 목록 · 코드 · 줄바꿈)
+  // 간단한 마크다운 → HTML (굵게 · 목록 · 코드 · 줄바꿈 · 표)
+  // 표: `| a | b |` 줄이 이어지면 표 하나 — 둘째 줄 `|---|---|` 는 머리글 구분선. 없던 때는 `|` 가 글자 그대로 찍혀 읽기 어려웠다(사용자 지적 2026-09-30)
+  const cellsOf = (ln) => ln.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+  const isSep = (ln) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(ln);
+  const tableHtml = (rows) => { const head = rows.length > 1 && isSep(rows[1]) ? cellsOf(rows[0]) : null; const body = (head ? rows.slice(2) : rows).filter((r) => !isSep(r)).map(cellsOf);
+    return `<table class="kc-tb">${head ? `<thead><tr>${head.map((c) => `<th>${c}</th>`).join('')}</tr></thead>` : ''}<tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`; };
   const md = (s) => {
-    const lines = esc(s).split('\n'); let out = ''; let inList = false;
+    const lines = esc(s).split('\n'); let out = ''; let inList = false; let tb = [];
+    const flushTb = () => { if (tb.length) { out += tableHtml(tb); tb = []; } };
     for (const ln of lines) {
+      if (/^\s*\|.*\|\s*$/.test(ln)) { if (inList) { out += '</ul>'; inList = false; } tb.push(ln); continue; }
+      flushTb();
       const hd = ln.match(/^\s*#{1,6}\s+(.*)$/);
       if (hd) { if (inList) { out += '</ul>'; inList = false; } out += `<p style="margin:10px 0 4px;font-weight:900">${hd[1]}</p>`; continue; }
       const li = ln.match(/^\s*(?:[-*•]|\d+\.)\s+(.*)$/);
@@ -208,7 +219,7 @@
       if (inList) { out += '</ul>'; inList = false; }
       out += ln.trim() ? `<p style="margin:6px 0">${ln}</p>` : '';
     }
-    if (inList) out += '</ul>';
+    flushTb(); if (inList) out += '</ul>';
     // 근거 링크 `[장 이름](#번호)` → 누르면 그 장으로 가는 칩(wholeDeck 덱, 2026-09-29). 번호는 주소 #n 과 같은 1부터
     return out.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\[([^\]\n]{1,60})\]\(#(\d{1,3})\)/g, (m, t, n) => `<a class="kc-go" data-goto="${Number(n) - 1}" title="${n}페이지로 이동">↗ ${t}</a>`);
