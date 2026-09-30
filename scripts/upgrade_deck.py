@@ -34,7 +34,17 @@ def upgrade(html):
                  "    current: () => deck.slides[deck.cur], goto: (i) => deck.show(i, 0), stageOf: () => null, contextOf: () => '', suggest: () => [],\n"
                  f"    intro: '{title} — 처음 보는 사람이 따라오게 만든 설명 덱(자막 · 자동 재생). 답은 쉬운 한국어로 짧게, 덱에 있는 내용만 근거로.' }}); }},")
         html = html[:m.end()] + ready + html[m.end():]; done.append('AI 패널 · ✎ 편집(onReady)')
-    # 3) ☰ 목록 단추 — 조작줄 전체화면 단추 앞
+    # 3) 페이지 목록(#toc) — 자막 덱(v2 한눈에)은 조작줄에 목록 자리가 없어 아래에 페이지 이름이 안 보였다(사용자 지적 2026-09-30).
+    #    다음(→) 단추 뒤에 넣고, 남는 폭을 먹던 쪽수 칸(.sp, flex:1)은 목록에 폭을 넘긴다
+    if 'id="toc"' not in html and 'id="bar"' in html:
+        html2 = re.sub(r'(<button class="nb" id="nx">[^<]*</button>)', r'\1<div id="toc"></div>', html, count=1)
+        if html2 != html:
+            html = re.sub(r'<span class="sp" id="cnt">', '<span id="cnt">', html2, count=1); done.append('페이지 목록')
+    # 4) 조작줄의 글 링크(「자세한 원리 덱」 등) — 폰에서 한 글자씩 세로로 꺾이며 ✎ 편집을 화면 밖으로 밀었다(실측 390px). 한 줄로 · 좁으면 숨긴다
+    bar = re.search(r'<div id="bar">.*', html)   # 조작줄은 한 줄 — 안에 #toc 의 </div> 가 있어 '</div> 까지'로 자르면 링크를 놓친다
+    if bar and re.search(r'<a (?![^>]*class="nb")', bar.group(0)) and 'upgrade:barlink' not in html:
+        html = html.replace('</style>', '/* upgrade:barlink */ #bar a:not(.nb) { white-space: nowrap; } @media (max-width: 640px) { #bar a:not(.nb) { display: none; } }\n</style>', 1); done.append('조작줄 링크 폰 정리')
+    # 5) ☰ 목록 단추 — 조작줄 전체화면 단추 앞
     if 'id="home"' not in html:
         html = re.sub(r'(<button class="nb" id="fs")', r'<a class="nb" id="home" href="/" title="발표 자료 목록">☰</a>\1', html, count=1)
         html = html.replace('</style>', f'{HOME_CSS}\n</style>', 1); done.append('☰ 목록 단추')
