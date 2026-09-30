@@ -167,7 +167,19 @@ def deck_rules():
     except OSError: return ''
     a = t.find('\n## 2.'); return t[a:].strip() if a >= 0 else ''
 
-def system_prompt(work, slide, n, port, files=(), plan=False, base='/'):
+DOC_RE = re.compile(r'files/[0-9a-f]{16}\.(pdf|pptx|docx)'); DOCTXT_RE = re.compile(r'files/[0-9a-f]{16}\.txt')
+
+def doc_line(dc):
+    """첨부 문서 한 줄 — 무엇을 어떻게 읽을지. PDF 는 Read 가 페이지를 직접 본다(한 번에 20페이지, 10페이지 넘으면 pages 인자 필수)"""
+    src = dc.get('src'); nm = dc.get('name') or src; txt = dc.get('text'); pg = int(dc.get('pages') or 0)
+    if src.endswith('.pdf'):
+        many = '페이지가 많으니 pages 로 나눠(예: 1-10) ' if pg > 10 else ''; npg = f' {pg}페이지' if pg else ''
+        how = f'PDF{npg} — Read 로 연다({many}그림 · 표까지 보인다)' + (f', 글만 찾을 땐 {txt} 를 grep' if txt else '')
+    else:
+        how = f'{"파워포인트" if src.endswith(".pptx") else "워드"} — 원본은 Read 로 못 연다. 뽑아 둔 글 {txt} 를 Read 로(슬라이드 · 문단 순서, 그림 · 도형 배치는 빠짐)' if txt else '글을 뽑지 못한 문서 — 내용을 알 수 없다고 답에 적는다'
+    return f'첨부 문서 「{nm}」: {src} — {how}. 이것이 재료다 — 숫자 · 사실은 여기서 가져오고, 없는 것은 지어내지 않는다'
+
+def system_prompt(work, slide, n, port, files=(), plan=False, base='/', docs=()):
     jpg = work.replace('.html', '.jpg')
     rules = deck_rules()
     return (PLAN if plan else '') + ((f'# 이 덱의 작성 규칙(DECK.md 2~7장 원문 — 사용자가 여러 번 고쳐 준 한국 발표 자료 규칙, 반드시 지킨다)\n{rules}\n\n# 작업\n') if rules else '') + (f'너는 슬라이드 덱(16:9 무대 1600×900)을 고치는 도우미다. 고칠 파일은 **{work} 하나뿐**이다(원본의 사본 — 다른 파일은 읽기만).\n'
@@ -175,7 +187,8 @@ def system_prompt(work, slide, n, port, files=(), plan=False, base='/'):
             # 예전엔 "말이 없으면 이 장만" 이라, 제목을 바꾸면 같은 말이 적힌 목차 · 간지 · 다른 장을 놔뒀다(사용자 지적 2026-09-30 "다른 부분에 수정 부분을 못 찾는다")
             '말이 없어도 **바꾸는 말(제목 · 이름 · 숫자 · 용어)이 다른 장 · 목차 · 간지(PARTS) · 주석 · AI 소개글에도 있으면 함께 고친다** — 고치기 전에 grep 으로 덱 파일 전체에서 그 말을 찾는다. '
             '배치 · 크기 · 색처럼 모양을 바꾸는 부탁은 말이 없으면 이 장만. 다른 페이지도 고쳤으면 답에 그 페이지를 적는다.\n'
-            + (f'사용자가 그림 {len(files)}장을 첨부했다: {", ".join(files)} — Read 로 열어 본다. 참고용(「이것처럼」)이면 보고 따르고, 덱에 넣으라면 이 경로를 그대로 <img src="…"> 로 쓴다(덱 폴더 기준 상대 경로).\n' if files else '') +
+            + (f'사용자가 그림 {len(files)}장을 첨부했다: {", ".join(files)} — Read 로 열어 본다. 참고용(「이것처럼」)이면 보고 따르고, 덱에 넣으라면 이 경로를 그대로 <img src="…"> 로 쓴다(덱 폴더 기준 상대 경로).\n' if files else '')
+            + ''.join(doc_line(dc) + '\n' for dc in docs) +
             '규칙: 위 작성 규칙을 새로 쓰거나 바꾸는 모든 글 · 크기 · 색 · 배치에 지킨다(제목은 명사형 · 설명은 개조식 · 글자는 --fs-* 단계 · 색은 --c-* 변수 · 숫자는 기록에서). 장마다 <section class="slide" data-name="…"> 이고, '
             "그 장을 그리는 스크립트는 INIT['장 이름'] = () => {…} 이다(간지는 PARTS 목록을 도는 스크립트). data-name · INIT 이름은 바꾸지 않는다. "
             'data-frozen 이 붙은 장은 스크립트가 다시 그리지 않는다 — 마크업이 곧 화면이다. 스크립트가 그리는 장은 마크업을 고쳐도 덮이니 스크립트를 고친다. '
@@ -229,7 +242,7 @@ def start(req, port, edit_target, slide_parts, shot, url_of, backup_name, owner)
     # 메타 — 대화를 다시 그릴 재료(부탁 글 · 페이지 · 그림 · 모델 선택)와 [적용]을 서버를 다시 켠 뒤에도 할 수 있게 사본 정보
     tid = str(req.get('thread') or ''); tid = tid if THREAD_RE.fullmatch(tid) else uuid.uuid4().hex[:12]
     json.dump({'rid': rid, 'owner': owner, 'thread': tid, 'prompt': str(req.get('display') or req.get('prompt') or '')[:8000], 'slide': str(req.get('slide') or ''),
-               'files': [f for f in (req.get('files') or []) if isinstance(f, str)][:3], 't': round(time.time(), 3),   # 소수 셋째 자리 — 같은 초에 남긴 빠른 답과 순서가 뒤집혔다 'done': False, 'state': {},
+               'files': [f for f in (req.get('files') or []) if isinstance(f, str)][:3], 'docs': [{k: d.get(k) for k in ('src', 'name')} for d in (req.get('docs') or []) if isinstance(d, dict)][:3], 't': round(time.time(), 3),   # 소수 셋째 자리 — 같은 초에 남긴 빠른 답과 순서가 뒤집혔다 'done': False, 'state': {},
                'o': {**{k: req.get(k) for k in ('model', 'effort', 'kind', 'plan', 'build')}, 'engine': r['engine'], 'web': bool(req.get('web')) and r['engine'] == 'sub'}, 'work': r['work'], 'sha0': r['sha0']},
               open(job.meta_f, 'w', encoding='utf-8'), ensure_ascii=False)
     # 오래된 부탁 정리 — 이 계정 것만, 끝난 것만
@@ -339,6 +352,9 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
         n = names.index(slide) + 1 if slide in names else 1
         # 첨부 그림 — 덱이 /api/asset 로 먼저 올린 img/uploads/ 경로만 받는다(Claude Code 가 작업 폴더 안에서 Read 로 연다)
         files = [f for f in (req.get('files') or []) if isinstance(f, str) and re.fullmatch(r'img/uploads/[0-9a-f]{16}\.(png|jpg|gif|webp)', f) and os.path.exists(os.path.join(cwd, f))][:3]
+        # 첨부 문서(pdf · pptx · docx) — /api/asset 이 files/ 에 둔 것만. 글을 뽑은 .txt 도 같은 폴더 경로만 받는다
+        docs = [{'src': d['src'], 'name': str(d.get('name') or '')[:80], 'text': d.get('text') if isinstance(d.get('text'), str) and DOCTXT_RE.fullmatch(d['text']) and os.path.exists(os.path.join(cwd, d['text'])) else '', 'pages': int(d.get('pages') or 0)}
+                for d in (req.get('docs') or []) if isinstance(d, dict) and isinstance(d.get('src'), str) and DOC_RE.fullmatch(d['src']) and os.path.exists(os.path.join(cwd, d['src']))][:3]
         send({'rid': rid, 'engine': engine})
         # ── 빠르게(사용자 지적 2026-09-30 "간단 수정마저 엄청 오래 걸린다" — 제목 한 줄: 28초, 118 에서 45초) ──
         # ① 고치기 전 화면은 시작하자마자 뒤에서 찍어 둔다(Claude 가 일하는 동안). 예전엔 끝난 뒤 전 · 후를 차례로 찍어 10초
@@ -368,7 +384,7 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
         if req.get('plan'):
             ask = f"[이번 차례는 계획만 — 파일을 고치지 않는다. 지금 덱은 ./{r['work']} 를 Read 해서 보고, 고칠 곳을 적은 뒤 「이대로 진행할까요?」로 끝낸다. 사용자가 [진행]을 누르면 다음 차례에 고친다]\n{ask}"
         args = [CLAUDE, '-p', ask, '--output-format', 'stream-json', '--verbose',
-                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, ''))) + (WEB if web else '') + hint, '--permission-mode', 'default',
+                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, '')), docs) + (WEB if web else '') + hint, '--permission-mode', 'default',
                 # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
                 '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if web else []),
                 # 웹은 기본으로 막는다 — [웹 검색] 켠 부탁(Claude 구독)에만 열고, WebFetch 는 관문 훅이 검색 결과 주소로 좁힌다

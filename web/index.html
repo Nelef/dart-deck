@@ -160,9 +160,9 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
       <label class="l" for="nText">가진 내용 전부<span>기획서 · 메모 · 회의록 · 표 — 형식 상관없이</span></label>
       <textarea class="f" id="nText" rows="16" placeholder="여기에 내용을 통째로 붙여 넣어 주세요. 누구에게 보여 줄 자료인지 한 줄 적어 주면 더 좋습니다."></textarea>
     </div>
-    <label class="l">그림<span>로고 · 사진 · 캡처 · 참고할 디자인 — 6장까지</span></label>
+    <label class="l">그림 · 문서<span>로고 · 사진 · 캡처 · PDF · PPT · 워드 — 합쳐 6개까지(문서는 25MB)</span></label>
     <div class="drop" id="nDrop">여기로 끌어 놓거나 눌러서 고르기 · 붙여넣기(Ctrl/⌘+V)도 됩니다</div>
-    <input type="file" id="nFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+    <input type="file" id="nFile" accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.pptx,.docx,application/pdf" multiple hidden>
     <div class="thumbs" id="nThumbs"></div>
     <label class="webopt"><input type="checkbox" id="nWeb"> <span><b>부족한 자료는 웹에서 찾아 보강</b> — 배경 · 최신 사실 · 공개 통계를 찾아 넣고 페이지마다 출처를 답니다</span></label>
     <div class="cc" id="nCC" hidden><span style="flex:1">새 발표 자료는 Claude Code 가 만듭니다 — 먼저 내 Claude 구독을 연결해 주세요.</span><button class="btn sm go" id="nConnect">Claude 구독 연결</button></div>
@@ -261,10 +261,17 @@ const prep = (file) => new Promise((ok, no) => { const rd = new FileReader(); rd
   const big = Math.max(im.naturalWidth, im.naturalHeight); const keep = big <= 1600 && file.size <= 2e6 && file.type !== 'image/webp'; const k = Math.min(1, 1600 / big);
   const c = document.createElement('canvas'); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
   ok({ name: keep ? file.name.replace(/[^\w.]+/g, '_') : 'image.jpg', data: keep ? rd.result : c.toDataURL('image/jpeg', 0.88) }); }; im.src = rd.result; }; rd.readAsDataURL(file); });
-// 그림을 더한다(6장까지)
-const addFiles = async (list) => { for (const f of [...list].filter((x) => /^image\/(png|jpeg|webp|gif)$/.test(x.type)).slice(0, Math.max(0, 6 - NW.files.length))) NW.files.push(await prep(f)); drawThumbs(); };
+// 문서(pdf · pptx · docx)도 받는다(사용자 지정 2026-09-30) — 줄이지 않고 그대로, 썸네일은 확장자를 적은 SVG. 서버가 글을 뽑아 Claude 에게 준다
+const DOC_RE = /\.(pdf|pptx|docx)$/i;
+const docThumb = (name) => { const x = (name.match(DOC_RE)?.[1] || '').toUpperCase().replace('PPTX', 'PPT').replace('DOCX', 'DOC'); const c = { PDF: '#DC2626', PPT: '#d97706', DOC: '#416AF0' }[x] || '#6b7280';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="14" fill="#f2f3f6"/><path d="M36 20h36l20 20v60H36z" fill="#fff" stroke="${c}" stroke-width="4"/><text x="64" y="84" font-family="sans-serif" font-size="22" font-weight="900" fill="${c}" text-anchor="middle">${x}</text></svg>`); };
+const prepDoc = (file) => new Promise((ok, no) => { const rd = new FileReader(); rd.onerror = no; rd.onload = () => ok({ name: file.name, data: rd.result, thumb: docThumb(file.name), doc: true }); rd.readAsDataURL(file); });
+// 그림 · 문서를 더한다(합쳐 6개까지, 문서는 25MB 까지)
+const addFiles = async (list) => { const ok = [...list].filter((x) => (/^image\/(png|jpeg|webp|gif)$/.test(x.type) || DOC_RE.test(x.name)) && !(DOC_RE.test(x.name) && x.size > 25e6));
+  if (ok.length < [...list].length) $('#nErr').textContent = '그림(png · jpg · gif · webp)과 문서(pdf · pptx · docx, 25MB 까지)만 넣을 수 있어요';
+  for (const f of ok.slice(0, Math.max(0, 6 - NW.files.length))) NW.files.push(DOC_RE.test(f.name) ? await prepDoc(f) : await prep(f)); drawThumbs(); };
 // 고른 그림 썸네일을 그린다
-const drawThumbs = () => { $('#nThumbs').innerHTML = NW.files.map((f, k) => `<div><img src="${f.data}" alt=""><button data-k="${k}" title="빼기">✕</button></div>`).join('');
+const drawThumbs = () => { $('#nThumbs').innerHTML = NW.files.map((f, k) => `<div title="${esc(f.name)}"><img src="${f.thumb || f.data}" alt=""><button data-k="${k}" title="빼기">✕</button></div>`).join('');
   $('#nThumbs').querySelectorAll('button').forEach((b) => { b.onclick = () => { NW.files.splice(Number(b.dataset.k), 1); drawThumbs(); }; }); };
 $('#nDrop').onclick = () => $('#nFile').click(); $('#nFile').onchange = () => { addFiles($('#nFile').files); $('#nFile').value = ''; };
 ['dragover', 'dragenter'].forEach((t) => $('#nDrop').addEventListener(t, (e) => { e.preventDefault(); $('#nDrop').classList.add('on'); }));
@@ -279,7 +286,7 @@ $('#nGo').onclick = async () => {
   const brief = NW.mode === 'paste' ? { mode: 'paste', text: $('#nText').value }
     : { mode: 'survey', audience: $('#nAud').value, info: $('#nInfo').value, key: $('#nKey').value, pages: chip('pages'), tone: chip('tone'), material: $('#nMat').value };
   brief.web = $('#nWeb').checked;
-  if (!Object.entries(brief).some(([k, v]) => k !== 'mode' && k !== 'web' && v.trim())) { $('#nErr').textContent = NW.mode === 'paste' ? '내용을 붙여 넣어 주세요' : '누가 보는지 · 무엇을 알려 줄지 하나 이상 적어 주세요'; return; }
+  if (!NW.files.some((f) => f.doc) && !Object.entries(brief).some(([k, v]) => k !== 'mode' && k !== 'web' && v.trim())) { $('#nErr').textContent = NW.mode === 'paste' ? '내용을 붙여 넣어 주세요' : '누가 보는지 · 무엇을 알려 줄지 하나 이상 적어 주세요'; return; }
   const b = $('#nGo'); b.disabled = true; b.textContent = '준비 중…';
   try { const j = await post('/api/decks', { action: 'create', title, brief, files: NW.files.map((f) => ({ name: f.name, data: f.data.split(',')[1] })) }); location.href = j.url; }
   catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '만들기 시작'; }

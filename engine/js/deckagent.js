@@ -21,6 +21,10 @@
     edit: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     web: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
   };
+  // 첨부 문서(사용자 지정 2026-09-30 "ppt, pdf 같은 거 첨부 가능한가") — pdf · pptx · docx. 썸네일은 확장자를 적은 작은 SVG(그림 썸네일 자리에 그대로 쓴다)
+  const DOC_RE = /\.(pdf|pptx|docx)$/i;
+  const docThumb = (name) => { const x = (name.match(DOC_RE)?.[1] || '').toUpperCase().replace('PPTX', 'PPT').replace('DOCX', 'DOC'); const c = { PDF: '#DC2626', PPT: '#d97706', DOC: '#416AF0' }[x] || '#6b7280';
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="14" fill="#f2f3f6"/><path d="M36 20h36l20 20v60H36z" fill="#fff" stroke="${c}" stroke-width="4"/><text x="64" y="84" font-family="sans-serif" font-size="22" font-weight="900" fill="${c}" text-anchor="middle">${x}</text></svg>`); };
   const CSS = `
   /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
      탭이 AI 하나뿐인 덱(noCode)은 「AI 에게 묻기」 알약과 따로 한 줄 먹던 페이지 이름 줄(kstage)을 없애고 윗줄에 합친다 */
@@ -170,7 +174,7 @@
         const b = e.target.closest('[data-ka]'); if (!b) return;
         const i = Number(b.dataset.mi); const m = K.chat[i];
         if (b.dataset.ka === 'apply') A.apply(i, b); else if (b.dataset.ka === 'discard') { A.discard(i); K.updateMsg(i); K.render(); }
-        else if (b.dataset.ka === 'go') { m.agent.go = true; A.mark(i, { go: true }); K.updateMsg(i); const g = m.agent.o || {}; A.ask('계획대로 진행해 주세요. 끝나면 고친 페이지마다 화면을 찍어 확인해 주세요.', { files: m.agent.files, model: g.model, effort: g.effort, kind: '여러 장 · 진행' }); }
+        else if (b.dataset.ka === 'go') { m.agent.go = true; A.mark(i, { go: true }); K.updateMsg(i); const g = m.agent.o || {}; A.ask('계획대로 진행해 주세요. 끝나면 고친 페이지마다 화면을 찍어 확인해 주세요.', { files: m.agent.files, docs: m.agent.docs, model: g.model, effort: g.effort, kind: '여러 장 · 진행' }); }
         else if (b.dataset.ka === 'cancel') { m.agent.cancelled = true; A.mark(i, { cancelled: true }); K.updateMsg(i); K.render(); }
         else if (b.dataset.ka === 'w-claude' || b.dataset.ka === 'w-gemma' || b.dataset.ka === 'w-cancel') A.decide(i, b.dataset.ka.slice(2));
       });
@@ -202,9 +206,13 @@
     files: [],
     take() { const f = A.files; A.files = []; A.drawFiles(); return f; },
     async addFiles(list) {
-      for (const file of [...list].filter((f) => /^image\/(png|jpeg|webp|gif)$/.test(f.type)).slice(0, Math.max(0, 3 - A.files.length))) A.files.push(await A.prep(file));
+      const ok = [...list].filter((f) => /^image\/(png|jpeg|webp|gif)$/.test(f.type) || DOC_RE.test(f.name));
+      const big = ok.find((f) => DOC_RE.test(f.name) && f.size > 25e6); if (big) A.toast(`「${big.name}」 은 25MB 를 넘어 뺐어요`, 3600);
+      for (const file of ok.filter((f) => !(DOC_RE.test(f.name) && f.size > 25e6)).slice(0, Math.max(0, 3 - A.files.length))) A.files.push(DOC_RE.test(file.name) ? await A.prepDoc(file) : await A.prep(file));
       A.drawFiles();
     },
+    // 문서는 줄이지 않고 그대로(서버가 글을 뽑는다)
+    prepDoc(file) { return new Promise((ok, no) => { const rd = new FileReader(); rd.onerror = no; rd.onload = () => ok({ name: file.name, data: rd.result, thumb: docThumb(file.name), doc: true }); rd.readAsDataURL(file); }); },
     prep(file) {
       return new Promise((ok, no) => {
         const rd = new FileReader(); rd.onerror = no;
@@ -223,9 +231,9 @@
     attachUI(body) {
       const box = body.querySelector('.kc-box'); const comp = body.querySelector('.kc-comp'); if (!box || !comp) return;
       const row = document.createElement('div'); row.className = 'ka-files'; comp.insertBefore(row, box);
-      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif'; inp.multiple = true; inp.style.display = 'none';
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif,.pdf,.pptx,.docx,application/pdf'; inp.multiple = true; inp.style.display = 'none';
       inp.onchange = () => { A.addFiles(inp.files); inp.value = ''; }; comp.appendChild(inp);
-      const bt = document.createElement('button'); bt.className = 'ka-att'; bt.type = 'button'; bt.textContent = '+'; bt.title = '그림 첨부 — 붙여넣기(Ctrl/⌘+V) · 채팅창에 끌어 놓기도 됨, 3장까지';
+      const bt = document.createElement('button'); bt.className = 'ka-att'; bt.type = 'button'; bt.textContent = '+'; bt.title = '그림 · 문서(PDF · PPT · 워드) 첨부 — 붙여넣기(Ctrl/⌘+V) · 채팅창에 끌어 놓기도 됨, 3개까지';
       bt.onclick = () => inp.click(); box.insertBefore(bt, box.firstChild);
       // 웹 검색 켜기 — Claude 구독 엔진에서만 된다(gemma 는 LiteLLM 경유라 검색 도구가 없다)
       const send = box.querySelector('.kc-send');
@@ -330,6 +338,8 @@
     // 판단은 gemma 에게 한 단어(수정 · 설명)로 — 앞 답이 제안이었으면 "그래 해줘"도 수정이다. 판단이 실패하면 수정 쪽으로(고치는 쪽은 안 고쳐도 답은 준다)
     async route(q, ask0, att = [], o2 = {}) {
       if (K.busy) return;
+      // 문서(PDF · PPT · 워드)는 Claude Code 만 읽는다 — gemma 빠른 답 · LiteLLM 경유 도구에는 문서를 넘길 길이 없다
+      if (A.engine !== 'claude' && att.some((f) => f.doc)) { A.toast('문서(PDF · PPT · 워드)는 Claude Code 에서만 읽어요 — 위에서 Claude 로 바꿔 주세요', 4200); K.draft = q; A.files = att; K.render(); return; }
       K.busy = true; K.setSend(); let kind = '작은 수정';
       try {
         const last = [...K.chat].reverse().find((m) => m.role === 'assistant' && m.text);
@@ -389,12 +399,13 @@
       K.busy = true; K.ctrl = new AbortController(); K.setSend(); const t0 = performance.now();
       try {
         // 첨부 그림을 덱 폴더(img/uploads/)에 올린다 — Claude Code 가 작업 폴더 안에서 Read 로 연다. [진행] 차례는 계획 때 올린 경로를 그대로
-        let files = o.files || [];
-        if (att.length) { a.agent.steps.push({ t: `그림 ${att.length}장 올리기` }); K.updateMsg(ai);
-          files = []; for (const f of att) { const j = await K.post('/api/asset', { file: location.pathname, name: f.name, data: f.data.split(',')[1] }); files.push(j.src); } }
-        a.agent.files = files;
+        let files = o.files || []; let docs = o.docs || [];
+        if (att.length) { a.agent.steps.push({ t: `첨부 ${att.length}개 올리기` }); K.updateMsg(ai);
+          files = []; docs = []; for (const f of att) { const j = await K.post('/api/asset', { file: location.pathname, name: f.name, data: f.data.split(',')[1] });
+            if (j.kind === 'doc') docs.push({ src: j.src, name: j.name, text: j.text, pages: j.pages }); else files.push(j.src); } }
+        a.agent.files = files; a.agent.docs = docs;
         const r = await fetch('/api/agent/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: K.ctrl.signal,
-          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), engine: a.agent.engine === 'sub' ? 'claude' : 'gemma', web: !!a.agent.o.web, slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.e === a.agent.engine ? A.sess.id : undefined, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
+          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), engine: a.agent.engine === 'sub' ? 'claude' : 'gemma', web: !!a.agent.o.web, slide, prompt: q, files, docs, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.e === a.agent.engine ? A.sess.id : undefined, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
             effort: (o.build ? o.effort : A.effort === 'auto' ? o.effort : A.effort) || undefined }) });   // 새로 만들기는 패널 선택과 상관없이 자기 값(Opus · high)
         await A.read(r, a, ai);
       } catch (e) {

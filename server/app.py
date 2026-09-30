@@ -177,12 +177,67 @@ def shot(req, port):
             except OSError: pass
 
 ASSET_EXT = {'.png': '.png', '.jpg': '.jpg', '.jpeg': '.jpg', '.gif': '.gif', '.webp': '.webp'}
+# 문서 첨부(사용자 지정 2026-09-30 "ppt, pdf 같은 거 첨부 가능한가") — 덱 폴더 files/ 에 두고 Claude Code 가 읽는다.
+#   PDF 는 Claude 의 Read 가 페이지를 직접 본다(그림 · 표까지). 글도 grep 할 수 있게 pdftotext 가 있으면 옆에 .txt 를 둔다.
+#   PPTX · DOCX 는 Claude 가 못 연다 → 올릴 때 슬라이드 · 문단 글을 뽑아 .txt 로(표준 라이브러리 zipfile + XML 만, 글자만 — 도형 배치 · 그림은 빠진다)
+DOC_EXT = {'.pdf': '.pdf', '.pptx': '.pptx', '.docx': '.docx'}
+DOC_MAX = 25_000_000
+
+def _xml_text(xml, para_tag, text_tag):
+    import re as _re, html as _h
+    out = []
+    for p in _re.findall(rf'<{para_tag}[ >].*?</{para_tag}>', xml, _re.S):
+        t = ''.join(_h.unescape(x) for x in _re.findall(rf'<{text_tag}(?: [^>]*)?>(.*?)</{text_tag}>', p, _re.S)).strip()
+        if t: out.append(t)
+    return out
+
+def doc_text(path):
+    """문서 → 글(.txt 옆에 저장한 경로, 없으면 ''). pptx = 슬라이드마다 「## 슬라이드 n」 + 글 + 발표자 메모, docx = 문단, pdf = pdftotext -layout"""
+    import zipfile, re as _re, subprocess, shutil
+    ext = os.path.splitext(path)[1].lower(); out = path[:-len(ext)] + '.txt'; L = []
+    try:
+        if ext == '.pptx':
+            z = zipfile.ZipFile(path); names = z.namelist()
+            num = lambda n: int(_re.search(r'(\d+)\.xml$', n).group(1))
+            for n in sorted([n for n in names if _re.fullmatch(r'ppt/slides/slide\d+\.xml', n)], key=num):
+                k = num(n); L.append(f'## 슬라이드 {k}'); L += _xml_text(z.read(n).decode('utf-8', 'replace'), 'a:p', 'a:t')
+                note = f'ppt/notesSlides/notesSlide{k}.xml'
+                if note in names:
+                    nt = [t for t in _xml_text(z.read(note).decode('utf-8', 'replace'), 'a:p', 'a:t') if not t.isdigit()]
+                    if nt: L += ['(발표자 메모)'] + nt
+                L.append('')
+        elif ext == '.docx':
+            L = _xml_text(zipfile.ZipFile(path).read('word/document.xml').decode('utf-8', 'replace'), 'w:p', 'w:t')
+        elif ext == '.pdf' and shutil.which('pdftotext'):
+            subprocess.run(['pdftotext', '-layout', '-enc', 'UTF-8', path, out], timeout=120, check=True)
+            return out if os.path.getsize(out) > 0 else ''
+    except Exception:
+        return ''
+    if not any(x.strip() for x in L): return ''
+    open(out, 'w', encoding='utf-8').write('\n'.join(L)); return out
+
+def pdf_pages(path):
+    import subprocess, shutil, re as _re
+    if not shutil.which('pdfinfo'): return 0
+    try: return int(_re.search(r'Pages:\s+(\d+)', subprocess.run(['pdfinfo', path], capture_output=True, text=True, timeout=30).stdout).group(1))
+    except Exception: return 0
+
+def doc_line(dc):
+    """첨부 문서 한 줄 설명 — 새 덱 부탁 · 패널 부탁이 같이 쓴다"""
+    return deckagent.doc_line(dc)
 
 def save_asset(req):
     deck = edit_target(req.get('file'))
-    ext = ASSET_EXT.get(os.path.splitext(str(req.get('name') or ''))[1].lower())
-    if not ext: raise ValueError('png · jpg · gif · webp 만 넣을 수 있습니다')
+    x = os.path.splitext(str(req.get('name') or ''))[1].lower(); ext = ASSET_EXT.get(x); dext = DOC_EXT.get(x)
+    if not ext and not dext: raise ValueError('그림(png · jpg · gif · webp)이나 문서(pdf · pptx · docx)만 넣을 수 있습니다')
     raw = base64.b64decode(str(req.get('data') or ''), validate=True)
+    if dext:
+        if not raw or len(raw) > DOC_MAX: raise ValueError('문서가 비었거나 25MB 를 넘습니다')
+        d = os.path.join(os.path.dirname(deck), 'files'); os.makedirs(d, exist_ok=True)
+        name = hashlib.sha1(raw).hexdigest()[:16] + dext; fp = os.path.join(d, name)
+        open(fp, 'wb').write(raw); txt = doc_text(fp)
+        orig = re.sub(r'[^\w.\- ]+', '_', os.path.basename(str(req.get('name'))))[:80]
+        return {'ok': True, 'src': f'files/{name}', 'kind': 'doc', 'name': orig, 'text': f'files/{os.path.basename(txt)}' if txt else '', 'pages': pdf_pages(fp) if dext == '.pdf' else 0}
     if not raw or len(raw) > 8_000_000: raise ValueError('그림이 비었거나 8MB 를 넘습니다')
     d = os.path.join(os.path.dirname(deck), 'img', 'uploads'); os.makedirs(d, exist_ok=True)
     name = hashlib.sha1(raw).hexdigest()[:16] + ext
@@ -256,15 +311,18 @@ def new_deck(user, req):
     if not title: raise ValueError('제목을 적어 주세요')
     b = req.get('brief') or {}
     brief = {'mode': 'paste' if b.get('mode') == 'paste' else 'survey', **{k: str(b.get(k) or '')[:40_000 if k in ('text', 'material') else 2000] for k in BRIEF_KEYS}, 'web': bool(b.get('web'))}
-    if not any(brief[k].strip() for k in BRIEF_KEYS): raise ValueError('어떤 사람에게 어떤 정보를 줄지 한 가지 이상 적어 주세요')
+    has_doc = any(os.path.splitext(str((f or {}).get('name') or ''))[1].lower() in DOC_EXT for f in (req.get('files') or []))   # 문서만 올려도 된다
+    if not has_doc and not any(brief[k].strip() for k in BRIEF_KEYS): raise ValueError('어떤 사람에게 어떤 정보를 줄지 한 가지 이상 적어 주세요')
     tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
     did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', htmlmod.escape(brief['key'][:120] or brief['audience'][:120])))
     link_engine(d)
-    files = []
+    files = []; docs = []
     for f in (req.get('files') or [])[:6]:
-        try: files.append(save_asset({'file': f'/d/{user["id"]}/{did}/', 'name': f.get('name'), 'data': f.get('data')})['src'])
+        try:
+            j = save_asset({'file': f'/d/{user["id"]}/{did}/', 'name': f.get('name'), 'data': f.get('data')})
+            (docs.append({k: j[k] for k in ('src', 'name', 'text', 'pages')}) if j.get('kind') == 'doc' else files.append(j['src']))
         except Exception as e: sys.stderr.write(f'새 덱 그림 실패: {e}\n')
-    brief.update({'title': title, 'files': files, 'at': int(time.time()), 'by': user['id']})
+    brief.update({'title': title, 'files': files, 'docs': docs, 'at': int(time.time()), 'by': user['id']})
     STORE._save(os.path.join(d, 'brief.json'), brief)
     return {'ok': True, 'id': did, 'url': f'/d/{user["id"]}/{did}/?new=1'}
 
@@ -278,7 +336,9 @@ def build_prompt(deck_dir):
     for k, n in NM.items():
         if (b.get(k) or '').strip(): L.append(f'- {n}: {b[k].strip()}')
     if (b.get('text') or '').strip(): L += ['- 사용자가 붙여 넣은 내용(이것이 재료다):', '"""', b['text'].strip(), '"""']
-    if b.get('files'): L.append(f'- 첨부 그림: {", ".join(b["files"])} — Read 로 열어 보고, 내용이면 재료로 · 덱에 넣을 만하면 <img src="그 경로"> 로')
+    imgs = [f for f in (b.get('files') or []) if f.startswith('img/')]; docs = b.get('docs') or []
+    if imgs: L.append(f'- 첨부 그림: {", ".join(imgs)} — Read 로 열어 보고, 내용이면 재료로 · 덱에 넣을 만하면 <img src="그 경로"> 로')
+    for dc in docs: L.append('- ' + doc_line(dc))
     if b.get('web'): L.append('- 웹 검색 켜짐: 받은 정보만으로 부족한 배경 · 최신 사실 · 공개 통계는 웹에서 찾아 보강하고 출처를 단다(받은 정보와 어긋나면 받은 정보를 따른다)')
     L += ['', '[만드는 순서]',
           '1. 듣는 사람과 목적에 맞춰 흐름을 정한다: 표지 → 목차 → (부분마다 간지 → 본문 페이지) → 정리. 한 페이지에 메시지 하나. 분량을 말하지 않았으면 본문 6~10페이지.',
@@ -456,7 +516,8 @@ class H(http.server.BaseHTTPRequestHandler):
             if path == '/api/classify': return self.classify(self.body(20_000))
             if path == '/api/ask': return self.ask(self.body(ASK_MAX_REQ))
             if path in ('/api/edit', '/api/edit/undo', '/api/shot', '/api/asset', '/api/font'):
-                req = self.body(12_000_000); self.deck_access(u, req.get('file'))
+                # 문서 첨부(25MB → base64 약 34MB)는 /api/asset 만 크게 받는다. 나머지(고치기 · 캡처 · 글꼴)는 12MB 그대로
+                req = self.body(36_000_000 if path == '/api/asset' else 12_000_000); self.deck_access(u, req.get('file'))
                 fn = {'/api/shot': lambda: shot(req, PORT), '/api/asset': lambda: save_asset(req), '/api/font': lambda: cache_font(req),
                       '/api/edit': lambda: apply_edits(req), '/api/edit/undo': lambda: undo_edit(req)}[path]
                 return self.reply(200, fn())
