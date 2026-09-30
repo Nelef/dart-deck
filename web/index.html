@@ -95,6 +95,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
 .chips button.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
 .drop { border-width: 2px; border-style: dashed; border-color: #d5d9df; border-radius: 14px; padding: 16px; text-align: center; color: var(--sub); font-weight: 700; cursor: pointer; }
 .drop.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
+.chips .cs { font-weight: 500; color: var(--sub); } .chips button.on .cs { color: inherit; opacity: .8; }
 .ifile { margin-top: 8px; font-weight: 800; color: var(--ink); } .ifile:empty { display: none; }
 .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; } .thumbs:empty { display: none; }
 .thumbs div { position: relative; width: 76px; height: 76px; border-radius: 10px; overflow: hidden; background: var(--bg); } .thumbs img { width: 100%; height: 100%; object-fit: cover; }
@@ -174,10 +175,13 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
     <div class="drop" id="nDrop">여기로 끌어 놓거나 눌러서 고르기 · 붙여넣기(Ctrl/⌘+V)도 됩니다</div>
     <input type="file" id="nFile" accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.pptx,.docx,application/pdf" multiple hidden>
     <div class="thumbs" id="nThumbs"></div>
+    <!-- 만들기 방식(사용자 지정 2026-09-30) — Sonnet 5.5 두 가지만. 30쪽 PDF 기준 빠르게 4~5분 · 자세하게 9분 안팎(Opus 는 새로 만들기에 쓰지 않는다) -->
+    <label class="l">만들기 방식</label>
+    <div class="chips" data-k="effort"><button data-v="medium">빠르게<span class="cs"> · 자료 많으면 5분 안팎</span></button><button data-v="high" class="on">자세하게<span class="cs"> · 10분 안팎 · 표 · 그림 더 많이</span></button></div>
     <label class="webopt"><input type="checkbox" id="nWeb"> <span><b>부족한 자료는 웹에서 찾아 보강</b> — 배경 · 최신 사실 · 공개 통계를 찾아 넣고 페이지마다 출처를 답니다</span></label>
     </div>
     <div class="cc" id="nCC" hidden><span style="flex:1">새 발표 자료는 Claude Code 가 만듭니다 — 먼저 내 Claude 구독을 연결해 주세요.</span><button class="btn sm go" id="nConnect">Claude 구독 연결</button></div>
-    <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분 · 창을 닫아도 계속 만듭니다</span><span class="bad" id="nErr"></span></div>
+    <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code(Sonnet 5.5)가 만들기 시작합니다 · 창을 닫아도 계속 만듭니다</span><span class="bad" id="nErr"></span></div>
   </div>
 </div>
 
@@ -267,7 +271,7 @@ const openNew = () => { setMode(NW.mode); $('#nErr').textContent = ''; setTimeou
 const setMode = (m) => { NW.mode = m; $('#nTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.m === m)); $('#mSurvey').hidden = m !== 'survey'; $('#mPaste').hidden = m !== 'paste';
   $('#mImport').hidden = m !== 'import'; $('#mAttach').hidden = m === 'import'; $('#nCC').hidden = m === 'import' || !!ME.claude; $('#nGo').disabled = m !== 'import' && !ME.claude;
   $('#nGo').textContent = m === 'import' ? '가져오기' : '만들기 시작';
-  document.querySelector('#new .gobar .hint').textContent = m === 'import' ? '원본 쪽마다 그림 한 장 · 가져온 뒤 바로 열립니다' : '열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분 · 창을 닫아도 계속 만듭니다'; };
+  document.querySelector('#new .gobar .hint').textContent = m === 'import' ? '원본 쪽마다 그림 한 장 · 가져온 뒤 바로 열립니다' : '열리자마자 Claude Code(Sonnet 5.5)가 만들기 시작합니다 · 창을 닫아도 계속 만듭니다'; };
 $('#nTabs').onclick = (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); };
 // 가져올 파일 — 하나만. 제목이 비었으면 파일 이름으로
 const pickImp = (f) => { if (!f) return; if (!/\.(pptx|ppt|pdf)$/i.test(f.name)) { $('#nErr').textContent = 'PPT(pptx · ppt)나 PDF 만 가져올 수 있어요'; return; }
@@ -310,7 +314,7 @@ $('#nGo').onclick = async () => {
   if (!title) { $('#nErr').textContent = '제목을 적어 주세요'; $('#nTitle').focus(); return; }
   const brief = NW.mode === 'paste' ? { mode: 'paste', text: $('#nText').value }
     : { mode: 'survey', audience: $('#nAud').value, info: $('#nInfo').value, key: $('#nKey').value, pages: chip('pages'), tone: chip('tone'), material: $('#nMat').value };
-  brief.web = $('#nWeb').checked;
+  brief.web = $('#nWeb').checked; brief.effort = $('.chips[data-k="effort"] button.on')?.dataset.v || 'high';
   if (!NW.files.some((f) => f.doc) && !Object.entries(brief).some(([k, v]) => k !== 'mode' && k !== 'web' && v.trim())) { $('#nErr').textContent = NW.mode === 'paste' ? '내용을 붙여 넣어 주세요' : '누가 보는지 · 무엇을 알려 줄지 하나 이상 적어 주세요'; return; }
   const b = $('#nGo'); b.disabled = true; b.textContent = '준비 중…';
   try { const j = await post('/api/decks', { action: 'create', title, brief, files: NW.files.map((f) => ({ name: f.name, data: f.data.split(',')[1] })) }); location.href = j.url; }

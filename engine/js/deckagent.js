@@ -196,9 +196,10 @@
       K.open('ai');
       const q = `받은 정보로 새 발표 자료를 만들어 주세요${b.audience ? ` — 보는 사람: ${b.audience}` : ''}${b.key ? ` · 핵심: ${b.key}` : ''}`;
       A.thread = A.newId();
-      // 새로 만들기 = Opus · 노력 high — 같은 설문 비교(2026-09-30): low 68초 · high 224초였지만 high 가 표 · 카드가 더 촘촘해
-      // "처음 만들 땐 high 가 낫겠다"(사용자 지정). 그 뒤 패널에서 고치는 부탁은 기본 Opus · low(A.model · A.effort 기본값)
-      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'high', kind: '새로 만들기' });
+      // 새로 만들기 = Sonnet 5.5 · 설문에서 고른 노력(빠르게 medium · 자세하게 high, 기본 high). Opus 는 쓰지 않는다 —
+      // 30쪽 PDF 비교(2026-09-30): Sonnet high 9분 · 17페이지 · 숫자 74/74 가 Opus high 13분 · 16페이지보다 빠르고 촘촘했다(사용자 지정 "opus high 는 쓰지 마")
+      const ef = b.effort === 'medium' ? 'medium' : 'high';
+      const go = () => A.ask(q, { build: true, model: 'sonnet', effort: ef, kind: '새로 만들기' });
       if (A.token) go(); else { A.afterLogin = go; A.login(); }
     },
     // ── 그림 첨부(사용자 지정 2026-09-30) — [그림] 버튼 · 붙여넣기(Ctrl/⌘+V) · 끌어 놓기, 3장까지. 폰 사진이 커서 긴 변 1600px 로 줄인다
@@ -357,7 +358,7 @@
       }
       // 여러 장(두 장 이상 · 새 장)은 계획부터 — 한 장이면 바로 고친다(사용자 지정 2026-09-30 "한 장만이면 지금처럼, 여러 장이면 물어보기")
       const plan = kind === '여러 장';
-      if (A.engine === 'claude') return A.ask(q, { model: A.model === 'auto' ? { 설명: 'haiku', '작은 수정': 'sonnet', '큰 수정': 'opus', '여러 장': 'opus' }[kind] : '', effort: { '작은 수정': 'medium', '큰 수정': 'high', '여러 장': 'high' }[kind] || '', kind, att, plan, noUser: o2.noUser });
+      if (A.engine === 'claude') return A.ask(q, { model: A.model === 'auto' ? { 설명: 'haiku', '작은 수정': 'sonnet', '큰 수정': 'sonnet', '여러 장': 'sonnet' }[kind] : '', effort: { '작은 수정': 'medium', '큰 수정': 'high', '여러 장': 'high' }[kind] || '', kind, att, plan, noUser: o2.noUser });
       // gemma 로 여러 장 · 레이아웃(큰 수정)은 바로 돌리지 않고 묻는다 — 벤치에서 레이아웃 과제는 거의 실패, 여러 장은 계획부터 어긋났다
       // (사용자 지정 2026-09-30 "로컬 llm 으로는 안 될 것 같다, Claude Code 로 돌리기 · 무시하고 진행 버튼으로")
       if (!o2.forceGemma && (kind === '여러 장' || kind === '큰 수정')) return A.warn(q, att, kind);
@@ -384,7 +385,7 @@
       const plan = g.kind === '여러 장';
       if (how === 'gemma') return A.ask(m.root, { att: g.att, plan, kind: g.kind, noUser: true });
       A.engine = 'claude'; K.render();
-      const go = () => A.ask(m.root, { att: g.att, plan, kind: g.kind, noUser: true, model: A.model === 'auto' ? 'opus' : '', effort: A.effort === 'auto' ? 'low' : '' });
+      const go = () => A.ask(m.root, { att: g.att, plan, kind: g.kind, noUser: true, model: A.model === 'auto' ? 'sonnet' : '', effort: A.effort === 'auto' ? 'high' : '' });   // 자동이면 Sonnet · high — Opus high 는 사람이 패널에서 고를 때만(사용자 지정 2026-09-30)
       if (A.token) go(); else { A.afterLogin = go; A.login(); }
     },
 

@@ -325,7 +325,8 @@ def new_deck(user, req):
     title = re.sub(r'\s+', ' ', str(req.get('title') or '')).strip()[:80]
     if not title: raise ValueError('제목을 적어 주세요')
     b = req.get('brief') or {}
-    brief = {'mode': 'paste' if b.get('mode') == 'paste' else 'survey', **{k: str(b.get(k) or '')[:40_000 if k in ('text', 'material') else 2000] for k in BRIEF_KEYS}, 'web': bool(b.get('web'))}
+    brief = {'mode': 'paste' if b.get('mode') == 'paste' else 'survey', **{k: str(b.get(k) or '')[:40_000 if k in ('text', 'material') else 2000] for k in BRIEF_KEYS}, 'web': bool(b.get('web')),
+             'effort': 'medium' if b.get('effort') == 'medium' else 'high'}   # 만들기 방식 — 빠르게(Sonnet medium) · 자세하게(Sonnet high)
     has_doc = any(os.path.splitext(str((f or {}).get('name') or ''))[1].lower() in DOC_EXT for f in (req.get('files') or []))   # 문서만 올려도 된다
     if not has_doc and not any(brief[k].strip() for k in BRIEF_KEYS): raise ValueError('어떤 사람에게 어떤 정보를 줄지 한 가지 이상 적어 주세요')
     tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
@@ -561,7 +562,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
             if req.get('build'):
                 dd = os.path.dirname(edit_target(req.get('file')))
-                req.update({'prompt': build_prompt(dd), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'high',
+                req.update({'prompt': build_prompt(dd), 'plan': False, 'model': 'sonnet', 'effort': req.get('effort') if req.get('effort') in ('medium', 'high') else 'high',   # 새로 만들기 = Sonnet medium · high 만
                             'web': bool((STORE._load(os.path.join(dd, 'brief.json'), {}) or {}).get('web'))})
             return self.agent_stream(req, u)
         # 대화 기록 — 이 계정이 이 덱에 한 부탁들 · 따라 보기 · 멈춤 · 상태(진행 · 취소 · 버림) · 새 대화(숨기기)
