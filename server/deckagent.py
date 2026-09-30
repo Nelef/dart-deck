@@ -354,7 +354,13 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
             hint += '\n# 이번 부탁은 작은 수정\n- 글 · 색 · 크기 몇 곳만 바꿨으면 캡처 확인(deck_shot)을 건너뛴다 — 고친 뒤 서버가 화면을 찍어 점검한다. 배치를 바꿨거나 넘칠 것 같으면 한 번만 찍는다.\n'
         # 웹 검색은 Claude 쪽 서버가 도는 도구라 구독 엔진에서만 된다(gemma 는 LiteLLM 경유라 안 된다)
         web = bool(req.get('web')) and engine == 'sub'
-        args = [CLAUDE, '-p', str(req.get('prompt') or '')[:BUILD_PROMPT_MAX if req.get('build') else 8000], '--output-format', 'stream-json', '--verbose',
+        # 앞 대화를 잇는 부탁(--resume)은 부탁마다 새 사본(.deckagent-<rid>.html)을 쓰는데, 모델이 **앞 차례의 사본 이름**을 기억해 거기에 쓰려다
+        # 허용 목록(이번 사본만)에 막혀 '고치기'가 20번 헛돈 일이 있다(2026-09-30, 앞 차례 = 설명). 시스템 프롬프트에만 적어서는 옛 기억을 못 이긴다 —
+        # 사용자 메시지 맨 앞에 이번 파일을 박는다
+        ask = str(req.get('prompt') or '')[:BUILD_PROMPT_MAX if req.get('build') else 8000]
+        if r['session'] and not req.get('plan'):
+            ask = f"[이번 부탁의 작업 파일은 ./{r['work']} — 앞 대화에서 쓴 .deckagent-*.html 사본은 지워졌다. 이 파일을 새로 Read 해서 고친다]\n{ask}"
+        args = [CLAUDE, '-p', ask, '--output-format', 'stream-json', '--verbose',
                 '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, ''))) + (WEB if web else '') + hint, '--permission-mode', 'default',
                 # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
                 '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if web else []),
