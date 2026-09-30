@@ -1,0 +1,415 @@
+# 덱 AI — Claude Code 로 고치기(serve.py 가 부른다). 사용자 지정(2026-09-30): "클로드 코드 도구를 연결 · 구독 계정으로, 계정 있으면 그걸로".
+# 왜 Claude Code 인가: 하네스 비교(bench/run.mjs, 12과제 × 2)에서 같은 gemma-4-26b 로도 Claude Code + 생각이 17/24 로 가장 좋았다
+#   (덱 패널 한 번에 쓰기 15/24 · Codex 11/24). 도구로 조금씩 고치고, 그림을 직접 열어 보며 스스로 확인하는 방식이 이긴다.
+#
+# 흐름: 원본 옆에 숨김 사본(.deckagent-<rid>.html)을 만들고 → Claude Code 가 사본만 고치고 tools/deck_shot.cjs 로 찍어 보며 확인 →
+#   끝나면 원본 · 사본을 찍어 덱에 보낸다 → 사람이 [적용]을 누르면 원본이 그 사이 안 바뀌었는지 보고 백업한 뒤 사본으로 바꾼다.
+# 엔진 두 가지:
+#   · 구독 — 쓰는 사람의 Claude 구독 토큰(claude setup-token 로 만든 것, CLAUDE_CODE_OAUTH_TOKEN). 토큰은 브라우저에만 두고 부탁마다 받는다(서버 디스크에 안 남김).
+#   · gemma — 로컬 gemma-4-26b. vLLM 의 /v1/messages 는 Claude Code 의 system 역할 메시지를 거부해서(실측 400) LiteLLM(:4011)을 거친다.
+# 안전: Tailscale 로 들어온 누구든 이 Mac 에서 돌리는 것이라 도구를 좁힌다 — 쓰기는 사본 한 파일만(Edit/Write(./사본)), 명령은 캡처 도구만
+#   (Bash(node tools/deck_shot.cjs:*)), 읽기는 작업 폴더(deck) 안만(Claude Code 기본: 폴더 밖은 허락을 물어 -p 에서는 거부).
+#   실측(2026-09-30): 다른 파일 고치기 · 폴더 밖 파일 읽기 · 'ls /' 전부 거부됨. 사용자 ~/.claude 의 훅 · 스킬이 안 끼게 설정 폴더를 따로 둔다.
+import os, re, json, uuid, time, hashlib, shutil, subprocess, threading, pty, select, signal, tempfile, fcntl, termios, struct, urllib.request, urllib.error
+
+# 경로 — ai-ppt(2026-09-30 이전 프로토타입 research/deckagent.py 에서 옮김). 덱은 DATA_DIR/decks/<계정>/<덱>/, 엔진은 engine/
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+ENGINE = os.path.join(ROOT, 'engine')
+DATA_DIR = os.path.abspath(os.environ.get('PPT_DATA_DIR', os.path.join(ROOT, 'data')))
+ADIR = os.path.join(DATA_DIR, '.agent')                        # Claude Code 설정 · 로그
+CLAUDE = shutil.which('claude') or next((p for p in ('/opt/homebrew/bin/claude', '/usr/local/bin/claude') if os.path.exists(p)), 'claude')
+LITE = os.environ.get('DECK_LITE_URL', 'http://127.0.0.1:4011')
+LITE_BIN = os.path.expanduser(os.environ.get('DECK_LITE_BIN', '~/.venvs/litellm/bin/litellm'))
+LITE_CFG = os.path.join(HERE, 'litellm.yaml')
+NODE_PATH = os.path.join(ROOT, 'node_modules')                 # 덱 사본 폴더의 tools/deck_shot.cjs 가 playwright 를 찾게
+RUN_SEC = 15 * 60                                             # 한 번 부탁의 상한(생각 켠 gemma 는 몇 분 걸린다 — 벤치 중앙 70초, 긴 것 10분)
+BUILD_SEC = 40 * 60                                            # 새 덱 처음 만들기(10페이지 안팎을 Opus 가 쓰고 찍어 보며 고친다)
+BUILD_PROMPT_MAX = 60_000                                      # 새 덱 부탁 — 사용자가 붙여 넣은 자료 전체가 들어간다
+RUNS = {}                                                      # rid → {file, work, sha0, session, slide, t}
+LOGINS = {}                                                    # 로그인 중계 — id → {pid, fd, buf, dir, t}
+LOCK = threading.Lock()
+LIMITS = {}                                                    # 토큰 지문(sha256 앞 16자) → {한도 종류: rate_limit_info, _t} — 토큰 자체는 저장 안 함
+def _fp(tok): return hashlib.sha256(str(tok).encode()).hexdigest()[:16]
+def _limit(tok, info):
+    if not isinstance(info, dict): return
+    d = LIMITS.setdefault(_fp(tok), {}); d[str(info.get('rateLimitType') or 'unknown')] = info; d['_t'] = time.time()
+    # 한도 창 전부 — 맨 위(rateLimitType)는 대표 한도 하나뿐이고 5시간 · 주간은 unifiedWindows 에 함께 온다(실측 2026-09-30: 주간만 보였다)
+    for k, w in (info.get('unifiedWindows') or {}).items():
+        if isinstance(w, dict): d[k] = {**w, 'rateLimitType': k, 'status': info.get('status') if k == info.get('rateLimitType') else w.get('status')}
+    try:   # 무엇이 왔는지 남긴다(토큰 없이) — 사용률 숫자를 실제로 주는지 확인용
+        os.makedirs(ADIR, exist_ok=True); open(os.path.join(ADIR, 'limits.log'), 'a', encoding='utf-8').write(f"{time.strftime('%H:%M:%S')} {_fp(tok)[:6]} {json.dumps(info, ensure_ascii=False)}\n")
+    except OSError: pass
+
+def _sha(t): return hashlib.sha256(t.encode('utf-8')).hexdigest()
+
+def _gc():
+    now = time.time()
+    for rid, r in list(RUNS.items()):
+        if now - r['t'] > 3 * 3600: discard({'rid': rid})
+    for lid, l in list(LOGINS.items()):
+        if now - l['t'] > 600: _login_kill(lid)
+
+# ── gemma 쪽 번역 서버 — 없으면 띄운다(venv 가 있을 때만) ──
+def ensure_lite():
+    try:
+        urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
+    except Exception: pass
+    if not os.path.exists(LITE_BIN): raise ValueError(f'gemma 로 돌리려면 LiteLLM 이 필요합니다({LITE_BIN} 없음) — research/tools/litellm.yaml 참고')
+    os.makedirs(ADIR, exist_ok=True)
+    port = LITE.rsplit(':', 1)[-1]
+    subprocess.Popen([LITE_BIN, '--config', LITE_CFG, '--host', '127.0.0.1', '--port', port, '--num_workers', '4'],
+                     stdout=open(os.path.join(ADIR, 'litellm.log'), 'a'), stderr=subprocess.STDOUT, start_new_session=True)
+    for _ in range(40):
+        time.sleep(0.5)
+        try: urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
+        except Exception: pass
+    raise ValueError('LiteLLM 이 뜨지 않았습니다(.deck-agent/litellm.log)')
+
+# 긴 줄 나누기 — 굳힌 장은 마크업이 한 줄 수천 자(격자 200칸)인데 Claude Code 의 Read 가 긴 줄을 잘라 보여 줘서, gemma 가 찾을 글을 짐작하다
+# Edit 이 16번 실패했다(실측 2026-09-30). 작업 사본에서만 <script> 밖의 긴 줄을 태그 경계(><)마다 주석 줄바꿈으로 나눈다 — 주석 안의 줄바꿈이라
+# 화면은 한 픽셀도 안 바뀌고(인라인 블록 사이 공백이 안 생긴다), [적용] 때 주석을 떼면 원래 한 줄로 돌아간다. 스크립트 안(JS 문자열)은 건드리면 문법이 깨진다.
+BRK = '<!--⏎\n-->'
+def unfold(text):
+    out = []; pos = 0
+    for m in re.finditer(r'<script\b[\s\S]*?</script>', text):
+        out.append(_unfold_part(text[pos:m.start()])); out.append(m.group(0)); pos = m.end()
+    out.append(_unfold_part(text[pos:])); return ''.join(out)
+def _unfold_part(t):
+    return '\n'.join(ln.replace('><', '>' + BRK + '<') if len(ln) > 600 else ln for ln in t.split('\n'))
+def fold(text): return text.replace(BRK, '')
+
+def slide_names(text): return re.findall(r'<section[^>]*\sdata-name="([^"]+)"', text)
+
+def changed_parts(orig, new, slide_parts):
+    """바뀐 장 이름들 · 그 밖(공용 style · 스크립트 등)이 바뀌었나"""
+    names = slide_names(orig); out = []
+    rest_o, rest_n = orig, new
+    for nm in names:
+        so, io = slide_parts(orig, nm); sn, inn = slide_parts(new, nm)
+        if so != sn or io != inn: out.append(nm)
+        for a in (so, io):
+            if a: rest_o = rest_o.replace(a, '', 1)
+        for a in (sn, inn):
+            if a: rest_n = rest_n.replace(a, '', 1)
+    # 주석만 바뀐 건 공용 변경으로 치지 않는다 — 스크립트 위 장 설명 주석(// ═══ 1. 정답률 …)을 고쳐 '공용 부분도 바뀜'으로 보였다(시험 B1)
+    nc = lambda t: re.sub(r'^\s*//[^\n]*$|<!--[\s\S]*?-->', '', t, flags=re.M)
+    return out, nc(rest_o) != nc(rest_n)
+
+PLAN = ('이번 차례는 **계획만** 세운다 — 파일을 고치지 않는다(고치기 도구가 막혀 있다). DECK.md 규칙(한 장에 메시지 하나 · 명사형 제목 · 개조식 · 인포그래픽)과 '
+        '지금 덱의 흐름(목차 · 간지 · 장 순서)을 읽고, 무엇을 어디에 넣거나 고칠지 짧게 제안한다:\n'
+        '- 넣을 자리(「2장과 3장 사이」 · 「6장 뒤」)와 장 수, 장마다 제목 · 담을 내용(개조식 2~4줄) · 그림 형태(표 · 막대 · 순서도 …)\n'
+        '- 고칠 기존 장이 있으면 몇 번째 장을 어떻게\n- 목차 · 간지를 같이 고쳐야 하면 그것도\n마지막 줄은 「이대로 진행할까요?」. 사용자가 진행을 누르면 다음 차례에 이 계획대로 고친다.\n')
+
+def deck_rules():
+    """DECK.md 2~7장(말 · 글자 크기 · 인포그래픽 · 숫자 · 색 · 끝내기 전 확인) 원문 — 수정이든 새로 쓰기든 계획이든 늘 지시문에 넣는다.
+    예전엔 '처음 고칠 때 DECK.md 를 읽고 따른다' 한 줄이라 읽을지 말지를 AI 가 정했다(사용자 지정 2026-09-30 "한국의 ppt 규칙 잘 지켜야 됨").
+    요약본을 따로 두면 DECK.md 와 어긋나므로 매번 파일에서 잘라 온다"""
+    try: t = open(os.path.join(ENGINE, 'DECK.md'), encoding='utf-8').read()
+    except OSError: return ''
+    a = t.find('\n## 2.'); return t[a:].strip() if a >= 0 else ''
+
+def system_prompt(work, slide, n, port, files=(), plan=False, base='/'):
+    jpg = work.replace('.html', '.jpg')
+    rules = deck_rules()
+    return (PLAN if plan else '') + ((f'# 이 덱의 작성 규칙(DECK.md 2~7장 원문 — 사용자가 여러 번 고쳐 준 한국 발표 자료 규칙, 반드시 지킨다)\n{rules}\n\n# 작업\n') if rules else '') + (f'너는 슬라이드 덱(16:9 무대 1600×900)을 고치는 도우미다. 고칠 파일은 **{work} 하나뿐**이다(원본의 사본 — 다른 파일은 읽기만).\n'
+            f'사용자가 지금 보고 있는 장: {n}번째 「{slide}」. "이 장" · "여기"는 이 장이다. 여러 장(「2장과 5장」 · 「모든 간지」 · 「전체 제목」)을 말하면 그 장들을 모두 고친다 — 말이 없으면 이 장만.\n'
+            + (f'사용자가 그림 {len(files)}장을 첨부했다: {", ".join(files)} — Read 로 열어 본다. 참고용(「이것처럼」)이면 보고 따르고, 덱에 넣으라면 이 경로를 그대로 <img src="…"> 로 쓴다(덱 폴더 기준 상대 경로).\n' if files else '') +
+            '규칙: 위 작성 규칙을 새로 쓰거나 바꾸는 모든 글 · 크기 · 색 · 배치에 지킨다(제목은 명사형 · 설명은 개조식 · 글자는 --fs-* 단계 · 색은 --c-* 변수 · 숫자는 기록에서). 장마다 <section class="slide" data-name="…"> 이고, '
+            "그 장을 그리는 스크립트는 INIT['장 이름'] = () => {…} 이다(간지는 PARTS 목록을 도는 스크립트). data-name · INIT 이름은 바꾸지 않는다. "
+            'data-frozen 이 붙은 장은 스크립트가 다시 그리지 않는다 — 마크업이 곧 화면이다. 스크립트가 그리는 장은 마크업을 고쳐도 덮이니 스크립트를 고친다. '
+            '색은 var(--c-*), 글자 크기는 var(--fs-*) 변수만. 그림 부품은 js/deckviz.js 의 Viz.* (인자 모양을 먼저 읽는다).\n'
+            f'파일의 긴 줄은 태그마다 {BRK!r} 주석으로 나눠 두었다(저장할 때 원래대로 붙인다) — 그 주석은 지우거나 새로 넣지 말고, 고칠 때 보이는 그대로 복사한다.\n'
+            f'고친 뒤에는 반드시 확인한다: `node tools/deck_shot.cjs http://127.0.0.1:{port}{base}{work} {n} {jpg}` 를 실행해 출력 JSON 의 errors · problems(넘침 · 겹침)를 보고, '
+            f'{jpg} 를 Read 로 열어 그림에서 요청대로 됐는지 · 요청 대상 전부에 적용됐는지 · 원래 정보가 사라지지 않았는지 본다. 그리고 새로 쓰거나 바꾼 제목 · 설명마다 작성 규칙(명사형 제목 · 개조식 · 글자 크기 · 한 장에 메시지 하나)에 맞는지 하나씩 대조한다. 여러 장을 고쳤으면 장 번호를 쉼표로(예: 3,5,9) 주면 '
+            f'{jpg.replace(".jpg", "-3.jpg")} 처럼 장마다 찍힌다. 문제가 있으면 고치고 다시 확인한다(최대 3번).\n'
+            '명령(Bash)은 위 캡처 명령과 이 폴더 안의 읽기 명령(grep · ls)만 된다 — 파일은 Read 로 보고 찾기는 grep 으로(sed · cd · 다른 폴더는 막혀 헛돈다. Grep 도구는 없다), 고치기는 Edit 로. 답은 이 덱 내용으로만 한다(개발 저장소 · 기록 얘기 금지).\n'
+            '사람에게 말할 때는 슬라이드 한 장을 「장」이 아니라 「페이지」라고 부른다(「3페이지」 · 「이 페이지」).\n'
+            '설명 · 질문이면 파일을 고치지 말고 답만 한다. 마지막 답은 한국어로 짧게 — 무엇을 바꿨는지 2~3줄(고쳤다면), 확인하지 못한 점이 있으면 솔직히.')
+
+def _step(name, inp):
+    f = str(inp.get('file_path') or inp.get('path') or inp.get('pattern') or '')
+    base = os.path.basename(f) if f else ''
+    if name == 'Read': return f'읽기 {base}' + (' (그림 확인)' if base.endswith('.jpg') else '')
+    if name in ('Edit', 'MultiEdit', 'Write'): return '고치기'
+    if name == 'Bash': return '화면 찍어 점검' if 'deck_shot' in str(inp.get('command')) else f"명령 {str(inp.get('command'))[:40]}"
+    if name in ('Grep', 'Glob'): return f'찾기 {str(inp.get("pattern"))[:30]}'
+    if name == 'TodoWrite': return '할 일 정리'
+    return name
+
+def run(req, send, port, edit_target, slide_parts, shot, url_of):
+    """url_of(파일 경로) → 그 파일의 웹 주소(/d/<계정>/<덱>/…) — 캡처 도구가 덱 사본을 여는 주소"""
+    """부탁 하나 — send(obj) 로 NDJSON 을 흘린다. 끊기면(BrokenPipe) Claude Code 를 죽인다"""
+    _gc()
+    engine = 'sub' if req.get('token') else 'gemma'
+    rid = str(req.get('rid') or '')
+    with LOCK:
+        if rid and rid in RUNS:
+            r = RUNS[rid]
+            if r.get('busy'): raise ValueError('이 대화는 아직 작업 중입니다')
+            # 엔진이 바뀌면 세션을 새로 — gemma 세션을 구독 설정 폴더에서 이어 붙이려다 'No conversation found' 로 실패했다(실측). 고친 사본은 이어 쓴다
+            if r.get('engine') != engine: r['session'] = ''; r['engine'] = engine
+        else:
+            path = edit_target(req.get('file')); text = open(path, encoding='utf-8').read()
+            rid = uuid.uuid4().hex[:10]; work = f'.deckagent-{rid}.html'
+            open(os.path.join(os.path.dirname(path), work), 'w', encoding='utf-8').write(unfold(text))
+            # 부탁마다 새 사본(지금 파일에서) — 대화 기억만 앞 세션으로 잇는다(req.session). 사본을 이어 고치던 방식은 '수정안이 떠 있는데
+            # 또 부탁하면?'이 헷갈려 없앴다(사용자 지정 2026-09-30 "심플하게"). 세션 ID 는 Claude Code 가 준 uuid 꼴만 받는다
+            sess = str(req.get('session') or '')
+            r = RUNS[rid] = {'file': path, 'work': work, 'sha0': _sha(text), 'session': sess if re.fullmatch(r'[0-9a-f-]{36}', sess) else '', 't': time.time(), 'engine': engine}
+        r['busy'] = True; r['t'] = time.time()
+    try:
+        path = r['file']; cwd = os.path.dirname(path); workp = os.path.join(cwd, r['work'])
+        slide = str(req.get('slide') or ''); names = slide_names(open(path, encoding='utf-8').read())
+        n = names.index(slide) + 1 if slide in names else 1
+        # 첨부 그림 — 덱이 /api/asset 로 먼저 올린 img/uploads/ 경로만 받는다(Claude Code 가 작업 폴더 안에서 Read 로 연다)
+        files = [f for f in (req.get('files') or []) if isinstance(f, str) and re.fullmatch(r'img/uploads/[0-9a-f]{16}\.(png|jpg|gif|webp)', f) and os.path.exists(os.path.join(cwd, f))][:3]
+        send({'rid': rid, 'engine': engine})
+        args = [CLAUDE, '-p', str(req.get('prompt') or '')[:BUILD_PROMPT_MAX if req.get('build') else 8000], '--output-format', 'stream-json', '--verbose',
+                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, ''))), '--permission-mode', 'default',
+                # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
+                '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)',
+                '--disallowedTools', 'WebFetch', 'WebSearch', 'Task', 'NotebookEdit',
+                # 덱 폴더의 js · css · tools · DECK.md 는 engine/ 을 가리키는 링크다 — 링크 너머 읽기가 '작업 폴더 밖'으로 막히지 않게 엔진 폴더를 읽기로 연다
+                '--add-dir', ENGINE]
+        env = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_CODE_OAUTH'))}
+        env.update({'DISABLE_AUTOUPDATER': '1', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1',
+                    # 개발 저장소 문맥을 끊는다 — 구독 시험(2026-09-30)에서 '왜 행을 빠뜨려?'에 최근 커밋(git 기록) · 저장소 CLAUDE.md 를 읽고 그 얘기로 답했다.
+                    # 덱 사용자에게 개발 기록이 새어 나가면 안 된다: git 안내 끔 · git 이 저장소를 못 찾게(research/ 에서 멈춤) · CLAUDE.md · 자동 메모리 끔
+                    'CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS': '1', 'GIT_CEILING_DIRECTORIES': DATA_DIR, 'NODE_PATH': NODE_PATH, 'CLAUDE_CODE_DISABLE_CLAUDE_MDS': '1', 'CLAUDE_CODE_DISABLE_AUTO_MEMORY': '1'})
+        if engine == 'sub':
+            env.update({'CLAUDE_CODE_OAUTH_TOKEN': str(req['token']), 'CLAUDE_CONFIG_DIR': os.path.join(ADIR, re.sub(r'[^a-z0-9_.-]', '', str(req.get('_cfg') or 'cfg-sub')) or 'cfg-sub')})
+            if req.get('model') in ('opus', 'sonnet', 'haiku'): args += ['--model', req['model']]
+            if req.get('effort') in ('low', 'medium', 'high', 'xhigh', 'max'): args += ['--effort', req['effort']]   # 노력 단계(사용자 지정 2026-09-30)
+        else:
+            ensure_lite()
+            # 생각 켬 — 벤치에서 Claude Code + gemma 는 생각을 켜야 좋았다(17/24 ↔ 끔 10/24)
+            env.update({'ANTHROPIC_BASE_URL': LITE, 'ANTHROPIC_API_KEY': 'x', 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '8000', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS': '65536',
+                        'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-gemma')})
+            args += ['--bare', '--model', 'gemma-think']
+        if r['session']: args += ['--resume', r['session']]
+        os.makedirs(env['CLAUDE_CONFIG_DIR'], exist_ok=True)
+        p = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        err = []; threading.Thread(target=lambda: err.extend(p.stderr.readlines()), daemon=True).start()
+        timed = []
+        sec = BUILD_SEC if req.get('build') else RUN_SEC
+        killer = threading.Timer(sec, lambda: (timed.append(1), os.killpg(p.pid, signal.SIGKILL))); killer.start()
+        result = None
+        try:
+            for line in p.stdout:
+                try: j = json.loads(line)
+                except ValueError: continue
+                t = j.get('type')
+                if t == 'system' and j.get('subtype') == 'init': r['session'] = j.get('session_id') or r['session']; send({'session': r['session']})
+                elif t == 'system' and j.get('subtype') == 'thinking_tokens': send({'think': 1})
+                elif t == 'assistant':
+                    for c in (j.get('message') or {}).get('content') or []:
+                        if c.get('type') == 'text' and c.get('text'): send({'d': c['text']})
+                        elif c.get('type') == 'tool_use': send({'step': _step(c.get('name'), c.get('input') or {})})
+                        elif c.get('type') == 'thinking': send({'think': len(c.get('thinking') or '')})
+                elif t == 'user':
+                    for c in (j.get('message') or {}).get('content') or []:
+                        if isinstance(c, dict) and c.get('type') == 'tool_result' and c.get('is_error'): send({'stepErr': str(c.get('content'))[:160]})
+                elif t == 'rate_limit_event' and engine == 'sub': _limit(req['token'], j.get('rate_limit_info'))   # 남은 사용량 재료(사용량 팝업)
+                elif t == 'result': result = j
+        except (BrokenPipeError, ConnectionResetError):
+            os.killpg(p.pid, signal.SIGKILL); raise
+        finally:
+            killer.cancel(); p.wait()
+        if not result or result.get('is_error'):
+            # 시간 초과면 그렇게 말한다 — stderr 끝줄(모르는 모델 이름 안내 등)이 까닭처럼 보였다(gemma 여러 장 진행 실측: 15분 뒤 엉뚱한 줄)
+            msg = (f'{sec // 60}분 안에 끝나지 않아 멈췄습니다' + (' — gemma 로는 여러 장 · 레이아웃이 어렵습니다. Claude Code 로 해 보세요' if engine == 'gemma' else '')) if timed \
+                else (result or {}).get('result') or ''.join(ln for ln in err if 'unrecognized_model' not in ln)[-600:].strip() or f'Claude Code 가 끝났습니다(코드 {p.returncode})'
+            if re.search(r'auth|login|token|401|403', msg, re.I) and engine == 'sub': msg = f'구독 인증 실패 — 계정을 다시 연결해 주세요 ({msg[:160]})'
+            send({'error': msg[:600]}); return
+        orig = open(path, encoding='utf-8').read(); new = fold(open(workp, encoding='utf-8').read())
+        slides, other = changed_parts(orig, new, slide_parts)
+        out = {'done': True, 'rid': rid, 'result': result.get('result') or '', 'turns': result.get('num_turns'), 'sec': round((result.get('duration_ms') or 0) / 1000),
+               'changed': new != orig, 'slides': slides, 'other': other, 'engine': engine,
+               # 실제로 쓰인 모델 ID — 별칭(opus · sonnet · haiku)이 어느 판으로 이어졌는지 사람이 보게(사용자 질문 2026-09-30 "소넷 5.5 는 없었니")
+               'models': [m for m in (result.get('modelUsage') or {}).keys()]}
+        if new != orig:
+            send({'step': '고치기 전 · 후 화면 찍기'})
+            # 바뀐 장마다(지금 장을 앞에, 최대 6장) — 여러 장 고치기(사용자 지정 2026-09-30). 한 번 열어 여러 장을 찍는다(deck_shot 쉼표 목록)
+            ks = sorted({names.index(x) + 1 for x in slides if x in names}, key=lambda k: (k != n, k))[:6] or [n]
+            rel = url_of(path)
+            b = shot({'file': rel, 'html': orig, 'slide': ks[0], 'slides': ks}, port); a2 = shot({'file': rel, 'html': new, 'slide': ks[0], 'slides': ks}, port)
+            out['before'] = {k: v for k, v in b.items() if k != 'jpgs'}; out['after'] = {k: v for k, v in a2.items() if k != 'jpgs'}; out['shotSlide'] = ks[0]
+            if len(ks) > 1:
+                out['shots'] = [{'n': k, 'name': names[k - 1], 'before': (b.get('jpgs') or {}).get(str(k), ''), 'after': (a2.get('jpgs') or {}).get(str(k), '')} for k in ks]
+        send(out)
+    finally:
+        r['busy'] = False; r['t'] = time.time()
+
+def apply(req, backup_name, edit_dir):
+    r = RUNS.get(str(req.get('rid') or ''))
+    if not r: raise ValueError('이 수정안이 서버에 없습니다(서버를 다시 켰거나 오래됨) — 다시 부탁해 주세요')
+    if r.get('busy'): raise ValueError('아직 작업 중입니다')
+    path = r['file']; text = open(path, encoding='utf-8').read()
+    if _sha(text) != r['sha0']: raise ValueError('그 사이 원본이 바뀌었습니다(다른 편집 · 저장) — 다시 부탁해 주세요')
+    workp = os.path.join(os.path.dirname(path), r['work']); new = fold(open(workp, encoding='utf-8').read())
+    import datetime
+    os.makedirs(edit_dir, exist_ok=True)
+    bak = f"{backup_name(path)}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
+    open(bak, 'w', encoding='utf-8').write(text); open(path, 'w', encoding='utf-8').write(new)
+    discard(req)
+    return {'ok': True, 'backup': os.path.basename(bak)}
+
+def discard(req):
+    r = RUNS.pop(str(req.get('rid') or ''), None)
+    if r:
+        for f in (r['work'], r['work'].replace('.html', '.jpg')):
+            try: os.remove(os.path.join(os.path.dirname(r['file']), f))
+            except OSError: pass
+    return {'ok': True}
+
+# ── 구독 계정 연결 — `claude setup-token` 을 서버에서 대신 돌린다(가상 터미널). 로그인은 쓰는 사람이 **자기 브라우저**에서 한다 ──
+# 1) start: 로그인 주소를 받아 덱에 준다 → 사람이 열어 로그인하면 claude.com 이 코드를 보여 준다
+# 2) finish: 그 코드를 받아 터미널에 넣고, 나온 토큰(1년짜리, 구독에 묶임)을 덱에 돌려준다 — 서버는 토큰을 저장하지 않는다
+_ANSI = re.compile(r'\x1b\[[0-9;?>]*[A-Za-z~]|\x1b\][^\x07]*\x07|\x1b[=>]')
+
+def _login_kill(lid):
+    l = LOGINS.pop(lid, None)
+    if not l: return
+    try: os.kill(l['pid'], signal.SIGKILL)
+    except OSError: pass
+    try: os.close(l['fd'])
+    except OSError: pass
+    shutil.rmtree(l['dir'], ignore_errors=True)
+
+def _login_read(l):
+    while True:
+        try:
+            rd, _, _ = select.select([l['fd']], [], [], 1)
+            if rd:
+                d = os.read(l['fd'], 65536)
+                if not d: break
+                l['buf'] += d.decode('utf-8', 'replace')
+        except OSError: break
+
+def login_start(req):
+    _gc(); os.makedirs(ADIR, exist_ok=True)
+    d = tempfile.mkdtemp(prefix='login-', dir=ADIR)
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_CODE_OAUTH'))}
+    env.update({'CLAUDE_CONFIG_DIR': d, 'BROWSER': '/usr/bin/true', 'TERM': 'xterm-256color'})
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execvpe(CLAUDE, [CLAUDE, 'setup-token'], env)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 50, 1000, 0, 0))   # 넓은 터미널 — 주소가 80칸에서 줄바꿈되지 않게
+    lid = uuid.uuid4().hex[:10]; l = LOGINS[lid] = {'pid': pid, 'fd': fd, 'buf': '', 'dir': d, 't': time.time()}
+    threading.Thread(target=_login_read, args=(l,), daemon=True).start()
+    for _ in range(60):
+        time.sleep(0.5)
+        # 줄 단위로 — 줄바꿈을 지우고 찾으면 다음 줄 'Paste code here if prompted' 가 state 끝에 붙어 로그인 확인값이 틀어졌다(2026-09-30 실측). 터미널 폭 1000 이라 주소는 한 줄
+        m = next((re.search(r'https://claude\.(?:com|ai)/\S*oauth/authorize\?\S*state=[A-Za-z0-9_\-]+', ln) for ln in _ANSI.sub('', l['buf']).replace('\r', '\n').split('\n')
+                  if re.search(r'oauth/authorize\?\S*state=[A-Za-z0-9_\-]+', ln)), None)
+        if m:
+            return {'ok': True, 'id': lid, 'url': m.group(0)}
+    _login_kill(lid); raise ValueError('로그인 주소를 받지 못했습니다')
+
+def login_finish(req):
+    """코드를 터미널에 넣고 곧바로 돌아온다 — 결과는 login_poll 로. 폰에서 코드를 복사하러 탭을 오가는 사이 40초짜리 요청이
+    끊겨('Failed to fetch', 서버 로그 Broken pipe) 결과를 못 받았다(2026-09-30). 기다리는 일은 서버 쪽 스레드가 한다"""
+    lid = str(req.get('id') or ''); l = LOGINS.get(lid)
+    if not l: raise ValueError('로그인 시간이 지났습니다 — 다시 연결을 눌러 주세요')
+    code = re.sub(r'\s+', '', str(req.get('code') or ''))
+    if not code or len(code) > 400: raise ValueError('코드를 붙여 넣어 주세요')
+    if l.get('sent'): return {'ok': True, 'pending': True}
+    l['sent'] = True; l['t'] = time.time(); n0 = len(l['buf'])
+    # 코드와 Enter 를 따로 — 한 번에 쓰면 긴 코드(100자 넘음)를 CLI 가 통째 '붙여넣기'로 받아 끝의 Enter 까지 글자로 삼키고
+    # 제출되지 않은 채 멈췄다(2026-09-30 폰 실측: 입력칸에 별표만 찍히고 끝). 짧은 가짜 코드로는 안 드러났다
+    os.write(l['fd'], code.encode()); time.sleep(0.8); os.write(l['fd'], b'\r'); time.sleep(0.8)
+    if not re.search(r'OAuth|sk-ant|Success|token', _ANSI.sub('', l['buf'][n0:]), re.I): os.write(l['fd'], b'\r')   # 그래도 반응이 없으면 한 번 더
+    def watch():
+        out = ''
+        for _ in range(150):
+            time.sleep(0.4)
+            out = _ANSI.sub('', l['buf'][n0:]).replace('\r', '\n')
+            # 줄 단위로 찾는다 — 예전엔 줄바꿈을 지우고 찾아 다음 줄 안내문(Store this token…)이 토큰 끝에 붙어 401(2026-09-30 실측)
+            m = next((re.search(r'sk-ant-oat\d+-[0-9A-Za-z_\-]{20,}', ln) for ln in out.split('\n') if re.search(r'sk-ant-oat\d+-[0-9A-Za-z_\-]{20,}', ln)), None)
+            if m:
+                tok = m.group(0); err = check_token(tok)
+                l['result'] = {'ok': True, 'token': tok} if not err else {'error': f'토큰을 받았지만 쓸 수 없습니다 — {err}'}
+                break
+            if re.search(r'OAuth error|Request failed|invalid|expired', out, re.I):
+                l['result'] = {'error': '코드가 맞지 않습니다 — 이 창의 「로그인 열기」로 받은 코드인지 확인해 주세요(창을 다시 열면 주소가 바뀌어 앞 코드는 못 씁니다)'}; break
+        else:
+            tail = re.sub(r'\s+', ' ', out).strip()[-160:]
+            l['result'] = {'error': f'토큰을 받지 못했습니다(60초){f" — 출력: {tail}" if tail else " — 코드를 넣은 뒤 아무 출력이 없습니다"}'}
+        if True:
+            try:   # 무엇이 나왔는지 늘 남긴다(토큰 모양 글자는 길이만)
+                os.makedirs(ADIR, exist_ok=True); open(os.path.join(ADIR, 'login-last.log'), 'w', encoding='utf-8').write(re.sub(r'sk-ant-[0-9A-Za-z_\-]+', lambda t: f'sk-ant-***({len(t.group(0))}자)', _ANSI.sub('', l['buf']))[-6000:])
+            except OSError: pass
+        try: os.kill(l['pid'], signal.SIGKILL)
+        except OSError: pass
+    threading.Thread(target=watch, daemon=True).start()
+    return {'ok': True, 'pending': True}
+
+def check_token(tok):
+    """받은 토큰으로 아주 짧은 부탁(Haiku, 한 턴)을 한 번 — 되면 '', 안 되면 까닭. 잘못 잡은 토큰을 브라우저에 저장하지 않게"""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_CODE_OAUTH'))}
+    env.update({'CLAUDE_CODE_OAUTH_TOKEN': tok, 'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-sub'), 'DISABLE_AUTOUPDATER': '1'})
+    os.makedirs(env['CLAUDE_CONFIG_DIR'], exist_ok=True)
+    try:
+        r = subprocess.run([CLAUDE, '-p', '"ok" 한 단어만 답하라', '--model', 'haiku', '--max-turns', '1', '--output-format', 'json'], env=env, cwd=ADIR,
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90)
+        j = json.loads(r.stdout or '{}')
+        if j.get('is_error') or r.returncode: return str(j.get('result') or r.stderr or r.stdout)[:200]
+        return ''
+    except Exception as e:
+        return str(e)[:200]
+
+def usage(req):
+    """구독 남은 사용량 — Claude Code 의 /usage 가 부르는 주소(api/oauth/usage)를 이 사람의 토큰으로 대신 부른다(사용자 지정 2026-09-30).
+    돌려주는 것: five_hour · seven_day · seven_day_opus · seven_day_sonnet … 마다 utilization(%) · resets_at. 토큰은 저장하지 않는다"""
+    tok = str(req.get('token') or '')
+    if not tok.startswith('sk-ant-'): raise ValueError('구독이 연결돼 있지 않습니다')
+    if req.get('probe'): _probe(tok)
+    rq = urllib.request.Request('https://api.anthropic.com/api/oauth/usage', headers={'Authorization': f'Bearer {tok}', 'anthropic-beta': 'oauth-2025-04-20',
+                                'User-Agent': 'claude-cli (deck-agent)', 'Accept': 'application/json'})
+    try:
+        j = json.loads(urllib.request.urlopen(rq, timeout=20).read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', 'replace')[:300]
+        # 연결 토큰(setup-token)은 추론 전용(user:inference)이라 이 주소가 403(user:profile 필요)을 준다(실측 2026-09-30) →
+        # Claude Code 가 부탁마다 내보내는 rate_limit_event(한도 종류 · 상태 · 사용률 · 초기화)를 모아 둔 것으로 보여 준다
+        # 429(사용량 주소 자체가 잦은 호출을 막음, 실측)도 같은 길로 — 401(토큰 무효)만 그대로 알린다
+        if e.code != 401:
+            d = LIMITS.get(_fp(tok))
+            if not d and not req.get('probe'): _probe(tok); d = LIMITS.get(_fp(tok))
+            if not d: raise ValueError(f'Claude 가 아직 사용량 정보를 주지 않았습니다(사용량 주소 HTTP {e.code}) — 잠시 뒤 [새로 보기]')
+            rows = []
+            for k, v in d.items():
+                if k.startswith('_'): continue
+                u = v.get('utilization'); u = (u * 100 if isinstance(u, (int, float)) and u <= 1 else u)
+                ra = v.get('resetsAt'); ra = (ra * 1000 if isinstance(ra, (int, float)) and ra < 1e12 else ra)
+                rows.append({'key': k, 'pct': u, 'status': v.get('status'), 'resets': ra, 'overage': v.get('isUsingOverage')})
+            order = ['five_hour', 'seven_day', 'seven_day_opus', 'seven_day_sonnet']
+            rows.sort(key=lambda r: order.index(r['key']) if r['key'] in order else 99)
+            return {'ok': True, 'rows': rows, 'source': 'events', 'age': round(time.time() - d.get('_t', time.time())), 'raw': {k: v for k, v in d.items() if not k.startswith('_')}}
+        if e.code in (401, 403): raise ValueError(f'사용량을 볼 권한이 없습니다(HTTP {e.code}): {body}')
+        raise ValueError(f'사용량을 못 받았습니다(HTTP {e.code}): {body}')
+    rows = [{'key': k, 'pct': v.get('utilization'), 'resets': v.get('resets_at')} for k, v in j.items() if isinstance(v, dict) and v.get('utilization') is not None]
+    return {'ok': True, 'rows': rows, 'raw': {k: v for k, v in j.items() if not isinstance(v, dict)}}
+
+def _probe(tok):
+    """아주 짧은 부탁(Haiku 한 턴)을 한 번 보내 rate_limit_event 를 받는다 — [새로 보기] · 아직 받은 값이 없을 때"""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_CODE_OAUTH'))}
+    env.update({'CLAUDE_CODE_OAUTH_TOKEN': tok, 'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-sub'), 'DISABLE_AUTOUPDATER': '1', 'CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS': '1', 'CLAUDE_CODE_DISABLE_CLAUDE_MDS': '1'})
+    try:
+        r = subprocess.run([CLAUDE, '-p', '"ok" 한 단어만', '--model', 'haiku', '--max-turns', '1', '--output-format', 'stream-json', '--verbose'], env=env, cwd=ADIR,
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90)
+        for ln in r.stdout.splitlines():
+            try: j = json.loads(ln)
+            except ValueError: continue
+            if j.get('type') == 'rate_limit_event': _limit(tok, j.get('rate_limit_info'))
+    except Exception: pass
+
+def login_poll(req):
+    lid = str(req.get('id') or ''); l = LOGINS.get(lid)
+    if not l: raise ValueError('로그인 시간이 지났습니다 — 다시 연결을 눌러 주세요')
+    r = l.get('result')
+    if not r: return {'ok': True, 'pending': True}
+    _login_kill(lid)
+    if r.get('error'): raise ValueError(r['error'])
+    return r

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI PPT</title>
+<link rel="stylesheet" href="/fonts/base.css">
+<style>
+/* AI PPT — 로그인 · 발표 자료 목록 · 새 발표 자료(설문 / 통째 붙여넣기) · 계정(비밀번호 · Claude 구독) · 사용자 관리(관리자).
+   색은 덱 엔진(css/deck.css)과 같은 값만 쓴다: 글자 #16181d · 보조 #545b66 · 흐림 #8b929c · 강조 #416AF0 · 바탕 #f2f3f6 · 경고 #b91c1c */
+:root { --ink: #16181d; --sub: #545b66; --mute: #8b929c; --brand: #416AF0; --brand-tint: #E8EEFD; --bg: #f2f3f6; --line: #e6e8ec; --bad: #b91c1c; --warn-bg: #fffbeb; --warn: #92400e; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font: 500 15px/1.6 'Noto Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.btn { border: 0; border-radius: 12px; padding: 0 18px; height: 44px; font-weight: 800; background: var(--bg); transition: transform .08s, background .15s; }
+.btn:hover { background: #e6e8ec; } .btn:active { transform: scale(0.98); }   /* TOSS: 누르면 살짝 작아진다 · 뜨는 효과 없음 */
+.btn.go { background: var(--ink); color: #fff; } .btn.go:hover { background: #2b3038; }
+.btn.blue { background: var(--brand); color: #fff; } .btn.blue:hover { background: #3558d6; }
+.btn.sm { height: 34px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; }
+.btn:disabled { opacity: .45; cursor: default; transform: none; }
+.link { border: 0; background: none; padding: 0; font-weight: 800; color: var(--brand); }
+.bad { color: var(--bad); font-weight: 700; font-size: 14px; }
+input.f, textarea.f, select.f { width: 100%; border-width: 1px; border-style: solid; border-color: #d5d9df; border-radius: 12px; padding: 11px 14px; font-size: 16px; background: #fff; outline: none; }
+input.f:focus, textarea.f:focus, select.f:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(65,106,240,.15); }
+textarea.f { resize: vertical; line-height: 1.6; }
+label.l { display: block; font-weight: 800; font-size: 14px; margin: 18px 0 6px; } label.l span { font-weight: 600; color: var(--mute); margin-left: 6px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+[hidden] { display: none !important; }
+
+/* ═══ 1. 로그인 ═══ */
+#login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
+#login .bx { width: 100%; max-width: 380px; background: #fff; border-radius: 20px; padding: 32px 28px; }
+#login h1 { margin: 0 0 4px; font-size: 26px; font-weight: 900; letter-spacing: -.02em; } #login p { margin: 0 0 20px; color: var(--sub); }
+#login input { margin-bottom: 10px; } #login .btn { width: 100%; margin-top: 6px; height: 50px; font-size: 16px; }
+
+/* ═══ 2. 머리 ═══ */
+header { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 8px; height: 60px; }
+header .logo { font-size: 18px; font-weight: 900; letter-spacing: -.02em; margin-right: auto; cursor: pointer; } header .logo b { color: var(--brand); }
+header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right: 4px; }
+.banner { background: var(--warn-bg); color: var(--warn); border-radius: 12px; padding: 12px 16px; margin: 16px 0 0; font-weight: 700; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ═══ 3. 목록 ═══ */
+.top { display: flex; align-items: flex-end; gap: 12px; margin: 36px 0 20px; flex-wrap: wrap; }
+.top h2 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -.02em; margin-right: auto; }
+.top .n { color: var(--mute); font-weight: 700; font-size: 15px; margin-left: 8px; }
+.owner { font-size: 15px; font-weight: 900; margin: 28px 0 10px; color: var(--sub); } .owner span { color: var(--mute); font-weight: 700; margin-left: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.card { position: relative; border-radius: 16px; background: var(--bg); cursor: pointer; transition: transform .08s, background .15s; overflow: hidden; }
+.card:hover { background: #e9ebef; } .card:active { transform: scale(0.98); }
+.card .th { aspect-ratio: 16 / 9; background: #fff; margin: 10px 10px 0; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; padding: 0 18px; overflow: hidden; }
+.card .th .bd { width: 34px; height: 5px; border-radius: 99px; background: var(--brand); margin-bottom: 10px; }
+.card .th .tt { font-size: 17px; font-weight: 900; line-height: 1.3; letter-spacing: -.02em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card .meta { padding: 10px 14px 12px; font-size: 13px; color: var(--sub); font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.card .meta b { color: var(--ink); font-weight: 800; font-size: 14.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .mn { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 99px; border: 0; background: rgba(242,243,246,.9); font-weight: 900; color: var(--sub); opacity: 0; transition: opacity .15s; }
+.card:hover .mn, .card .mn:focus { opacity: 1; } @media (hover: none) { .card .mn { opacity: 1; } }
+.menu { position: fixed; z-index: 60; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.16); padding: 6px; min-width: 150px; }
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 8px; font-weight: 700; }
+.menu button:hover { background: var(--bg); } .menu button.del { color: var(--bad); }
+.empty { text-align: center; padding: 80px 20px; color: var(--sub); } .empty h3 { margin: 0 0 6px; font-size: 20px; color: var(--ink); } .empty .btn { margin-top: 18px; }
+
+/* ═══ 4. 창(계정 · 사용자 관리 · Claude 연결) ═══ */
+.sheet { position: fixed; inset: 0; z-index: 50; background: rgba(10,12,16,.5); display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow-y: auto; }
+.sheet .bx { width: 100%; max-width: 560px; background: #fff; border-radius: 20px; padding: 26px 26px 22px; }
+.sheet .bx.wide { max-width: 820px; }
+.sheet h3 { margin: 0 0 4px; font-size: 21px; font-weight: 900; letter-spacing: -.02em; }
+.sheet .sec { padding: 18px 0; border-bottom: 1px solid var(--line); } .sheet .sec:last-of-type { border-bottom: 0; }
+.sheet .sec h4 { margin: 0 0 8px; font-size: 16px; font-weight: 900; }
+.sheet .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.pill { display: inline-block; border-radius: 99px; padding: 2px 10px; font-size: 12.5px; font-weight: 800; background: var(--bg); color: var(--sub); }
+.pill.on { background: var(--brand-tint); color: var(--brand); } .pill.admin { background: #16181d; color: #fff; }
+.ulist .u { display: flex; align-items: center; gap: 10px; min-height: 60px; border-bottom: 1px solid var(--line); flex-wrap: wrap; padding: 8px 0; }   /* TOSS: 리스트 행 높이 60 */
+.ulist .u .nm { font-weight: 800; } .ulist .u .id { color: var(--mute); font-size: 13.5px; } .ulist .u .sp { flex: 1; }
+.add { display: grid; grid-template-columns: 1fr 1fr 1fr auto auto; gap: 8px; margin-top: 14px; } @media (max-width: 640px) { .add { grid-template-columns: 1fr 1fr; } }
+.steps { padding-left: 20px; margin: 8px 0; } .note { font-size: 13px; color: var(--warn); background: var(--warn-bg); border-radius: 10px; padding: 9px 12px; margin: 10px 0; }
+
+/* ═══ 5. 새 발표 자료 ═══ */
+#new { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+#new .back { margin-bottom: 18px; }
+#new h2 { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -.02em; line-height: 1.35; }
+#new .lead { color: var(--sub); margin: 8px 0 22px; }
+.tabs { display: inline-flex; background: var(--bg); border-radius: 12px; padding: 4px; margin: 22px 0 4px; }
+.tabs button { border: 0; background: none; border-radius: 9px; padding: 8px 16px; font-weight: 800; color: var(--sub); }
+.tabs button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips button { border-width: 1px; border-style: solid; border-color: #d5d9df; background: #fff; border-radius: 99px; padding: 7px 14px; font-weight: 700; font-size: 14px; }
+.chips button.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
+.drop { border-width: 2px; border-style: dashed; border-color: #d5d9df; border-radius: 14px; padding: 16px; text-align: center; color: var(--sub); font-weight: 700; cursor: pointer; }
+.drop.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; } .thumbs:empty { display: none; }
+.thumbs div { position: relative; width: 76px; height: 76px; border-radius: 10px; overflow: hidden; background: var(--bg); } .thumbs img { width: 100%; height: 100%; object-fit: cover; }
+.thumbs button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 99px; background: rgba(22,24,29,.75); color: #fff; font-size: 11px; }
+.gobar { position: sticky; bottom: 0; background: linear-gradient(transparent, #fff 30%); padding: 26px 0 16px; display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.gobar .btn { height: 52px; font-size: 16px; padding: 0 26px; } .gobar .hint { color: var(--sub); font-size: 13.5px; flex: 1; min-width: 200px; }
+.cc { display: flex; gap: 12px; align-items: center; background: var(--warn-bg); border-radius: 14px; padding: 14px 16px; margin-top: 22px; color: var(--warn); font-weight: 700; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="login" hidden>
+  <form class="bx" onsubmit="return false">
+    <h1>인지 <b style="color:var(--brand)">AI PPT</b></h1>
+    <p>발표 자료를 AI 와 함께 만듭니다</p>
+    <input class="f" id="lid" placeholder="아이디" autocomplete="username" autocapitalize="none">
+    <input class="f" id="lpw" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <div class="bad" id="lerr"></div>
+    <button class="btn go" id="lgo">로그인</button>
+  </form>
+</div>
+
+<!-- 앱 -->
+<div id="app" hidden>
+  <header><div class="wrap">
+    <div class="logo" id="logo">인지 <b>AI PPT</b></div>
+    <span class="who" id="who"></span>
+    <button class="btn sm" id="bUsers" hidden>사용자 관리</button>
+    <button class="btn sm" id="bAcct">계정</button>
+    <button class="btn sm" id="bOut">로그아웃</button>
+  </div></header>
+
+  <div id="list" class="wrap">
+    <div id="banners"></div>
+    <div class="top"><h2>발표 자료<span class="n" id="cnt"></span></h2><button class="btn blue" id="bNew">＋ 새 발표 자료</button></div>
+    <div id="decks"></div>
+  </div>
+
+  <div id="new" hidden>
+    <button class="btn sm back" id="nBack">← 목록</button>
+    <h2>어떤 사람에게<br>어떤 정보를 줄 예정이신가요?</h2>
+    <p class="lead">많이 알려 줄수록 좋은 자료가 나옵니다. 설문에 답하거나, 가진 내용을 통째로 붙여 넣어 주세요. Claude Code 가 발표 자료 작성 규칙에 맞춰 만들기 시작합니다.</p>
+    <label class="l" for="nTitle">제목</label>
+    <input class="f" id="nTitle" placeholder="예: 2026년 하반기 영업 전략" maxlength="80">
+    <div class="tabs" id="nTabs"><button data-m="survey" class="on">간단 설문</button><button data-m="paste">내용 통째로 붙여넣기</button></div>
+    <div id="mSurvey">
+      <label class="l" for="nAud">누가 보나요?<span>직급 · 부서 · 얼마나 아는 사람인지</span></label>
+      <input class="f" id="nAud" placeholder="예: 임원진 · 이 사업을 처음 듣는 사람">
+      <label class="l" for="nInfo">무엇을 알려 주나요?<span>다룰 내용 · 순서가 있으면 순서대로</span></label>
+      <textarea class="f" id="nInfo" rows="4" placeholder="예: 상반기 실적 요약 → 문제점 세 가지 → 하반기 전략 → 필요한 지원"></textarea>
+      <label class="l" for="nKey">보고 나서 꼭 남아야 할 한 줄</label>
+      <input class="f" id="nKey" placeholder="예: 하반기엔 기존 고객 재계약에 집중한다">
+      <label class="l">분량</label>
+      <div class="chips" data-k="pages"><button>5페이지 안팎</button><button>10페이지 안팎</button><button>20페이지 안팎</button><button class="on">알아서</button></div>
+      <label class="l">형식</label>
+      <div class="chips" data-k="tone"><button>보고</button><button>제안 · 설득</button><button>교육 · 설명</button><button>소개</button><button class="on">알아서</button></div>
+      <label class="l" for="nMat">자료 · 숫자<span>있으면 붙여 넣기 — 없는 숫자는 지어내지 않고 자리만 둡니다</span></label>
+      <textarea class="f" id="nMat" rows="6" placeholder="표 · 메모 · 숫자를 그대로 붙여 넣어도 됩니다"></textarea>
+    </div>
+    <div id="mPaste" hidden>
+      <label class="l" for="nText">가진 내용 전부<span>기획서 · 메모 · 회의록 · 표 — 형식 상관없이</span></label>
+      <textarea class="f" id="nText" rows="16" placeholder="여기에 내용을 통째로 붙여 넣어 주세요. 누구에게 보여 줄 자료인지 한 줄 적어 주면 더 좋습니다."></textarea>
+    </div>
+    <label class="l">그림<span>로고 · 사진 · 캡처 · 참고할 디자인 — 6장까지</span></label>
+    <div class="drop" id="nDrop">여기로 끌어 놓거나 눌러서 고르기 · 붙여넣기(Ctrl/⌘+V)도 됩니다</div>
+    <input type="file" id="nFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+    <div class="thumbs" id="nThumbs"></div>
+    <div class="cc" id="nCC" hidden><span style="flex:1">새 발표 자료는 Claude Code 가 만듭니다 — 먼저 내 Claude 구독을 연결해 주세요.</span><button class="btn sm go" id="nConnect">Claude 구독 연결</button></div>
+    <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분</span><span class="bad" id="nErr"></span></div>
+  </div>
+</div>
+
+<script>
+// AI PPT 화면 — 서버(server/app.py)의 /api/me · /api/decks · /api/users · /api/agent/login/* 를 쓴다
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// JSON 을 보내고 받는다 — 실패면 서버가 준 까닭으로 던진다
+const post = async (url, body) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`); return j; };
+// JSON 을 받는다
+const get = async (url) => { const r = await fetch(url, { cache: 'no-store' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); return j; };
+// 날짜를 '방금 · n분 전 · 9월 30일' 로
+const ago = (t) => { if (!t) return ''; const s = Date.now() / 1000 - t; if (s < 60) return '방금'; if (s < 3600) return `${Math.floor(s / 60)}분 전`; if (s < 86400) return `${Math.floor(s / 3600)}시간 전`; const d = new Date(t * 1000); return `${d.getMonth() + 1}월 ${d.getDate()}일`; };
+let ME = null;
+
+// ── 로그인 ──
+// 로그인 정보를 보내고 목록을 연다
+const doLogin = async () => {
+  $('#lerr').textContent = '';
+  try { const j = await post('/api/login', { id: $('#lid').value, pw: $('#lpw').value }); ME = j.user;
+    const next = new URLSearchParams(location.search).get('next'); if (next && next.startsWith('/d/')) { location.href = next; return; }
+    show(); } catch (e) { $('#lerr').textContent = e.message; }
+};
+$('#lgo').onclick = doLogin;
+$('#lpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+$('#bOut').onclick = async () => { await post('/api/logout').catch(() => {}); ME = null; show(); };
+$('#logo').onclick = () => { history.pushState(null, '', '/'); route(); };
+
+// 로그인 여부에 따라 화면을 고른다
+const show = () => {
+  $('#login').hidden = !!ME; $('#app').hidden = !ME;
+  if (!ME) { setTimeout(() => $('#lid').focus(), 50); return; }
+  $('#who').textContent = `${ME.name}${ME.role === 'admin' ? ' · 관리자' : ''}`; $('#bUsers').hidden = ME.role !== 'admin';
+  route();
+};
+// 주소(#new)에 따라 목록 · 새 발표 자료를 고른다
+const route = () => { const nw = location.hash === '#new'; $('#list').hidden = nw; $('#new').hidden = !nw; if (nw) openNew(); else loadDecks(); };
+addEventListener('popstate', route); addEventListener('hashchange', route);
+
+// ── 목록 ──
+// 발표 자료 목록을 받아 그린다(관리자는 사람별로 묶는다)
+const loadDecks = async () => {
+  $('#banners').innerHTML = (ME.mustChange ? '<div class="banner"><span style="flex:1">처음 받은 비밀번호를 쓰고 있습니다 — 바꿔 주세요.</span><button class="btn sm" onclick="openAcct()">비밀번호 바꾸기</button></div>' : '')
+    + (!ME.claude ? '<div class="banner"><span style="flex:1">발표 자료를 만들고 고치려면 내 Claude 구독(Pro · Max)을 연결해 주세요.</span><button class="btn sm go" onclick="connectClaude()">Claude 구독 연결</button></div>' : '');
+  let ds = [];
+  try { ds = (await get('/api/decks')).decks; } catch (e) { if (/로그인/.test(e.message)) { ME = null; return show(); } $('#decks').innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+  $('#cnt').textContent = ds.length ? ds.length : '';
+  if (!ds.length) { $('#decks').innerHTML = '<div class="empty"><h3>아직 발표 자료가 없어요</h3><div>누구에게 무엇을 알려 줄지 알려 주면 AI 가 첫 판을 만들어 드려요</div><button class="btn blue" onclick="goNew()">＋ 새 발표 자료</button></div>'; return; }
+  const card = (d) => `<div class="card" data-u="${esc(d.url)}"><div class="th"><div class="bd"></div><div class="tt">${esc(d.title)}</div></div>`
+    + `<div class="meta"><b>${esc(d.title)}</b><span>${d.pages}페이지 · ${ago(d.updated)}</span></div><button class="mn" data-o="${esc(d.owner)}" data-i="${esc(d.id)}" data-t="${esc(d.title)}" title="더 보기">⋯</button></div>`;
+  if (ME.role === 'admin') {
+    const by = {}; ds.forEach((d) => (by[d.owner] ||= []).push(d));
+    const keys = Object.keys(by).sort((a, b) => (a === ME.id ? -1 : b === ME.id ? 1 : a.localeCompare(b)));
+    $('#decks').innerHTML = keys.map((k) => `<div class="owner">${esc(by[k][0].ownerName)}${k === ME.id ? ' (나)' : ''}<span>${by[k].length}개</span></div><div class="grid">${by[k].map(card).join('')}</div>`).join('');
+  } else $('#decks').innerHTML = `<div class="grid">${ds.map(card).join('')}</div>`;
+};
+document.addEventListener('click', (e) => {
+  const mn = e.target.closest('.mn'); const m0 = $('.menu');
+  if (m0 && !e.target.closest('.menu')) m0.remove();
+  if (mn) { e.stopPropagation(); return deckMenu(mn); }
+  const c = e.target.closest('.card'); if (c && !e.target.closest('.menu')) location.href = c.dataset.u;
+});
+// 카드 메뉴 — 이름 바꾸기 · 지우기
+const deckMenu = (b) => {
+  const r = b.getBoundingClientRect(); const m = document.createElement('div'); m.className = 'menu';
+  m.style.left = `${Math.min(innerWidth - 170, r.left)}px`; m.style.top = `${r.bottom + 6}px`;
+  m.innerHTML = '<button data-a="open">새 탭에서 열기</button><button data-a="rename">이름 바꾸기</button><button data-a="del" class="del">지우기</button>';
+  document.body.appendChild(m);
+  m.onclick = async (e) => { const a = e.target.dataset.a; if (!a) return; m.remove(); const o = b.dataset.o; const i = b.dataset.i;
+    try {
+      if (a === 'open') window.open(`/d/${o}/${i}/`, '_blank');
+      if (a === 'rename') { const t = prompt('새 이름', b.dataset.t); if (t && t.trim()) { await post('/api/decks', { action: 'rename', owner: o, id: i, title: t }); loadDecks(); } }
+      if (a === 'del' && confirm(`「${b.dataset.t}」을(를) 지울까요?\n(서버 휴지통으로 옮겨 관리자가 되살릴 수 있습니다)`)) { await post('/api/decks', { action: 'delete', owner: o, id: i }); loadDecks(); }
+    } catch (err) { alert(err.message); } };
+};
+
+// ── 새 발표 자료 ──
+const NW = { mode: 'survey', files: [] };
+// 새 발표 자료 화면으로
+const goNew = () => { location.hash = 'new'; };
+$('#bNew').onclick = goNew; $('#nBack').onclick = () => { history.pushState(null, '', '/'); route(); };
+// 새 발표 자료 화면을 연다 — Claude 미연결이면 안내
+const openNew = () => { $('#nCC').hidden = !!ME.claude; $('#nGo').disabled = !ME.claude; $('#nErr').textContent = ''; setTimeout(() => $('#nTitle').focus(), 50); };
+$('#nTabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; NW.mode = b.dataset.m; $('#nTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); $('#mSurvey').hidden = NW.mode !== 'survey'; $('#mPaste').hidden = NW.mode !== 'paste'; };
+document.querySelectorAll('.chips').forEach((g) => { g.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; g.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+// 고른 칩 글자(알아서 = 빈 값)
+const chip = (k) => { const t = $(`.chips[data-k="${k}"] button.on`)?.textContent || ''; return t === '알아서' ? '' : t; };
+// 그림을 긴 변 1600px 로 줄여 data URL 과 썸네일로
+const prep = (file) => new Promise((ok, no) => { const rd = new FileReader(); rd.onerror = no; rd.onload = () => { const im = new Image(); im.onerror = no; im.onload = () => {
+  const big = Math.max(im.naturalWidth, im.naturalHeight); const keep = big <= 1600 && file.size <= 2e6 && file.type !== 'image/webp'; const k = Math.min(1, 1600 / big);
+  const c = document.createElement('canvas'); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+  ok({ name: keep ? file.name.replace(/[^\w.]+/g, '_') : 'image.jpg', data: keep ? rd.result : c.toDataURL('image/jpeg', 0.88) }); }; im.src = rd.result; }; rd.readAsDataURL(file); });
+// 그림을 더한다(6장까지)
+const addFiles = async (list) => { for (const f of [...list].filter((x) => /^image\/(png|jpeg|webp|gif)$/.test(x.type)).slice(0, Math.max(0, 6 - NW.files.length))) NW.files.push(await prep(f)); drawThumbs(); };
+// 고른 그림 썸네일을 그린다
+const drawThumbs = () => { $('#nThumbs').innerHTML = NW.files.map((f, k) => `<div><img src="${f.data}" alt=""><button data-k="${k}" title="빼기">✕</button></div>`).join('');
+  $('#nThumbs').querySelectorAll('button').forEach((b) => { b.onclick = () => { NW.files.splice(Number(b.dataset.k), 1); drawThumbs(); }; }); };
+$('#nDrop').onclick = () => $('#nFile').click(); $('#nFile').onchange = () => { addFiles($('#nFile').files); $('#nFile').value = ''; };
+['dragover', 'dragenter'].forEach((t) => $('#nDrop').addEventListener(t, (e) => { e.preventDefault(); $('#nDrop').classList.add('on'); }));
+['dragleave', 'drop'].forEach((t) => $('#nDrop').addEventListener(t, () => $('#nDrop').classList.remove('on')));
+$('#nDrop').addEventListener('drop', (e) => { e.preventDefault(); addFiles(e.dataTransfer.files); });
+document.addEventListener('paste', (e) => { if ($('#new').hidden) return; const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); addFiles(fs); } });
+$('#nConnect').onclick = () => connectClaude();
+// 받은 정보를 서버에 보내 덱을 만들고 연다(열리면 Claude Code 가 만들기 시작)
+$('#nGo').onclick = async () => {
+  const title = $('#nTitle').value.trim(); $('#nErr').textContent = '';
+  if (!title) { $('#nErr').textContent = '제목을 적어 주세요'; $('#nTitle').focus(); return; }
+  const brief = NW.mode === 'paste' ? { mode: 'paste', text: $('#nText').value }
+    : { mode: 'survey', audience: $('#nAud').value, info: $('#nInfo').value, key: $('#nKey').value, pages: chip('pages'), tone: chip('tone'), material: $('#nMat').value };
+  if (!Object.entries(brief).some(([k, v]) => k !== 'mode' && v.trim())) { $('#nErr').textContent = NW.mode === 'paste' ? '내용을 붙여 넣어 주세요' : '누가 보는지 · 무엇을 알려 줄지 하나 이상 적어 주세요'; return; }
+  const b = $('#nGo'); b.disabled = true; b.textContent = '준비 중…';
+  try { const j = await post('/api/decks', { action: 'create', title, brief, files: NW.files.map((f) => ({ name: f.name, data: f.data.split(',')[1] })) }); location.href = j.url; }
+  catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '만들기 시작'; }
+};
+
+// ── 창 ──
+// 창을 연다 — 바깥을 누르면 닫힌다
+const sheet = (html, wide) => { const s = document.createElement('div'); s.className = 'sheet'; s.innerHTML = `<div class="bx${wide ? ' wide' : ''}">${html}</div>`; document.body.appendChild(s);
+  s.addEventListener('mousedown', (e) => { if (e.target === s) s.remove(); }); return s; };
+// 내 정보를 다시 받는다
+const refreshMe = async () => { ME = (await get('/api/me')).user; show(); };
+
+// 계정 창 — 비밀번호 · Claude 구독
+const openAcct = () => {
+  const s = sheet(`<h3>계정</h3><div style="color:var(--sub)">${esc(ME.name)} · ${esc(ME.id)}${ME.role === 'admin' ? ' · 관리자' : ''}</div>
+    <div class="sec"><h4>Claude 구독</h4>${ME.claude ? `<div><span class="pill on">연결됨</span> <span style="color:var(--mute);font-size:13.5px">${ME.claudeAt ? new Date(ME.claudeAt * 1000).toLocaleDateString('ko-KR') + ' 연결' : ''}</span></div>
+      <div style="color:var(--sub);font-size:14px;margin-top:6px">발표 자료를 만들고 고칠 때 이 구독으로 Claude Code 가 일합니다. 사용량은 이 구독에 잡힙니다.</div><div class="row"><button class="btn sm" id="aDis">연결 끊기</button></div>`
+      : `<div style="color:var(--sub);font-size:14px">연결하면 Claude Code 가 발표 자료를 만들고 고칩니다(Pro · Max 구독).</div><div class="row"><button class="btn sm go" id="aCon">Claude 구독 연결</button></div>`}</div>
+    <div class="sec"><h4>비밀번호 바꾸기</h4><input class="f" id="aOld" type="password" placeholder="지금 비밀번호" autocomplete="current-password" style="margin-bottom:8px"><input class="f" id="aNew" type="password" placeholder="새 비밀번호(4자 이상)" autocomplete="new-password" style="margin-bottom:8px"><input class="f" id="aNew2" type="password" placeholder="새 비밀번호 한 번 더" autocomplete="new-password">
+      <div class="bad" id="aErr"></div><div class="row"><button class="btn sm go" id="aPw">바꾸기</button></div></div>
+    <div class="row"><button class="btn" id="aX">닫기</button></div>`);
+  $('#aX', s).onclick = () => s.remove();
+  $('#aDis', s)?.addEventListener('click', async () => { if (!confirm('Claude 구독 연결을 끊을까요?')) return; await post('/api/me/claude/disconnect'); s.remove(); await refreshMe(); openAcct(); });
+  $('#aCon', s)?.addEventListener('click', () => { s.remove(); connectClaude(); });
+  $('#aPw', s).onclick = async () => { $('#aErr', s).textContent = '';
+    if ($('#aNew', s).value !== $('#aNew2', s).value) { $('#aErr', s).textContent = '새 비밀번호 두 칸이 다릅니다'; return; }
+    try { await post('/api/me/password', { old: $('#aOld', s).value, new: $('#aNew', s).value }); s.remove(); await refreshMe(); alert('비밀번호를 바꿨습니다'); } catch (e) { $('#aErr', s).textContent = e.message; } };
+};
+$('#bAcct').onclick = openAcct;
+
+// Claude 구독 연결 — 서버가 `claude setup-token` 을 돌리고, 로그인은 이 사람이 자기 브라우저에서. 받은 토큰은 서버가 계정에 저장(화면에는 안 온다)
+const connectClaude = async () => {
+  const s = sheet('<h3>Claude 구독 연결</h3><div>로그인 주소를 받는 중…</div>');
+  let id = '';
+  try { const j = await post('/api/agent/login/start'); id = j.id;
+    s.firstElementChild.innerHTML = `<h3>Claude 구독 연결</h3><ol class="steps"><li><a class="link" href="${esc(j.url)}" target="_blank" rel="noopener">Claude 로그인 열기 ↗</a> — 새 탭에서 구독 계정(Pro · Max)으로 로그인하고 허용</li><li>로그인 뒤 화면에 나오는 <b>코드</b>를 복사해 아래에 붙여 넣기</li></ol>
+      <input class="f" id="cCode" placeholder="코드 붙여 넣기" autocomplete="off" spellcheck="false" style="font-family:'JetBrains Mono',monospace">
+      <div class="note">구독으로 돌리면 Claude 와 연결됩니다. 사용량은 이 구독에 잡히고, 연결은 내 계정에 저장됩니다(1년, 언제든 끊기 가능).</div>
+      <div class="bad" id="cErr"></div><div class="row"><button class="btn" id="cX">취소</button><button class="btn go" id="cGo">연결</button></div>`;
+  } catch (e) { s.firstElementChild.innerHTML = `<h3>Claude 구독 연결</h3><div class="bad">${esc(e.message)}</div><div class="row"><button class="btn" id="cX">닫기</button></div>`; }
+  $('#cX', s).onclick = () => s.remove();
+  const go = $('#cGo', s); if (!go) return;
+  go.onclick = async () => { const code = $('#cCode', s).value.trim(); if (!code) return; go.disabled = true; go.textContent = '연결 중…'; $('#cErr', s).textContent = '';
+    try { await post('/api/agent/login/finish', { id, code });
+      let j = null; for (let k = 0; k < 150 && !j?.connected; k++) { await new Promise((ok) => setTimeout(ok, 1000)); try { j = await post('/api/agent/login/poll', { id }); } catch (e) { if (!/Failed to fetch|NetworkError|Load failed/.test(e.message)) throw e; } }
+      if (!j?.connected) throw new Error('연결하지 못했습니다 — 다시 연결을 눌러 주세요');
+      s.remove(); await refreshMe();
+    } catch (e) { $('#cErr', s).textContent = e.message; go.disabled = false; go.textContent = '연결'; } };
+};
+
+// 사용자 관리(관리자) — 목록 · 추가 · 비밀번호 초기화 · 지우기
+const openUsers = async () => {
+  const s = sheet('<h3>사용자 관리</h3><div>불러오는 중…</div>', true);
+  // 목록을 다시 그린다
+  const draw = async () => {
+    let us = []; try { us = (await get('/api/users')).users; } catch (e) { s.firstElementChild.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+    s.firstElementChild.innerHTML = `<h3>사용자 관리</h3><div style="color:var(--sub)">아이디 · 비밀번호로 로그인합니다. 관리자는 모든 사람의 발표 자료를 봅니다.</div>
+      <div class="ulist" style="margin-top:12px">${us.map((u) => `<div class="u"><span class="nm">${esc(u.name)}</span><span class="id">${esc(u.id)}</span>${u.role === 'admin' ? '<span class="pill admin">관리자</span>' : ''}<span class="pill ${u.claude ? 'on' : ''}">${u.claude ? 'Claude 연결' : 'Claude 미연결'}</span><span class="pill">자료 ${u.decks}</span><span class="sp"></span>
+        <button class="btn sm" data-pw="${esc(u.id)}">비밀번호 초기화</button>${u.id === ME.id ? '' : `<button class="btn sm" data-del="${esc(u.id)}" style="color:var(--bad)">지우기</button>`}</div>`).join('')}</div>
+      <div class="sec"><h4>사용자 추가</h4><div class="add"><input class="f" id="uId" placeholder="아이디(영문 소문자 · 숫자)" autocapitalize="none"><input class="f" id="uName" placeholder="이름"><input class="f" id="uPw" placeholder="처음 비밀번호"><select class="f" id="uRole"><option value="user">일반</option><option value="admin">관리자</option></select><button class="btn go" id="uAdd">추가</button></div><div class="bad" id="uErr"></div></div>
+      <div class="row"><button class="btn" id="uX">닫기</button></div>`;
+    $('#uX', s).onclick = () => s.remove();
+    $('#uAdd', s).onclick = async () => { try { await post('/api/users', { action: 'add', id: $('#uId', s).value, name: $('#uName', s).value, pw: $('#uPw', s).value, role: $('#uRole', s).value }); draw(); } catch (e) { $('#uErr', s).textContent = e.message; } };
+    s.querySelectorAll('[data-pw]').forEach((b) => { b.onclick = async () => { const pw = prompt(`${b.dataset.pw} 의 새 비밀번호(4자 이상) — 다음 로그인 때 바꾸라고 알립니다`); if (!pw) return; try { await post('/api/users', { action: 'password', id: b.dataset.pw, pw }); alert('바꿨습니다'); } catch (e) { alert(e.message); } }; });
+    s.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => { if (!confirm(`${b.dataset.del} 계정을 지울까요? (발표 자료 파일은 서버에 남습니다)`)) return; try { await post('/api/users', { action: 'delete', id: b.dataset.del }); draw(); } catch (e) { alert(e.message); } }; });
+  };
+  draw();
+};
+$('#bUsers').onclick = openUsers;
+
+// 시작 — 로그인돼 있으면 목록
+get('/api/me').then((j) => { ME = j.user; show(); }).catch(() => { ME = null; show(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="stylesheet" href="fonts/base.css">
+<link rel="stylesheet" href="css/deck.css">
+<style>
+/* {{TITLE}} — AI PPT 로 만든 덱. 엔진 사용법 · 작성 규칙은 DECK.md(명사형 제목 · 개조식 · 글자 크기 --fs-* · 색 --c-* · 인포그래픽).
+   무대 1600×900 = PPT 16:9 13.33in → 1pt = 1.667px */
+.slide h2 { font-size: var(--fs-title); line-height: 1.2; margin: 8px 0 10px; max-width: none; }
+.slide .eyebrow { font-size: var(--fs-small); }
+.slide .foot .hint { font-size: var(--fs-foot); color: var(--c-text-mute); }
+ul.pts { list-style: none; margin: 4px 0 0; padding: 0; }
+ul.pts li { position: relative; padding-left: 34px; font-size: var(--fs-body); line-height: 1.5; color: var(--sub); }
+ul.pts li::before { content: ''; position: absolute; left: 8px; top: .62em; width: 12px; height: 12px; border-radius: 3px; background: var(--c-brand); }
+ul.pts b { color: var(--ink); }
+.cardx { position: absolute; background: #fff; border-radius: 20px; box-shadow: 0 2px 14px rgba(20,24,40,.07); }
+/* 표지 */
+.cover h1 { position: absolute; left: 72px; right: 72px; top: 300px; margin: 0; }
+.cover .sub { position: absolute; left: 72px; right: 72px; top: 520px; font-size: var(--fs-body); color: var(--sub); line-height: 1.5; }
+.cover .band { position: absolute; left: 72px; top: 250px; width: 96px; height: 10px; border-radius: 99px; background: var(--c-brand); }
+/* 목록으로 — 발표 자료 목록(/)으로. 조작줄 오른쪽 전체화면 단추 옆(무대를 가리지 않게) */
+#bar #home { display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 15px; }
+</style>
+</head>
+
+<body>
+<div id="ldr" style="position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:#0f1115;color:#e8eaf0;font:600 15px 'Noto Sans KR',sans-serif;transition:opacity .3s">
+  <div style="width:min(440px,86vw)"><div id="ldr-t" style="font-size:18px;margin-bottom:10px">불러오는 중…</div>
+  <div style="height:8px;background:#2a2f3a;border-radius:99px;overflow:hidden"><i id="ldr-b" style="display:block;height:100%;width:3%;background:#416AF0;transition:width .2s"></i></div></div></div>
+<script>
+(() => {
+  const t0 = performance.now(); const $ = (i) => document.getElementById(i);
+  const tick = () => { if (!$('ldr')) return; $('ldr-t').textContent = `불러오는 중 · ${((performance.now() - t0) / 1000).toFixed(1)}초`; $('ldr-b').style.width = `${Math.min(96, 3 + (performance.now() - t0) / 30)}%`; setTimeout(tick, 200); };
+  tick();
+  addEventListener('deckready', () => { const l = $('ldr'); if (!l) return; l.style.opacity = '0'; setTimeout(() => l.remove(), 320); });
+  addEventListener('deckfail', (e) => { $('ldr-t').textContent = `불러오지 못했습니다 — ${e.detail}`; });
+})();
+</script>
+<div id="view"><div id="stage">
+
+<!-- ════════ 표지 ════════ -->
+<section class="slide cover" data-name="표지" data-steps="0">
+  <div class="band"></div>
+  <h1>{{TITLE}}</h1>
+  <div class="sub">{{SUB}}</div>
+</section>
+
+<div id="tip"></div>
+</div></div>
+
+<div id="bar"><button class="nb" id="pv">←</button><div id="toc"></div><span id="cnt"></span><button class="nb" id="nx">→</button><a class="nb" id="home" href="/" title="발표 자료 목록">☰</a><button class="nb" id="fs" title="전체화면 (F)">⛶</button></div>
+
+<script src="js/deck.js"></script>
+<script src="js/deckviz.js"></script>
+<script src="js/deckcheck.js"></script>
+<script src="js/deckkit.js"></script>
+<script src="js/deckedit.js"></script>
+<script src="js/deckedit-ribbon.js"></script>
+<script>
+// {{TITLE}} — 페이지마다 그림 함수(INIT['페이지 이름'] = () => {…}). 뼈대는 덱 엔진(js/deck.js)
+const INIT = {};
+const $ = (s) => document.querySelector(s);
+// 페이지마다 추천 질문(AI 패널)
+const SUGGEST = {};
+// 페이지마다 AI 에게 줄 원자료(숫자 · 출처) — 화면 글만으로는 AI 가 근거를 모를 때
+const CTX = {};
+const deck = Deck.create({ inits: INIT,
+  onReady: () => { DeckEdit.init({ current: () => deck.slides[deck.cur], deck: () => deck }); DeckKit.init({
+    deck: document.title, codemap: null, noCode: true, wholeDeck: true, editable: true, current: () => deck.slides[deck.cur], goto: (i) => deck.show(i, 0),
+    stageOf: () => null, contextOf: (s) => { try { return (CTX[s.dataset.name] || (() => ''))(); } catch (e) { return ''; } },
+    suggest: (s) => SUGGEST[s.dataset.name] || [],
+    intro: 'AI PPT 로 만든 발표 자료. 답은 쉬운 한국어로 짧게, 덱에 있는 내용만 근거로 한다.',
+  }); },
+});
+</script>
+</body>
+</html>

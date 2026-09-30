@@ -1,0 +1,202 @@
+/* 덱 엔진 공통 스타일(밝은 테마 하나) — deck 의 덱이 함께 쓴다(2026-09-28 사용자 지정: "엔진을 만들어 재사용",
+   "밝은 테마만 — PPT 는 거의 하얀색"). 뼈대는 js/deck.js, 실제 기록 그림 부품은 js/deckviz.js.
+   덱마다 다른 값만 그 덱의 <style> 에 남긴다(같은 선택자를 뒤에 다시 쓰면 덮인다).
+   값의 출처: v2·v1 파이프라인 원리 덱이 쓰던 스타일 그대로 — 옮기면서 화면이 한 픽셀도 바뀌지 않게 했다. */
+:root {
+  --bg: #0f1115; --stage: #fbfbfd; --ink: #16181d; --sub: #545b66; --mute: #9aa1ab; --line: #e6e8ec; --soft: #f2f3f6;
+  /* 등장인물 색 — 덱 전체에서 같은 뜻으로만 쓴다 */
+  --vl: #ea580c; --vls: #fff1e8; --pps: #7c3aed; --ppss: #f1ebff; --aio: #0284c7; --aios: #e4f4fd;
+  --llm: #c026d3; --llms: #fbe9fd; --code: #334155; --codes: #eceff3;
+  --ok: #16a34a; --oks: #dcfce7; --warn: #d97706; --warns: #fef3c7; --bad: #dc2626; --bads: #fee2e2;
+  /* 글자 크기 단계(DECK.md) — 무대 1600px = PPT 16:9 13.33in 이라 1pt = 1.667px.
+     기준: 발표 슬라이드 제목 36~44pt · 본문 18~24pt(띄워 보면 20pt 이상) · 국내 발표 자료 본문 최소 14~18pt.
+     새 덱은 이 값만 쓴다. 옛 덱(v2·v1 원리 · 개선 기록 · 한눈에)은 아직 옛 크기 그대로다 — 옮기면 화면이 바뀐다 */
+  --fs-title: 60px;  /* 36pt 장 제목 */
+  --fs-body: 34px;   /* 20pt 설명 글머리표 */
+  --fs-box: 28px;    /* 17pt 상자·카드 제목 */
+  --fs-small: 24px;  /* 14pt 상자 안 설명·표 */
+  --fs-foot: 20px;   /* 12pt 각주·출처 — 읽지 않아도 되는 글만 */
+  /* 색 체계(DECK.md 7) —  파랑 한 가족 + 회색 + 경고 빨강 하나. 60-30-10: 바탕 60 · 글자·회색 30 · 파랑 강조 10.
+     파랑 #416AF0 은  홈페이지 대표색(example.com 에서 가장 많이 쓰는 색, 2026-09-29 확인). 흰 바탕 대비는 괄호.
+     새 덱은 이 값만 쓴다. 위의 엔진별 색(--vl --pps --aio --llm --code)과 --ok 초록은 옛 덱용이다. */
+  --c-brand: #416AF0;       /* 강조 파랑 (4.62 — 글자 가능) · v2 · 좋은 쪽 · 핵심 숫자 */
+  --c-brand-deep: #1E3A8A;  /* 진한 남색 (10.4) · 이름표 · 굵은 글자 */
+  --c-brand-mid: #9DB2F7;   /* 중간 파랑 (2.1 — 면 채우기만) · 두 번째 막대 조각 */
+  --c-brand-tint: #E8EEFD;  /* 옅은 파랑 (면 채우기만) · 강조 상자 바탕 */
+  --c-neutral: #8D95A1;     /* 회색 (면 채우기) · v1 · 비교 대상 */
+  --c-neutral-tint: #E9EBEE;
+  --c-alert: #DC2626;       /* 빨강 (4.83) · 틀림 · 문제에만 */
+  --c-alert-tint: #FEE2E2;
+  --c-text-mute: #6B7280;   /* 흐린 글자 (4.8) — --mute(#9aa1ab, 2.6)는 글자에 쓰지 않는다 */
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+body { font-family: 'Noto Sans KR', 'Noto Sans Symbols 2', 'Noto Sans Symbols', sans-serif; color: var(--ink); }   /* -apple-system(맥 전용)을 빼 Windows 와 같게 */
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+
+/* ═══ 1. 무대(16:9, 창에 맞춰 통째로 축소·확대) ═══ */
+#view { position: fixed; inset: 0 0 52px 0; display: flex; align-items: center; justify-content: center; }
+#stage { width: 1600px; height: 900px; flex: none; position: relative; background: var(--stage); border-radius: 18px; overflow: hidden; transform-origin: center center; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+/* 옆 패널과 같은 곡선·같은 시간으로 옮기고 줄인다(js/deck.js fit 주석) — 패널 폭을 끄는 동안에는 바로 따른다 */
+#stage { transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+body.kgrab #stage { transition: none; }
+/* 나가는 장은 즉시 숨기고(겹쳐 남는 잔상 방지) 들어오는 장만 페이드인 */
+.slide { position: absolute; inset: 0; padding: 50px 72px 0; opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+.slide.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .4s ease; }
+.eyebrow { font-size: 18px; font-weight: 800; letter-spacing: .04em; color: var(--mute); display: flex; gap: 12px; align-items: center; }
+.eyebrow .no { color: #fff; background: var(--ink); border-radius: 99px; padding: 2px 12px; font-size: 16px; }
+h1 { font-size: 74px; line-height: 1.12; margin: 14px 0 18px; font-weight: 900; letter-spacing: -.03em; }
+h2 { font-size: 40px; line-height: 1.22; margin: 10px 0 6px; font-weight: 900; letter-spacing: -.025em; max-width: 1180px; }
+.cap { font-size: 21px; color: var(--sub); margin: 0; line-height: 1.5; max-width: 1150px; }
+.cap b { color: var(--ink); }
+.canvas { position: absolute; left: 72px; right: 72px; top: 205px; bottom: 84px; }
+
+/* 이 장에서 일하는 쪽 — 오른쪽 위 등장인물 띠 */
+.cast { position: absolute; top: 46px; right: 64px; display: flex; gap: 6px; }
+.cast span { padding: 5px 12px; border-radius: 99px; font-size: 14px; font-weight: 800; background: var(--soft); color: #c3c8cf; }
+.cast span.on { color: #fff; }
+.cast .vl.on { background: var(--vl); } .cast .pps.on { background: var(--pps); } .cast .aio.on { background: var(--aio); }
+.cast .llm.on { background: var(--llm); } .cast .code.on { background: var(--code); }
+
+/* 단계별로 나타나는 것 — data-at 이 지금 단계 이하일 때 보인다 */
+[data-at] { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .5s ease; }
+[data-at].shown { opacity: 1; transform: none; }
+/* data-only — 그 단계에서만 보인다("1,2" 처럼 여럿). 안 보일 때는 누르기도 막는다 */
+[data-only] { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .5s ease; }
+[data-only].shown { opacity: 1; transform: none; }
+[data-only]:not(.shown) { pointer-events: none; }
+svg [data-at], svg [data-only] { transform: none !important; }
+.fade { transition: opacity .45s ease; }
+
+/* 장 아래 안내(단계 점 · 자동 재생 · 상세보기) */
+.foot { position: absolute; left: 72px; right: 72px; bottom: 22px; display: flex; align-items: center; gap: 14px; }
+.steps { display: flex; gap: 7px; }
+.steps i { width: 11px; height: 11px; border-radius: 99px; background: var(--line); transition: background .3s, width .3s; }
+.steps i.on { background: var(--ink); width: 28px; }
+.hint { font-size: 16px; color: var(--mute); flex: 1; }
+.pill { padding: 9px 18px; border-radius: 99px; background: var(--soft); font-size: 17px; font-weight: 700; transition: transform .12s, background .15s; }
+.pill:hover { background: var(--line); } .pill:active { transform: scale(.97); }
+
+/* ═══ 2. 조작줄(무대 밖) ═══ */
+#bar { position: fixed; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 14px; color: #cfd3da; }
+#bar .nb { width: 36px; height: 36px; border-radius: 99px; background: #23262d; font-size: 16px; color: #fff; flex: none; }
+#toc { flex: 1; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+#toc button { flex: 0 0 auto; height: 30px; padding: 0 11px; border-radius: 99px; font-size: 13px; font-weight: 600; color: #9aa1ab; }
+#toc button.on { background: #fff; color: #111; }
+#cnt { font-size: 13px; color: #9aa1ab; min-width: 48px; text-align: right; }
+
+/* ═══ 3. 상세보기 서랍(겹쳐 열림) ═══ */
+#drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 660px; background: #fff; box-shadow: -20px 0 60px rgba(0,0,0,.18); transform: translateX(105%); transition: transform .38s cubic-bezier(.2,.8,.2,1); z-index: 30; padding: 46px 44px; overflow-y: auto; }
+#drawer.open { transform: none; }
+#drawer h3 { font-size: 29px; margin: 0 0 16px; font-weight: 900; }
+#drawer .x { position: absolute; top: 22px; right: 22px; width: 44px; height: 44px; border-radius: 99px; background: var(--soft); font-size: 20px; }
+#drawer p, #drawer li { font-size: 18px; line-height: 1.65; color: var(--sub); }
+#drawer b { color: var(--ink); }
+#drawer code { font-family: 'JetBrains Mono', monospace; font-size: 15px; background: var(--soft); padding: 1px 7px; border-radius: 6px; color: var(--ink); }
+#drawer pre { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; background: #15171c; color: #d8dee8; border-radius: 12px; padding: 14px 16px; white-space: pre-wrap; word-break: break-all; line-height: 1.55; }
+details.more { margin: 14px 0; }
+details.more > summary { list-style: none; display: inline-flex; gap: 8px; align-items: center; padding: 9px 18px; border-radius: 99px; background: var(--soft); font-size: 16px; font-weight: 700; color: var(--sub); cursor: pointer; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::after { content: '▾'; transition: transform .2s; }
+details.more[open] > summary::after { transform: rotate(180deg); }
+details.more > div { margin: 12px 0 0 6px; padding: 4px 0 4px 18px; border-left: 3px solid var(--line); animation: drop .3s ease; }
+@keyframes drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* ═══ 4. 공통 부품 ═══ */
+.card { position: absolute; background: #fff; border-radius: 16px; box-shadow: 0 8px 30px rgba(20,24,40,.09); padding: 20px 24px; }
+.docbox { position: absolute; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(20,24,40,.12); overflow: hidden; }
+.docbox svg { display: block; width: 100%; height: 100%; }
+.code { font-family: 'JetBrains Mono', monospace; background: #15171c; color: #d8dee8; border-radius: 14px; padding: 16px 18px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; overflow: auto; }
+.code .t { color: #8cc8ff; } .code .a { color: #ffb86b; } .code .v { color: #ffd08a; } .code .m { color: #7a828e; } .code .hl { background: rgba(234,88,12,.35); border-radius: 4px; }
+.big { font-size: 60px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.lab { font-size: 16px; color: var(--mute); margin-top: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 8px; font-size: 16px; font-weight: 600; margin: 3px 4px 3px 0; background: var(--soft); }
+.tag { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 13px; font-weight: 800; color: #fff; }
+.t-vl { background: var(--vl); } .t-pps { background: var(--pps); } .t-aio { background: var(--aio); } .t-llm { background: var(--llm); } .t-code { background: var(--code); }
+.c-vl { color: var(--vl); } .c-pps { color: var(--pps); } .c-aio { color: var(--aio); } .c-llm { color: var(--llm); } .c-code { color: var(--code); }
+.tab { padding: 9px 18px; border-radius: 99px; background: var(--soft); font-size: 17px; font-weight: 700; color: var(--sub); transition: background .2s; margin: 0 6px 6px 0; }
+.tab.on { background: var(--ink); color: #fff; }
+.tgl { padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 800; border: 2px solid var(--line); background: #fff; color: var(--mute); margin: 0 6px 6px 0; transition: all .2s; }
+.tgl.on { color: #fff; }
+.tgl.on.vl { background: var(--vl); border-color: var(--vl); } .tgl.on.pps { background: var(--pps); border-color: var(--pps); } .tgl.on.aio { background: var(--aio); border-color: var(--aio); }
+.light { width: 22px; height: 22px; border-radius: 99px; display: inline-block; flex: none; vertical-align: middle; }
+.lg { background: var(--ok); } .ly { background: var(--warn); } .lr { background: var(--bad); }
+svg text { font-family: 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif; }
+#tip { position: absolute; z-index: 40; pointer-events: none; background: #15171c; color: #fff; font-size: 15px; line-height: 1.45; padding: 8px 12px; border-radius: 10px; max-width: 420px; opacity: 0; transition: opacity .12s; white-space: pre-line; }
+#tip.on { opacity: 1; }
+.kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; font-size: 17px; align-items: baseline; }
+.kv .k { color: var(--mute); font-size: 15px; font-weight: 700; }
+.note { font-size: 17px; color: var(--sub); line-height: 1.55; }
+.note b { color: var(--ink); }
+.pulse { animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.rd { display: grid; grid-template-columns: 128px 1fr 44px; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+.rd:last-child { border-bottom: 0; }
+.rd .n { font-weight: 800; font-size: 14px; }
+.rd .x { font-family: 'JetBrains Mono', monospace; font-size: 15px; word-break: break-all; }
+.rd .m { text-align: center; font-weight: 900; font-size: 18px; }
+.m-eq { color: var(--ok); } .m-in { color: var(--warn); } .m-ne { color: var(--bad); }
+
+/* 하나씩 강조하는 줄 — 지금 들어온 요소를 넓게, 앞 요소는 좁게(크기가 바뀌는 연출만 움직인다 · 사용자 지정 2026-09-28).
+   이미 나온 요소를 누르면 그 요소가 다시 넓어진다. */
+.focusrow { display: flex; gap: 16px; align-items: stretch; }
+.focusrow > .fitem { position: relative !important; left: auto !important; top: auto !important; width: auto !important; flex: 0 0 0; min-width: 0; overflow: hidden; transition: flex-grow .45s ease; }
+.focusrow > .fitem:not(.shown) { margin-left: -16px; padding: 0 !important; border: 0; box-shadow: none; }
+.focusrow > .fitem.shown { flex: 1 1 0; cursor: pointer; }
+.focusrow > .fitem.cur { flex: 2.6 1 0; cursor: default; }
+
+/* ═══ 5. 폰 · 좁은 화면(사용자 지정 2026-09-29 "모바일 UI 도") ═══
+   실측(390×844 세로): 아래 목차 줄이 34px 로 눌려 글자가 잘리고, 전체화면 버튼은 아이폰에서 동작하지 않는다.
+   → 좁으면 목차 줄 대신 「2 / 13」 을 눌러 장 목록을 연다(아래에서 올라오는 목록). 손가락으로 옆으로 밀면 넘긴다(js/deck.js). */
+#cnt { cursor: pointer; border-radius: 99px; padding: 6px 4px; }
+#cnt:hover { color: #fff; }
+@media (max-width: 640px) {
+  #toc { display: none; }
+  #bar { gap: 6px; padding: 0 10px; }
+  #cnt { flex: 1; text-align: center; font-size: 14px; font-weight: 700; color: #e8eaf0; }
+  #bar .nb { width: 40px; height: 40px; }
+  #bar .nb[id="de-btn"], #bar .nb[title*="AI"] { width: auto !important; padding: 0 12px !important; }
+}
+/* 가로로 누운 폰 — 높이가 모자라 조작줄을 얇게 */
+@media (max-height: 500px) {
+  #view { bottom: 44px; } #bar { height: 44px; } #bar .nb { width: 34px; height: 34px; }
+}
+/* 세로로 든 폰 — 무대가 화면 가운데 띠만 쓴다. 가로로 돌리면 두 배 넘게 커진다는 걸 알린다(버튼 없이 글 한 줄) */
+@media (max-width: 640px) and (orientation: portrait) {
+  #view::after { content: '가로로 돌리면 크게 보입니다 · 옆으로 밀어 넘기기'; position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 13px; color: #6b7280; pointer-events: none; }
+  body.kside #view::after, body.dedit #view::after { display: none; }
+}
+/* 장 목록 — 「2 / 13」 을 누르면 아래에서 올라온다(모든 화면 공통, 좁은 화면에선 목차 줄을 대신한다) */
+#dsheet { position: fixed; inset: 0; z-index: 90; display: none; }
+#dsheet.on { display: block; }
+#dsheet .bg { position: absolute; inset: 0; background: rgba(0,0,0,.45); animation: shfade .2s ease; }
+#dsheet .sh { position: absolute; left: 0; right: 0; bottom: 0; max-height: 75%; overflow-y: auto; background: #fff; border-radius: 18px 18px 0 0; padding: 8px 0 max(12px, env(safe-area-inset-bottom)); animation: shup .25s cubic-bezier(.2,.8,.2,1); }
+@media (min-width: 641px) { #dsheet .sh { left: 50%; width: 520px; margin-left: -260px; bottom: 60px; border-radius: 18px; } }
+#dsheet .grab { width: 40px; height: 5px; border-radius: 99px; background: #d5d9df; margin: 4px auto 8px; }
+#dsheet .hd { font-size: 13px; font-weight: 800; color: #6b7280; padding: 4px 20px 8px; }
+#dsheet button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; padding: 0 20px; text-align: left; font-size: 16px; font-weight: 600; color: #16181d; }
+#dsheet button:active { background: #f2f3f6; }
+#dsheet button i { font-style: normal; font-size: 13px; font-weight: 800; color: #9aa1ab; min-width: 22px; }
+#dsheet button.on { color: #1E3A8A; background: #E8EEFD; } #dsheet button.on i { color: #416AF0; }
+@keyframes shup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes shfade { from { opacity: 0; } }
+
+/* ═══ 6. 조작줄 순서 · 전체화면(사용자 지정 2026-09-30) ═══
+   ← 4/13 → 를 왼쪽 아래에 모은다(덱 HTML 은 ← 목차 4/13 → 순서라 order 로만 바꾼다 — 덱마다 고치지 않게). 그 뒤로 목차 · 편집 · AI · 전체화면 */
+#bar #pv { order: -3; } #bar #cnt { order: -2; min-width: 0; padding: 6px 8px; } #bar #nx { order: -1; margin-right: 6px; }
+@media (max-width: 640px) { #bar #cnt { flex: none; } #bar #nx { margin-right: auto; } }
+/* 전체화면 — 16:9 화면이면 무대가 꽉 차게(여백 · 둥근 모서리 · 그림자 없이), 조작줄은 무대 위에 겹쳐 숨었다가 마우스가 아래로 오면 나온다(발표용) */
+body.dfs #view { inset: 0; }
+body.dfs #stage { border-radius: 0; box-shadow: none; }
+body.dfs #bar { background: rgba(15,17,21,.88); transform: translateY(100%); transition: transform .22s ease; z-index: 60; }
+body.dfs.dbar #bar { transform: none; }
+body.dfs:not(.dbar) { cursor: none; }
+/* [편집] 은 ← 위(왼쪽 아래), [AI] 는 ⛶ 위(오른쪽 아래)에 띄운다(사용자 지정 2026-09-30). 조작줄 안에서 위로 띄우는 것이라 조작줄과 같이 움직인다
+   (전체화면에서 숨고 · AI 패널이 열리면 오른쪽 끝이 따라온다). 무대 위에 겹쳐도 된다(사용자 지정 — 버튼 자리를 따로 비우니 빈 띠가 생겨 무대만 작아졌다).
+   좁은 화면은 조작줄 안 그대로 */
+@media (min-width: 641px) and (min-height: 501px) {
+  #bar #de-btn, #bar #k-ai, #bar #k-code { box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  #bar #de-btn, #bar #k-ai, #bar #k-code { position: absolute; bottom: calc(100% + 6px); height: 36px; }
+  #bar #de-btn { left: 14px; } #bar #k-ai { right: 14px; } #bar #k-code { right: 88px; }
+}

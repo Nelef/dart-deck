@@ -1,0 +1,8 @@
+# 실행 데이터 — 계정 · 세션(Claude 토큰 포함) · 덱. 절대 커밋하지 않는다
+data/
+node_modules/
+build/
+__pycache__/
+*.pyc
+.DS_Store
+.env
