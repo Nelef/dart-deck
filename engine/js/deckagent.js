@@ -433,7 +433,9 @@
         A.finish(a, -1, 0, false);
       }
       if (gen !== A.gen) return;
-      K.open('ai'); K.render(); A.swap();
+      // 패널은 **아직 도는 작업이 있을 때만** 연다 — 지난 대화가 있다고 매번 열면, 닫고 새로고침해도 다시 켜진다(사용자 지적 2026-09-30).
+      // 끝난 대화는 조용히 불러 두고, [✦ AI] 를 누르면 그대로 보인다
+      if (live.length) K.open('ai'); K.render(); A.swap();
       // 도는 중인 작업(보통 마지막 하나) — 이 창에서 이어서 지켜본다. 멈춤도 된다
       for (const a of live) {
         const ai = K.chat.indexOf(a); K.busy = true; K.ctrl = new AbortController(); K.setSend(); K.updateMsg(ai);
