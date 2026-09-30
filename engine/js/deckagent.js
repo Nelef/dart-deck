@@ -25,6 +25,9 @@
   .ka-acct ~ .ka-new { margin-left: 0; }
   .ka-acct { margin-left: auto; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; }
   .ka-acct.on { border-color: #d97706; color: #92400e; background: #fffbeb; }
+  .ka-web { border-width: 1px; border-style: solid; border-color: #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; transition: transform .08s, background .15s, color .15s, border-color .15s; }
+  .ka-web:hover { background: #f2f3f6; } .ka-web:active { transform: scale(0.98); }
+  .ka-web.on { border-color: #416AF0; background: #E8EEFD; color: #416AF0; }
   .ka-steps { margin: 4px 0 8px; font: 600 12.5px/1.6 'Noto Sans KR', sans-serif; color: #545b66; }
   .ka-steps summary { cursor: pointer; font-weight: 800; }
   .ka-steps li { list-style: none; padding-left: 2px; } .ka-steps li.bad { color: #b91c1c; }
@@ -102,6 +105,8 @@
     get model() { return ls.get('deckagent.model') ?? 'auto'; }, set model(v) { ls.set('deckagent.model', v); },
     // 노력(effort) — Claude Code --effort. 자동 = 작은 수정 medium · 큰 수정 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
     get effort() { return ls.get('deckagent.effort') ?? 'auto'; }, set effort(v) { ls.set('deckagent.effort', v); },
+    // 웹 검색 — Claude Code 엔진에서만(검색은 Claude 쪽 도구). 켠 부탁만 검색 · 웹 읽기가 열리고, 가져온 사실엔 출처를 단다(사용자 지정 2026-09-30)
+    get web() { return ls.get('deckagent.web') === '1'; }, set web(v) { ls.set('deckagent.web', v ? '1' : null); },
     // 연결 여부 — 토큰 자체는 서버(계정)에만. 'server' 는 자리표시(서버가 이 값을 무시하고 계정 토큰을 붙인다). 끊기 = 서버에서 지운다
     me: null,
     get token() { return A.me?.claude ? 'server' : ''; },
@@ -227,6 +232,7 @@
       bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma 26b</button><button data-e="claude" class="${cc ? 'on' : ''}" title="Claude Code — 내 Claude 구독으로">Claude Code</button></span>`
         + (cc && sub ? `<select class="ka-model" title="Claude 모델 — 구독 등급에 따라 못 쓰는 것이 있을 수 있다">${MODELS.map(([v, n]) => `<option value="${v}" ${A.model === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
           + `<select class="ka-model ka-effort" title="노력(effort) — 높을수록 오래 생각하고 사용량이 는다">${[['auto', '노력 자동'], ['low', '노력 low'], ['medium', '노력 medium'], ['high', '노력 high'], ['xhigh', '노력 xhigh'], ['max', '노력 max']].map(([v, n]) => `<option value="${v}" ${A.effort === v ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '')
+        + (cc && sub ? `<button class="ka-web${A.web ? ' on' : ''}" title="켜면 AI 가 웹에서 찾아 넣는다 — 가져온 사실엔 출처를 달고, 검색 결과에 나온 주소만 연다">${A.web ? '✓ 웹 검색' : '웹 검색'}</button>` : '')
         + (cc ? `<button class="ka-acct${sub ? ' on' : ''}">${sub ? '✓ 구독 연결됨' : 'Claude 구독 연결'}</button>` : '')
         + (cc && sub ? '<button class="ka-new ka-use" title="남은 사용량">사용량</button>' : '')
         ;
@@ -238,6 +244,7 @@
       const ms = bar.querySelector('.ka-model:not(.ka-effort)'); if (ms) ms.onchange = () => { A.model = ms.value; };
       const es = bar.querySelector('.ka-effort'); if (es) es.onchange = () => { A.effort = es.value; };
       const us = bar.querySelector('.ka-use'); if (us) us.onclick = () => A.usage();
+      const wb = bar.querySelector('.ka-web'); if (wb) wb.onclick = () => { A.web = !A.web; wb.classList.toggle('on', A.web); wb.textContent = A.web ? '✓ 웹 검색' : '웹 검색'; A.toast(A.web ? '웹 검색 켬 — 필요하면 웹에서 찾아 출처와 함께 넣어요' : '웹 검색 끔'); };
       const ac = bar.querySelector('.ka-acct'); if (ac) ac.onclick = () => (sub ? (confirm('Claude 구독 연결을 끊을까요? (내 계정에 저장된 연결을 지웁니다)') && (A.token = '', K.render())) : A.login());
       // 연결 안 된 Claude Code — 보내기를 막는다(입력은 그대로 두고 연결을 권한다)
       const sendB = body.querySelector('.kc-send'); const ta = body.querySelector('.kc-box textarea');
@@ -334,7 +341,7 @@
           files = []; for (const f of att) { const j = await K.post('/api/asset', { file: location.pathname, name: f.name, data: f.data.split(',')[1] }); files.push(j.src); } }
         a.agent.files = files;
         const r = await fetch('/api/agent/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: K.ctrl.signal,
-          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), engine: a.agent.engine === 'sub' ? 'claude' : 'gemma', slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.e === a.agent.engine ? A.sess.id : undefined, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
+          body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), engine: a.agent.engine === 'sub' ? 'claude' : 'gemma', web: !!a.agent.o.web, slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.e === a.agent.engine ? A.sess.id : undefined, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
             effort: (A.effort === 'auto' ? o.effort : A.effort) || undefined }) });
         await A.read(r, a, ai);
       } catch (e) {
@@ -346,7 +353,8 @@
     },
     // 새 답 말풍선 — o: 모델 · 노력 · 종류 · 계획 여부(대화를 다시 그릴 때는 서버 메타에서)
     newMsg(slide, q, o = {}) { const eng = o.engine ? (o.engine === 'gemma' ? 'gemma' : 'sub') : (o.build || A.engine === 'claude' ? 'sub' : 'gemma');
-      return { _gen: A.gen, role: 'assistant', text: '', slide, streaming: true, agent: { steps: [], engine: eng, quick: !!o.quick, plan: !!o.plan, build: !!o.build, o: { model: o.model, effort: o.effort, kind: o.kind } }, root: q }; },
+      const web = o.web ?? (eng === 'sub' && !o.build && A.web);
+      return { _gen: A.gen, role: 'assistant', text: '', slide, streaming: true, agent: { steps: [], engine: eng, quick: !!o.quick, plan: !!o.plan, build: !!o.build, o: { model: o.model, effort: o.effort, kind: o.kind, web } }, root: q }; },
     // 서버가 흘리는 줄(NDJSON)을 읽어 말풍선에 쌓는다 — 새 부탁 · 다시 열어 따라 보기 · 지난 대화 다시 그리기가 같은 길
     async read(r, a, ai) {
       if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
@@ -392,7 +400,7 @@
       // 실제 모델 ID(Claude Code 결과의 modelUsage) — 보조 호출용 작은 모델(haiku)이 같이 찍히면 둘 다
       const used = (a.agent.models || []).join(', ');
       a.model = a.agent.quick ? '빠른 답 · gemma-4-26b' : a.agent.engine === 'gemma' ? `gemma 26b 생각 · 수정${o.kind ? ` (${String(o.kind).replace(/장/g, '페이지')})` : ''}`
-        : `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${used ? ` · 실제: ${used}` : ''}`;
+        : `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${o.web ? ' · 웹 검색' : ''}${used ? ` · 실제: ${used}` : ''}`;
       // 구독 인증 실패 — 연결을 지우고 다시 연결하게(잘못된 토큰으로 계속 401 이 나지 않게). 지난 대화를 다시 그릴 때는 건드리지 않는다
       if (live && a.agent.engine === 'sub' && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
       K.busy = false; K.ctrl = null; if (ai >= 0) K.updateMsg(ai); K.setSend();

@@ -222,7 +222,7 @@ def new_deck(user, req):
     title = re.sub(r'\s+', ' ', str(req.get('title') or '')).strip()[:80]
     if not title: raise ValueError('제목을 적어 주세요')
     b = req.get('brief') or {}
-    brief = {'mode': 'paste' if b.get('mode') == 'paste' else 'survey', **{k: str(b.get(k) or '')[:40_000 if k in ('text', 'material') else 2000] for k in BRIEF_KEYS}}
+    brief = {'mode': 'paste' if b.get('mode') == 'paste' else 'survey', **{k: str(b.get(k) or '')[:40_000 if k in ('text', 'material') else 2000] for k in BRIEF_KEYS}, 'web': bool(b.get('web'))}
     if not any(brief[k].strip() for k in BRIEF_KEYS): raise ValueError('어떤 사람에게 어떤 정보를 줄지 한 가지 이상 적어 주세요')
     tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
     did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', htmlmod.escape(brief['key'][:120] or brief['audience'][:120])))
@@ -246,6 +246,7 @@ def build_prompt(deck_dir):
         if (b.get(k) or '').strip(): L.append(f'- {n}: {b[k].strip()}')
     if (b.get('text') or '').strip(): L += ['- 사용자가 붙여 넣은 내용(이것이 재료다):', '"""', b['text'].strip(), '"""']
     if b.get('files'): L.append(f'- 첨부 그림: {", ".join(b["files"])} — Read 로 열어 보고, 내용이면 재료로 · 덱에 넣을 만하면 <img src="그 경로"> 로')
+    if b.get('web'): L.append('- 웹 검색 켜짐: 받은 정보만으로 부족한 배경 · 최신 사실 · 공개 통계는 웹에서 찾아 보강하고 출처를 단다(받은 정보와 어긋나면 받은 정보를 따른다)')
     L += ['', '[만드는 순서]',
           '1. 듣는 사람과 목적에 맞춰 흐름을 정한다: 표지 → 목차 → (부분마다 간지 → 본문 페이지) → 정리. 한 페이지에 메시지 하나. 분량을 말하지 않았으면 본문 6~10페이지.',
           '2. 페이지마다 명사형 제목 · 개조식 설명(2~4줄) · 그림(표 · 막대 · 순서도 · 비교 카드 등 인포그래픽)을 먼저 생각한다. 글만 있는 페이지는 피한다.',
@@ -439,7 +440,9 @@ class H(http.server.BaseHTTPRequestHandler):
                 if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
                 req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
             if req.get('build'):
-                req.update({'prompt': build_prompt(os.path.dirname(edit_target(req.get('file')))), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'high'})
+                dd = os.path.dirname(edit_target(req.get('file')))
+                req.update({'prompt': build_prompt(dd), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'high',
+                            'web': bool((STORE._load(os.path.join(dd, 'brief.json'), {}) or {}).get('web'))})
             return self.agent_stream(req, u)
         # 대화 기록 — 이 계정이 이 덱에 한 부탁들 · 따라 보기 · 멈춤 · 상태(진행 · 취소 · 버림) · 새 대화(숨기기)
         if path == '/api/agent/note':
