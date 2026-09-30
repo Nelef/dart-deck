@@ -50,6 +50,8 @@
     const panelW = () => panelBox().w;
     // AI PPT — 왼쪽 위 로고 = 발표 자료 목록 · 탭 아이콘(사용자 지정 2026-09-30). 덱 HTML 을 고치지 않게 엔진이 붙인다(모양은 css/deck.css 끝)
     if (!document.querySelector('#ppt-home')) { const a = document.createElement('a'); a.id = 'ppt-home'; a.href = '/'; a.title = '발표 자료 목록'; a.innerHTML = '<img src="/web/ai-ppt.svg" alt="AI PPT">'; document.body.appendChild(a); }
+    // 확대 · 축소(휠 · 핀치 · + − 0 · 끌어 이동)는 엔진 기본 — 덱 HTML 에 없어도 붙인다(사용자 지정 2026-09-30). 덱이 뒤에서 직접 불러오면 js/deckzoom.js 가 알아서 한 번만 붙는다
+    if (!window.DeckZoom) setTimeout(() => { if (!window.DeckZoom && !document.querySelector('script[src$="deckzoom.js"]')) { const z = document.createElement('script'); z.src = 'js/deckzoom.js'; document.body.appendChild(z); } }, 0);
     if (!document.querySelector('link[rel~="icon"]')) { const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = '/web/favicon.svg'; document.head.appendChild(l); }
     // --fit-top: 위쪽에 비워 둘 높이 — ✎ 편집의 리본(도구 막대)이 무대를 가리지 않게(deckedit 가 편집 중에만 준다, 기본 0 이라 다른 덱은 그대로)
     const fit = () => {

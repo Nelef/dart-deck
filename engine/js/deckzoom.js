@@ -3,8 +3,12 @@
 // 그래서 덱마다 있는 fit() 과 충돌하지 않는다. 좌표를 쓰는 곳(말풍선·세부 카드)은 K 대신
 // 무대의 실제 화면 폭(getBoundingClientRect().width / 1600)으로 나눠야 확대 중에도 맞는다.
 (() => {
+  // 엔진 기본(deck.js 가 모든 덱에 불러온다, 2026-09-30 사용자 지정) — 덱이 직접 불러와도 두 번 붙지 않게
+  if (window.DeckZoom) return;
   const view = document.querySelector('#view');
   if (!view) return;
+  // ✎ 편집 중에는 쉰다 — 끌기가 요소 옮기기라 확대 이동과 겹친다(편집을 켜면 배율도 되돌린다)
+  const editing = () => document.body.classList.contains('dedit');
   const MIN = 1; const MAX = 5;
   let Z = 1; let tx = 0; let ty = 0;
   const st = document.createElement('style');
@@ -57,6 +61,7 @@
     return false;
   };
   view.addEventListener('wheel', (e) => {
+    if (editing()) return;
     if (!e.ctrlKey && scrollableUnder(e.target)) return;
     e.preventDefault();
     // 트랙패드 핀치는 deltaY 가 작고 촘촘하게, 마우스 휠은 한 칸이 크게 온다 — 계수를 달리 둔다
@@ -68,6 +73,7 @@
   const pts = new Map();
   let pinch = null; let drag = null; let moved = false;
   view.addEventListener('pointerdown', (e) => {
+    if (editing()) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.target.closest('#drawer, #kpop, .code, pre, textarea, input, select')) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -108,6 +114,7 @@
   // 키 — + 확대 · − 축소 · 0 되돌리기(글 입력 중엔 무시)
   addEventListener('keydown', (e) => {
     if (e.target && /TEXTAREA|INPUT/.test(e.target.tagName)) return;
+    if (editing() || e.target?.isContentEditable || e.ctrlKey || e.metaKey) return;   // 편집 · Ctrl/⌘ 단축키(브라우저 확대)는 그대로
     const cx = view.offsetLeft + view.offsetWidth / 2; const cy = view.offsetTop + view.offsetHeight / 2;
     if (e.key === '+' || e.key === '=') zoomAt(cx, cy, Z * 1.25);
     else if (e.key === '-' || e.key === '_') zoomAt(cx, cy, Z / 1.25);
@@ -117,5 +124,6 @@
   const mo = new MutationObserver((ms) => { if (ms.some((m) => m.target.classList.contains('slide') && m.target.classList.contains('on') && !(m.oldValue || '').includes('on'))) reset(); });
   document.querySelectorAll('.slide').forEach((s) => mo.observe(s, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }));
   addEventListener('resize', () => apply());
+  new MutationObserver(() => { if (editing() && Z !== 1) reset(); badge.style.display = editing() ? 'none' : ''; }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   apply();
 })();
