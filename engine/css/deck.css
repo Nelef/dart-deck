@@ -200,3 +200,15 @@ body.dfs:not(.dbar) { cursor: none; }
   #bar #de-btn, #bar #k-ai, #bar #k-code { position: absolute; bottom: calc(100% + 6px); height: 36px; }
   #bar #de-btn { left: 14px; } #bar #k-ai { right: 14px; } #bar #k-code { right: 88px; }
 }
+
+/* ═══ AI PPT 로고 — 왼쪽 위, 누르면 발표 자료 목록(사용자 지정 2026-09-30 "목록 단추는 왼쪽 위에 · AI PPT 로고로") ═══
+   덱 HTML 을 고치지 않게 엔진(deck.js)이 붙인다. 어두운 무대 바탕 위라 흰 알약 안에. 무대가 로고에 가리지 않게 위를 비운다(--fit-top) —
+   편집 중(리본이 그 자리) · 전체화면에서는 숨기고 비우지 않는다. 조작줄의 옛 ☰ 는 숨긴다(덱 파일엔 남아 있어도 된다) */
+#ppt-home { position: fixed; left: 14px; top: 9px; z-index: 45; display: flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 99px; background: #fff;
+  box-shadow: 0 1px 6px rgba(0,0,0,.2); transition: transform .08s ease, box-shadow .15s ease; }
+#ppt-home:hover { box-shadow: 0 2px 10px rgba(0,0,0,.28); } #ppt-home:active { transform: scale(.98); }
+#ppt-home img { display: block; height: 15px; width: auto; }
+body:not(.dfs):not(.dedit) { --fit-top: 46px; }
+body.dfs #ppt-home, body.dedit #ppt-home { display: none; }
+#bar #home { display: none !important; }
+@media (max-width: 640px) { #ppt-home { left: 10px; top: 8px; height: 26px; padding: 0 11px; } #ppt-home img { height: 12px; } body:not(.dfs):not(.dedit) { --fit-top: 38px; } }

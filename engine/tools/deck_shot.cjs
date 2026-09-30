@@ -17,6 +17,7 @@ const [url, slideNo, out] = process.argv.slice(2);
     p.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
     p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
     await p.goto(url); await p.waitForFunction(() => typeof deck !== 'undefined' && deck.slides && deck.slides.length, null, { timeout: 15000 });
+    await p.addStyleTag({ content: '#ppt-home { display: none !important; } body { --fit-top: 0px !important; } ' }); await p.evaluate(() => { window.DeckFit?.(); dispatchEvent(new Event('resize')); });   // 왼쪽 위 로고 · 그 자리 비움 없이 무대를 크게
     await p.waitForTimeout(1800);                                   // 재료(json) · 장 그리기
     const n = await p.evaluate(() => deck.slides.length); const slides = [];
     for (let i = 0; i < n; i++) {

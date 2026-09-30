@@ -13,7 +13,7 @@ const [url, out] = process.argv.slice(2);
     const p = await b.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 0.4, extraHTTPHeaders: KEY ? { 'x-shot-key': KEY } : {} });
     await p.goto(url.replace(/#.*$/, '') + '#1');
     await p.waitForFunction(() => typeof deck !== 'undefined' && deck.slides && deck.slides.length, null, { timeout: 20000 });
-    await p.addStyleTag({ content: '#bar, #ldr, #kpanel, #de-btn, #de-ai, #k-ai, #k-code, .kfab { display: none !important; } #view { inset: 0 !important; } html, body, #view { background: #fff !important; }' });   // 무대 둥근 모서리 밖 어두운 바탕이 찍히지 않게
+    await p.addStyleTag({ content: '#ppt-home { display: none !important; } body { --fit-top: 0px !important; } #bar, #ldr, #kpanel, #de-btn, #de-ai, #k-ai, #k-code, .kfab { display: none !important; } #view { inset: 0 !important; } html, body, #view { background: #fff !important; }' });   // 무대 둥근 모서리 밖 어두운 바탕이 찍히지 않게
     await p.evaluate(() => { deck.show(0, 0); window.DeckFit?.(); dispatchEvent(new Event('resize')); });
     await p.waitForTimeout(1800);   // 재료(json) · 그림 · 글꼴 · 숫자 올리기
     await p.locator('#stage').screenshot({ path: out, type: 'jpeg', quality: 78 });

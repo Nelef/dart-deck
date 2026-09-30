@@ -48,6 +48,9 @@
     // 폰 세로 화면에서는 패널이 오른쪽이 아니라 **아래에서** 올라온다(deckkit 의 좁은 화면 CSS) — 폭이 창 전체면 아래 패널로 본다
     const panelBox = () => { if (!document.body.classList.contains('kside')) return { w: 0, h: 0 }; const r = $('#kpanel')?.getBoundingClientRect(); if (!r) return { w: 0, h: 0 }; return r.width >= innerWidth - 2 ? { w: 0, h: r.height } : { w: r.width, h: 0 }; };
     const panelW = () => panelBox().w;
+    // AI PPT — 왼쪽 위 로고 = 발표 자료 목록 · 탭 아이콘(사용자 지정 2026-09-30). 덱 HTML 을 고치지 않게 엔진이 붙인다(모양은 css/deck.css 끝)
+    if (!document.querySelector('#ppt-home')) { const a = document.createElement('a'); a.id = 'ppt-home'; a.href = '/'; a.title = '발표 자료 목록'; a.innerHTML = '<img src="/web/ai-ppt.svg" alt="AI PPT">'; document.body.appendChild(a); }
+    if (!document.querySelector('link[rel~="icon"]')) { const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = '/web/favicon.svg'; document.head.appendChild(l); }
     // --fit-top: 위쪽에 비워 둘 높이 — ✎ 편집의 리본(도구 막대)이 무대를 가리지 않게(deckedit 가 편집 중에만 준다, 기본 0 이라 다른 덱은 그대로)
     const fit = () => {
       const v = $('#view'); const { w: pw0, h: ph } = panelBox(); const top = parseFloat(getComputedStyle(document.body).getPropertyValue('--fit-top')) || 0;
