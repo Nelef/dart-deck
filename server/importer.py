@@ -28,10 +28,17 @@ def _notes(pptx):
 def to_pdf(src, work):
     """pptx · ppt → PDF(LibreOffice 머리 없이). 사용자 설정 폴더를 작업 폴더에 따로 둬 동시에 돌아도 잠금이 겹치지 않게"""
     if not SOFFICE: raise ValueError('이 서버에는 PPT 변환 도구(LibreOffice)가 없습니다 — PPT 를 PDF 로 저장해 올려 주세요')
+    pdf = os.path.splitext(src)[0] + '.pdf'
+    # 먼저 UNO 스크립트(lo_convert.py — 한 · 영 사이 자동 간격을 끄고 내보냄). python3-uno 가 없거나 실패하면 그냥 --convert-to
+    if subprocess.run(['python3', '-c', 'import uno'], capture_output=True).returncode == 0:
+        try:
+            subprocess.run(['python3', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lo_convert.py'), SOFFICE, src, pdf, work], capture_output=True, timeout=600)
+            if os.path.exists(pdf) and os.path.getsize(pdf) > 0: return pdf
+        except Exception:
+            pass
     prof = 'file://' + os.path.join(work, 'lo-profile')
     r = subprocess.run([SOFFICE, f'-env:UserInstallation={prof}', '--headless', '--norestore', '--convert-to', 'pdf', '--outdir', work, src],
                        capture_output=True, text=True, timeout=600)
-    pdf = os.path.splitext(src)[0] + '.pdf'
     if r.returncode != 0 or not os.path.exists(pdf): raise ValueError(f'PPT 를 PDF 로 바꾸지 못했습니다 — {(r.stderr or r.stdout)[-200:]}')
     return pdf
 
