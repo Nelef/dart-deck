@@ -192,6 +192,10 @@ def system_prompt(work, slide, n, port, files=(), plan=False, base='/', docs=())
             '규칙: 위 작성 규칙을 새로 쓰거나 바꾸는 모든 글 · 크기 · 색 · 배치에 지킨다(제목은 명사형 · 설명은 개조식 · 글자는 --fs-* 단계 · 색은 --c-* 변수 · 숫자는 기록에서). 장마다 <section class="slide" data-name="…"> 이고, '
             "그 장을 그리는 스크립트는 INIT['장 이름'] = () => {…} 이다(간지는 PARTS 목록을 도는 스크립트). data-name · INIT 이름은 바꾸지 않는다. "
             'data-frozen 이 붙은 장은 스크립트가 다시 그리지 않는다 — 마크업이 곧 화면이다. 스크립트가 그리는 장은 마크업을 고쳐도 덮이니 스크립트를 고친다. '
+            # 가져온 PPT(server/importer.py) — 쪽마다 원본 그림 한 장. 고치고 싶은 페이지만 이 규칙으로 HTML 로 바꾼다(사용자 선택 2026-09-30)
+            'data-import 가 붙은 장은 기존 PPT · PDF 에서 **그림으로 가져온 페이지**다(<img class="ppt-page"> 한 장, 그 쪽 글은 파일 아래 const PPT[장 이름].text). '
+            '그 장을 고치거나 「편집 가능하게」 바꿔 달라면: 그 그림을 Read 로 열어 보고, PPT 글을 글자 그대로 써서 같은 내용 · 같은 배치 · 비슷한 색의 이 엔진 HTML(글상자 · 표 · Viz 그림)로 다시 쓴다 — '
+            '이 장은 DECK.md 스타일보다 **원본 모양이 먼저**다. 다 쓰면 그 section 의 data-import · class ppt-img 와 그림을 없앤다(data-frozen 은 두어도 된다). 다른 가져온 장은 건드리지 않는다. '
             '색은 var(--c-*), 글자 크기는 var(--fs-*) 변수만. 그림 부품은 js/deckviz.js 의 Viz.* (인자 모양을 먼저 읽는다).\n'
             f'파일의 긴 줄은 태그마다 {BRK!r} 주석으로 나눠 두었다(저장할 때 원래대로 붙인다) — 그 주석은 지우거나 새로 넣지 말고, 고칠 때 보이는 그대로 복사한다.\n'
             f'고친 뒤에는 반드시 확인한다: `node tools/deck_shot.cjs http://127.0.0.1:{port}{base}{work} {n} {jpg}` 를 실행해 출력 JSON 의 errors · problems(넘침 · 겹침)를 보고, '

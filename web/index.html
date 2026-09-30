@@ -95,6 +95,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
 .chips button.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
 .drop { border-width: 2px; border-style: dashed; border-color: #d5d9df; border-radius: 14px; padding: 16px; text-align: center; color: var(--sub); font-weight: 700; cursor: pointer; }
 .drop.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
+.ifile { margin-top: 8px; font-weight: 800; color: var(--ink); } .ifile:empty { display: none; }
 .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; } .thumbs:empty { display: none; }
 .thumbs div { position: relative; width: 76px; height: 76px; border-radius: 10px; overflow: hidden; background: var(--bg); } .thumbs img { width: 100%; height: 100%; object-fit: cover; }
 .thumbs button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 99px; background: rgba(22,24,29,.75); color: #fff; font-size: 11px; }
@@ -141,7 +142,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
     <p class="lead">많이 알려 줄수록 좋은 자료가 나옵니다. 설문에 답하거나, 가진 내용을 통째로 붙여 넣어 주세요. Claude Code 가 발표 자료 작성 규칙에 맞춰 만들기 시작합니다.</p>
     <label class="l" for="nTitle">제목</label>
     <input class="f" id="nTitle" placeholder="예: 2026년 하반기 영업 전략" maxlength="80">
-    <div class="tabs" id="nTabs"><button data-m="survey" class="on">간단 설문</button><button data-m="paste">내용 통째로 붙여넣기</button></div>
+    <div class="tabs" id="nTabs"><button data-m="survey" class="on">간단 설문</button><button data-m="paste">내용 통째로 붙여넣기</button><button data-m="import">기존 PPT 가져오기</button></div>
     <div id="mSurvey">
       <label class="l" for="nAud">누가 보나요?<span>직급 · 부서 · 얼마나 아는 사람인지</span></label>
       <input class="f" id="nAud" placeholder="예: 임원진 · 이 사업을 처음 듣는 사람">
@@ -160,11 +161,21 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
       <label class="l" for="nText">가진 내용 전부<span>기획서 · 메모 · 회의록 · 표 — 형식 상관없이</span></label>
       <textarea class="f" id="nText" rows="16" placeholder="여기에 내용을 통째로 붙여 넣어 주세요. 누구에게 보여 줄 자료인지 한 줄 적어 주면 더 좋습니다."></textarea>
     </div>
+    <!-- 기존 PPT 가져오기(사용자 지정 2026-09-30) — 쪽마다 원본 모양 그대로의 그림으로. AI 없이 바로 열린다 · 고치고 싶은 페이지만 [편집 가능하게 바꾸기] -->
+    <div id="mImport" hidden>
+      <label class="l">가져올 파일<span>PPT(pptx · ppt) 또는 PDF — 40MB 까지</span></label>
+      <div class="drop" id="iDrop">여기로 끌어 놓거나 눌러서 고르기</div>
+      <input type="file" id="iFile" accept=".pptx,.ppt,.pdf,application/pdf" hidden>
+      <div class="ifile" id="iName"></div>
+      <p class="lead" style="margin-top:12px">페이지마다 <b>원본 모양 그대로</b> 그림으로 가져옵니다(AI 사용 없음 · 쪽 수에 따라 몇십 초). 글자를 고치고 싶은 페이지는 열린 뒤 AI 패널에서 <b>「이 페이지를 편집 가능하게 바꿔줘」</b>를 누르면 Claude 가 같은 모양의 편집 가능한 페이지로 바꿉니다. 동영상 · 애니메이션은 빠집니다.</p>
+    </div>
+    <div id="mAttach">
     <label class="l">그림 · 문서<span>로고 · 사진 · 캡처 · PDF · PPT · 워드 — 합쳐 6개까지(문서는 25MB)</span></label>
     <div class="drop" id="nDrop">여기로 끌어 놓거나 눌러서 고르기 · 붙여넣기(Ctrl/⌘+V)도 됩니다</div>
     <input type="file" id="nFile" accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.pptx,.docx,application/pdf" multiple hidden>
     <div class="thumbs" id="nThumbs"></div>
     <label class="webopt"><input type="checkbox" id="nWeb"> <span><b>부족한 자료는 웹에서 찾아 보강</b> — 배경 · 최신 사실 · 공개 통계를 찾아 넣고 페이지마다 출처를 답니다</span></label>
+    </div>
     <div class="cc" id="nCC" hidden><span style="flex:1">새 발표 자료는 Claude Code 가 만듭니다 — 먼저 내 Claude 구독을 연결해 주세요.</span><button class="btn sm go" id="nConnect">Claude 구독 연결</button></div>
     <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분 · 창을 닫아도 계속 만듭니다</span><span class="bad" id="nErr"></span></div>
   </div>
@@ -246,13 +257,26 @@ const deckMenu = (b) => {
 };
 
 // ── 새 발표 자료 ──
-const NW = { mode: 'survey', files: [] };
+const NW = { mode: 'survey', files: [], imp: null };
 // 새 발표 자료 화면으로
 const goNew = () => { location.hash = 'new'; };
 $('#bNew').onclick = goNew; $('#nBack').onclick = () => { history.pushState(null, '', '/'); route(); };
 // 새 발표 자료 화면을 연다 — Claude 미연결이면 안내
-const openNew = () => { $('#nCC').hidden = !!ME.claude; $('#nGo').disabled = !ME.claude; $('#nErr').textContent = ''; setTimeout(() => { if (document.activeElement === document.body) $('#nTitle').focus(); }, 50); };
-$('#nTabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; NW.mode = b.dataset.m; $('#nTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); $('#mSurvey').hidden = NW.mode !== 'survey'; $('#mPaste').hidden = NW.mode !== 'paste'; };
+const openNew = () => { setMode(NW.mode); $('#nErr').textContent = ''; setTimeout(() => { if (document.activeElement === document.body) $('#nTitle').focus(); }, 50); };
+// 탭 — 가져오기는 AI 를 쓰지 않아 구독 안내 · 첨부 · 웹 칸을 숨기고 단추 글을 바꾼다
+const setMode = (m) => { NW.mode = m; $('#nTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.m === m)); $('#mSurvey').hidden = m !== 'survey'; $('#mPaste').hidden = m !== 'paste';
+  $('#mImport').hidden = m !== 'import'; $('#mAttach').hidden = m === 'import'; $('#nCC').hidden = m === 'import' || !!ME.claude; $('#nGo').disabled = m !== 'import' && !ME.claude;
+  $('#nGo').textContent = m === 'import' ? '가져오기' : '만들기 시작';
+  document.querySelector('#new .gobar .hint').textContent = m === 'import' ? '원본 쪽마다 그림 한 장 · 가져온 뒤 바로 열립니다' : '열리자마자 Claude Code 가 만들기 시작합니다 · 10페이지 안팎에 10~20분 · 창을 닫아도 계속 만듭니다'; };
+$('#nTabs').onclick = (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); };
+// 가져올 파일 — 하나만. 제목이 비었으면 파일 이름으로
+const pickImp = (f) => { if (!f) return; if (!/\.(pptx|ppt|pdf)$/i.test(f.name)) { $('#nErr').textContent = 'PPT(pptx · ppt)나 PDF 만 가져올 수 있어요'; return; }
+  if (f.size > 40e6) { $('#nErr').textContent = '40MB 를 넘는 파일은 가져올 수 없어요'; return; }
+  const rd = new FileReader(); rd.onload = () => { NW.imp = { name: f.name, data: rd.result }; $('#iName').textContent = `${f.name} · ${(f.size / 1e6).toFixed(1)}MB`; $('#nErr').textContent = '';
+    if (!$('#nTitle').value.trim()) $('#nTitle').value = f.name.replace(/\.(pptx|ppt|pdf)$/i, '').slice(0, 80); }; rd.readAsDataURL(f); };
+$('#iDrop').onclick = () => $('#iFile').click(); $('#iFile').onchange = () => { pickImp($('#iFile').files[0]); $('#iFile').value = ''; };
+['dragover', 'dragenter'].forEach((t) => $('#iDrop').addEventListener(t, (e) => { e.preventDefault(); $('#iDrop').classList.add('on'); }));
+['dragleave', 'drop'].forEach((t) => $('#iDrop').addEventListener(t, (e) => { e.preventDefault(); $('#iDrop').classList.remove('on'); if (t === 'drop') pickImp(e.dataTransfer.files[0]); }));
 document.querySelectorAll('.chips').forEach((g) => { g.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; g.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
 // 고른 칩 글자(알아서 = 빈 값)
 const chip = (k) => { const t = $(`.chips[data-k="${k}"] button.on`)?.textContent || ''; return t === '알아서' ? '' : t; };
@@ -281,6 +305,7 @@ document.addEventListener('paste', (e) => { if ($('#new').hidden) return; const 
 $('#nConnect').onclick = () => connectClaude();
 // 받은 정보를 서버에 보내 덱을 만들고 연다(열리면 Claude Code 가 만들기 시작)
 $('#nGo').onclick = async () => {
+  if (NW.mode === 'import') return importPpt();
   const title = $('#nTitle').value.trim(); $('#nErr').textContent = '';
   if (!title) { $('#nErr').textContent = '제목을 적어 주세요'; $('#nTitle').focus(); return; }
   const brief = NW.mode === 'paste' ? { mode: 'paste', text: $('#nText').value }
@@ -290,6 +315,15 @@ $('#nGo').onclick = async () => {
   const b = $('#nGo'); b.disabled = true; b.textContent = '준비 중…';
   try { const j = await post('/api/decks', { action: 'create', title, brief, files: NW.files.map((f) => ({ name: f.name, data: f.data.split(',')[1] })) }); location.href = j.url; }
   catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '만들기 시작'; }
+};
+
+// 기존 PPT · PDF 를 가져와 연다(서버가 쪽마다 그림으로 바꾼다 — 몇십 초)
+const importPpt = async () => {
+  $('#nErr').textContent = ''; if (!NW.imp) { $('#nErr').textContent = '가져올 파일을 골라 주세요'; return; }
+  const b = $('#nGo'); b.disabled = true; const t0 = Date.now(); const tick = setInterval(() => { b.textContent = `가져오는 중… ${Math.round((Date.now() - t0) / 1000)}초`; }, 500);
+  try { const j = await post('/api/decks', { action: 'import', title: $('#nTitle').value.trim(), name: NW.imp.name, data: NW.imp.data.split(',')[1] }); location.href = j.url; }
+  catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '가져오기'; }
+  finally { clearInterval(tick); }
 };
 
 // ── 창 ──

@@ -20,7 +20,7 @@ NODE_PATH = os.path.join(ROOT, 'node_modules')
 SHOT_KEY = secrets.token_hex(16); os.environ['DECK_SHOT_KEY'] = SHOT_KEY
 os.environ['NODE_PATH'] = NODE_PATH
 os.environ.setdefault('PPT_DATA_DIR', DATA_DIR)
-import store as storemod, deckagent
+import store as storemod, deckagent, importer
 STORE = storemod.Store(DATA_DIR)
 COOKIE = 'ppt_sid'
 
@@ -304,6 +304,21 @@ def make_thumb(owner, did):
 
 # ── 새 덱 ──
 BRIEF_KEYS = ('audience', 'info', 'key', 'pages', 'tone', 'material', 'text')
+def import_deck(user, req):
+    """기존 PPT · PDF → 쪽마다 원본 그림 한 장인 덱(server/importer.py). AI 없이 바로 열린다 — Claude 구독이 없어도 된다"""
+    name = os.path.basename(str(req.get('name') or '')); raw = base64.b64decode(str(req.get('data') or ''), validate=True)
+    title = re.sub(r'\s+', ' ', str(req.get('title') or os.path.splitext(name)[0])).strip()[:80] or '가져온 발표 자료'
+    tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
+    did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', ''))
+    try:
+        html, n, src = importer.build(tpl, title, d, name, raw)
+    except Exception:
+        shutil.rmtree(d, ignore_errors=True); raise
+    open(os.path.join(d, 'index.html'), 'w', encoding='utf-8').write(html)
+    m = STORE._load(os.path.join(d, 'meta.json'), {}); m.update({'from': name, 'imported': src, 'pages': n}); STORE._save(os.path.join(d, 'meta.json'), m)
+    link_engine(d)
+    return {'ok': True, 'url': f'/d/{user["id"]}/{did}/', 'pages': n}
+
 def new_deck(user, req):
     """제목 + 받은 정보(설문 또는 통째 붙여넣기) + 그림 → 표지 한 페이지짜리 덱과 brief.json. 만들기는 덱을 연 뒤 Claude Code 가(?new=1)"""
     if not STORE.claude_token(user['id']): raise ValueError('새 발표 자료는 Claude Code 가 만듭니다 — 먼저 계정 설정에서 Claude 구독을 연결해 주세요')
@@ -507,6 +522,7 @@ class H(http.server.BaseHTTPRequestHandler):
             if path == '/api/decks':
                 req = self.body(40_000_000); a = req.get('action')
                 if a == 'create': return self.reply(200, new_deck(u, req))
+                if a == 'import': return self.reply(200, import_deck(u, req))
                 owner, did = str(req.get('owner') or ''), str(req.get('id') or '')
                 if not self.can(u, owner) or not re.fullmatch(r'\d{8}-[0-9a-f]{6}', did): return self.reply(403, {'error': '권한이 없습니다'})
                 if a == 'rename': STORE.rename_deck(owner, did, re.sub(r'\s+', ' ', str(req.get('title') or '')).strip()[:80] or '제목 없음')
