@@ -103,6 +103,8 @@
       addEventListener('beforeunload', (e) => { if (E.on && E.dirty) { e.preventDefault(); e.returnValue = ''; } });
       // 왼쪽 장 목록(썸네일 · 장 더하기) — 덱 HTML 을 고치지 않게 여기서 불러온다. 장을 더한 뒤 새로고침이면 편집을 이어 연다
       if (!window.DeckSlides) { const sc = document.createElement('script'); sc.src = 'js/deckedit-slides.js'; document.head.appendChild(sc); }
+      // 한 페이지 안의 단계(나타나는 순서) — 리본 [단계] 탭(js/deckedit-steps.js, 2026-09-30 "한 장에 여러 단계인 것도 편집에")
+      if (!window.DeckSteps) { const sc = document.createElement('script'); sc.src = 'js/deckedit-steps.js'; document.head.appendChild(sc); }
       try { if (sessionStorage.getItem('deckedit.resume')) { sessionStorage.removeItem('deckedit.resume'); addEventListener('deckready', () => setTimeout(() => E.start(), 300), { once: true }); } } catch (e) { /* 저장소 없음 */ }
       try { const j = sessionStorage.getItem(`deckedit.saved:${location.pathname}`); if (j) { sessionStorage.removeItem(`deckedit.saved:${location.pathname}`); setTimeout(() => window.DeckRibbon?.savedBanner(JSON.parse(j)), 300); } } catch (e) { /* 저장소 없음 */ }
     },
@@ -183,6 +185,8 @@
     mirror(el, { html = false } = {}) {
       if (E.frozen) return; const s = E.srcOf(el); if (!s) return;
       const st = el.getAttribute('style'); if (st) s.setAttribute('style', st); else s.removeAttribute('style');
+      // 나타나는 단계(data-at · data-only)도 원본 틀에 — 단계 탭에서 바꾼다
+      for (const a of ['data-at', 'data-only']) { const v = el.getAttribute(a); if (v != null) s.setAttribute(a, v); else s.removeAttribute(a); }
       if (html) s.innerHTML = E.clean(el.innerHTML);
     },
 
@@ -463,7 +467,8 @@
     },
 
     // ── 저장 ─────────────────────────────────────────────────────────────────
-    clean(h) { return String(h).replace(/\s*\b(de-sel|de-over|ksel|kdim)\b/g, '').replace(/ class="\s*"/g, '').replace(/ contenteditable="[^"]*"/g, ''); },
+    // shown — 덱 엔진이 단계마다 붙였다 뗐다 하는 표시(지금 단계에 보이는 것). 파일에 굳으면 저장한 순간의 단계가 박힌다
+    clean(h) { return String(h).replace(/\s*\b(de-sel|de-over|ksel|kdim|shown)\b/g, '').replace(/ class="\s*"/g, '').replace(/ contenteditable="[^"]*"/g, ''); },
     async save() {
       if (!E.dirty) { E.toast('바꾼 곳이 없습니다'); return; }
       document.activeElement?.blur?.();
@@ -472,6 +477,7 @@
       // (예전엔 INIT 을 비웠다 — 목록으로 만든 스크립트(간지)는 비울 글자가 없어 굳힘이 안 먹었다. 표시를 지우면 다시 스크립트가 그린다)
       const froze = E.frozen && !E.frozen0;
       if (froze) open = open.replace(/>$/, ` data-frozen="${new Date().toLocaleDateString('sv')}">`);
+      if (window.DeckSteps?.openTag) open = window.DeckSteps.openTag(open);   // 단계 수를 바꿨으면 data-steps
       const inner = E.frozen ? E.clean(E.cur().innerHTML) : E.clean(E.tpl.content.firstElementChild.innerHTML);
       const edits = [{ kind: 'slide', find: E.secSrc, replace: `${open}${inner}</section>` }];
       // 새 글꼴을 썼으면 서버가 fonts/ 에 받아 두고 덱이 그 CSS 를 읽게 한다 — 다른 컴퓨터(Windows · Mac)에서도 같은 글꼴로, Google 을 기다리지 않고
