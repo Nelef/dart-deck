@@ -274,6 +274,33 @@ def build_messages(req):
 # 찍는 동안에는 옛 썸네일을 준다 — 없으면 기다렸다가(첫 목록). 크롬을 한꺼번에 여럿 띄우지 않게 동시에 2개까지
 import threading as _th
 THUMB_TOOL = os.path.join(ENGINE, 'tools', 'deck_thumb.cjs')
+PDF_TOOL = os.path.join(ENGINE, 'tools', 'deck_pdf.cjs')
+PDF_LOCKS = {}; PDF_SEM = _th.Semaphore(2)   # 크롬이 하나에 300MB 안팎 — 동시에 두 개까지(나머지는 줄을 선다)
+
+def pdf_key(d):
+    """PDF 가 옛것인지 — 덱 파일(index.html · data · img · 글꼴 링크 밖) 중 가장 늦게 바뀐 시각 + 엔진(js · css)이 바뀐 시각"""
+    ts = [os.path.getmtime(os.path.join(d, 'index.html'))]
+    for sub in ('data', 'img', 'fonts'):
+        for root, _, fs in os.walk(os.path.join(d, sub)):
+            ts += [os.path.getmtime(os.path.join(root, f)) for f in fs if not f.startswith('.')]
+    for sub in ('js', 'css'):
+        for root, _, fs in os.walk(os.path.join(ENGINE, sub)): ts += [os.path.getmtime(os.path.join(root, f)) for f in fs]
+    return str(round(max(ts), 3))
+
+def make_pdf(owner, did):
+    """덱 → PDF(engine/tools/deck_pdf.cjs — 페이지마다 화면 그대로 찍어 한 쪽씩). 바뀌지 않았으면 전에 만든 것을 쓴다(덱 폴더 .export.pdf).
+    같은 덱을 동시에 두 번 만들지 않게 덱마다 잠금"""
+    d = STORE.deck_dir(owner, did); out = os.path.join(d, '.export.pdf'); kf = os.path.join(d, '.export.key')
+    lock = PDF_LOCKS.setdefault((owner, did), _th.Lock())
+    with lock:
+        key = pdf_key(d)
+        if os.path.exists(out) and os.path.exists(kf) and open(kf).read() == key: return out, {'cached': True}
+        tmp = out + '.tmp'
+        with PDF_SEM: r = subprocess.run([NODE, PDF_TOOL, f'http://127.0.0.1:{PORT}/d/{owner}/{did}/', tmp], capture_output=True, text=True, timeout=900, env={**os.environ, 'NODE_PATH': NODE_PATH})
+        info = json.loads(r.stdout or '{}')
+        if not os.path.exists(tmp) or not info.get('pages'): raise ValueError('PDF 를 만들지 못했습니다 — ' + '; '.join(info.get('errors') or [r.stderr[-200:]]))
+        os.replace(tmp, out); open(kf, 'w').write(key)
+        return out, info
 THUMB_SEM = _th.Semaphore(2); THUMB_BUSY = {}; THUMB_LOCK = _th.Lock()
 def thumb_path(owner, did): return os.path.join(STORE.deck_dir(owner, did), '.thumb.jpg')
 def thumb_fresh(owner, did):
@@ -453,6 +480,21 @@ class H(http.server.BaseHTTPRequestHandler):
                 if os.path.exists(t): _th.Thread(target=make_thumb, args=(owner, did), daemon=True).start()   # 옛 것을 주고 뒤에서 새로
                 elif not make_thumb(owner, did): return self.send_error(404)
             return self.send_file(t, head_only)
+        # PDF 로 받기(사용자 지정 2026-10-01) — 덱 주인 · 관리자만. 화면 그대로 찍은 PDF(engine/tools/deck_pdf.cjs)
+        m = re.fullmatch(r'/pdf/([a-z0-9][a-z0-9_.-]{1,31})/(\d{8}-[0-9a-f]{6})\.pdf', path)
+        if m:
+            owner, did = m.groups(); u = self.me()
+            if not self.can(u, owner) or not os.path.isfile(os.path.join(STORE.deck_dir(owner, did), 'index.html')): return self.send_error(404)
+            try: f, info = make_pdf(owner, did)
+            except Exception as e: return self.reply(500, {'error': str(e)})
+            title = (STORE._load(os.path.join(STORE.deck_dir(owner, did), 'meta.json'), {}) or {}).get('title') or did
+            name = re.sub(r'[\\/:*?"<>|]+', ' ', title).strip()[:80] + '.pdf'
+            data = open(f, 'rb').read()
+            self.send_response(200); self.send_header('Content-Type', 'application/pdf'); self.send_header('Content-Length', str(len(data)))
+            self.send_header('Content-Disposition', "attachment; filename=\"deck.pdf\"; filename*=UTF-8''" + urllib.parse.quote(name)); self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Pdf-Info', urllib.parse.quote(json.dumps({k: info.get(k) for k in ('cached', 'pages', 'ms', 'bytes')}))); self.end_headers()
+            if not head_only: self.wfile.write(data)
+            return
         if path.startswith('/fonts/'):   # 목록 화면도 덱과 같은 글꼴(로그인 없이 — 글꼴 파일뿐)
             rest = path[7:]; base = FONT_DIR if os.path.exists(os.path.join(FONT_DIR, rest)) else os.path.join(ENGINE, 'fonts')
             p = os.path.realpath(os.path.join(base, rest))
