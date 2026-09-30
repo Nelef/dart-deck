@@ -214,6 +214,39 @@ def build_messages(req):
     msgs.append({'role': 'user', 'content': [{'type': 'text', 'text': text}] + [{'type': 'image_url', 'image_url': {'url': u}} for u in imgs] if imgs else text})
     return q, msgs
 
+# ── 목록 썸네일 — 덱의 실제 첫 화면(사용자 지정 2026-09-30 "메인 화면이 실제 첫 화면이 아니라 커스텀") ──
+# 덱 폴더의 .thumb.jpg(숨김 — 웹으로는 /thumb/ 로만). 덱(index.html)이 썸네일보다 새로우면 다시 찍는다(저장 · AI 적용 뒤).
+# 찍는 동안에는 옛 썸네일을 준다 — 없으면 기다렸다가(첫 목록). 크롬을 한꺼번에 여럿 띄우지 않게 동시에 2개까지
+import threading as _th
+THUMB_TOOL = os.path.join(ENGINE, 'tools', 'deck_thumb.cjs')
+THUMB_SEM = _th.Semaphore(2); THUMB_BUSY = {}; THUMB_LOCK = _th.Lock()
+def thumb_path(owner, did): return os.path.join(STORE.deck_dir(owner, did), '.thumb.jpg')
+def thumb_fresh(owner, did):
+    t = thumb_path(owner, did); idx = os.path.join(STORE.deck_dir(owner, did), 'index.html')
+    return os.path.exists(t) and os.path.getmtime(t) >= os.path.getmtime(idx)
+def make_thumb(owner, did):
+    """찍는다(같은 덱을 두 번 동시에 찍지 않는다) — 끝나면 True"""
+    key = f'{owner}/{did}'
+    with THUMB_LOCK:
+        ev = THUMB_BUSY.get(key)
+        if ev: mine = False
+        else: ev = THUMB_BUSY[key] = _th.Event(); mine = True
+    if not mine: return ev.wait(60)
+    try:
+        with THUMB_SEM:
+            out = thumb_path(owner, did); tmp = out + '.tmp.jpg'
+            r = subprocess.run([NODE, THUMB_TOOL, f'http://127.0.0.1:{PORT}/d/{owner}/{did}/', tmp], capture_output=True, text=True, timeout=60, env={**os.environ, 'NODE_PATH': NODE_PATH})
+            if r.returncode == 0 and os.path.exists(tmp): os.replace(tmp, out); return True
+            sys.stderr.write(f'썸네일 실패 {key}: {(r.stderr or r.stdout)[-300:]}\n')
+            try: os.remove(tmp)
+            except OSError: pass
+            return False
+    except Exception as e:
+        sys.stderr.write(f'썸네일 실패 {key}: {e}\n'); return False
+    finally:
+        with THUMB_LOCK: THUMB_BUSY.pop(key, None)
+        ev.set()
+
 # ── 새 덱 ──
 BRIEF_KEYS = ('audience', 'info', 'key', 'pages', 'tone', 'material', 'text')
 def new_deck(user, req):
@@ -322,6 +355,7 @@ class H(http.server.BaseHTTPRequestHandler):
             for x in ds:
                 x['ownerName'] = names.get(x['owner'], x['owner'])
                 x['busy'] = os.path.join(STORE.deck_dir(x['owner'], x['id']), 'index.html') in busy   # Claude 가 고치거나 만드는 중
+                x['thumb'] = f"/thumb/{x['owner']}/{x['id']}.jpg?v={x['updated'] or 0}"   # 덱이 바뀌면 주소가 바뀌어 브라우저가 새로 받는다
             return self.reply(200, {'decks': ds})
         if path == '/api/users':
             u = self.me()
@@ -334,6 +368,15 @@ class H(http.server.BaseHTTPRequestHandler):
             p = os.path.realpath(os.path.join(WEB, path[5:]))
             if not p.startswith(WEB + os.sep): return self.send_error(404)
             return self.send_file(p, head_only)
+        m = re.fullmatch(r'/thumb/([a-z0-9][a-z0-9_.-]{1,31})/(\d{8}-[0-9a-f]{6})\.jpg', path)
+        if m:
+            owner, did = m.groups(); u = self.me()
+            if not self.can(u, owner) or not os.path.isfile(os.path.join(STORE.deck_dir(owner, did), 'index.html')): return self.send_error(404)
+            t = thumb_path(owner, did)
+            if not thumb_fresh(owner, did):
+                if os.path.exists(t): _th.Thread(target=make_thumb, args=(owner, did), daemon=True).start()   # 옛 것을 주고 뒤에서 새로
+                elif not make_thumb(owner, did): return self.send_error(404)
+            return self.send_file(t, head_only)
         if path.startswith('/fonts/'):   # 목록 화면도 덱과 같은 글꼴(로그인 없이 — 글꼴 파일뿐)
             rest = path[7:]; base = FONT_DIR if os.path.exists(os.path.join(FONT_DIR, rest)) else os.path.join(ENGINE, 'fonts')
             p = os.path.realpath(os.path.join(base, rest))

@@ -50,6 +50,11 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
 .card { position: relative; border-radius: 16px; background: var(--bg); cursor: pointer; transition: transform .08s, background .15s; overflow: hidden; }
 .card:hover { background: #e9ebef; } .card:active { transform: scale(0.98); }
 .card .th { aspect-ratio: 16 / 9; background: #fff; margin: 10px 10px 0; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; padding: 0 18px; overflow: hidden; }
+/* 썸네일 — 덱의 실제 첫 화면(서버가 찍는다). 받기 전 · 못 받으면 제목 카드가 자리를 지킨다 */
+.card .th { position: relative; }
+.card .th img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .35s ease; }
+.card .th.ok img { opacity: 1; } .card .th.ok .bd, .card .th.ok .tt { visibility: hidden; }
+.card .th.ok { box-shadow: inset 0 0 0 1px #e6e8ec; }
 .card .th .bd { width: 34px; height: 5px; border-radius: 99px; background: var(--brand); margin-bottom: 10px; }
 .card .th .tt { font-size: 17px; font-weight: 900; line-height: 1.3; letter-spacing: -.02em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .card .meta { padding: 10px 14px 12px; font-size: 13px; color: var(--sub); font-weight: 600; display: flex; gap: 8px; align-items: center; }
@@ -209,7 +214,7 @@ const loadDecks = async () => {
   try { ds = (await get('/api/decks')).decks; } catch (e) { if (/로그인/.test(e.message)) { ME = null; return show(); } $('#decks').innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
   $('#cnt').textContent = ds.length ? ds.length : '';
   if (!ds.length) { $('#decks').innerHTML = '<div class="empty"><h3>아직 발표 자료가 없어요</h3><div>누구에게 무엇을 알려 줄지 알려 주면 AI 가 첫 판을 만들어 드려요</div><button class="btn blue" onclick="goNew()">＋ 새 발표 자료</button></div>'; return; }
-  const card = (d) => `<div class="card" data-u="${esc(d.url)}"><div class="th"><div class="bd"></div><div class="tt">${esc(d.title)}</div></div>`
+  const card = (d) => `<div class="card" data-u="${esc(d.url)}"><div class="th"><div class="bd"></div><div class="tt">${esc(d.title)}</div>${d.thumb ? `<img src="${esc(d.thumb)}" alt="" loading="lazy" onload="this.parentElement.classList.add('ok')" onerror="this.remove()">` : ''}</div>`
     + `<div class="meta"><b>${esc(d.title)}</b>${d.busy ? '<span class="pill on">AI 작업 중</span>' : `<span>${d.pages}페이지 · ${ago(d.updated)}</span>`}</div><button class="mn" data-o="${esc(d.owner)}" data-i="${esc(d.id)}" data-t="${esc(d.title)}" title="더 보기">⋯</button></div>`;
   if (ME.role === 'admin') {
     const by = {}; ds.forEach((d) => (by[d.owner] ||= []).push(d));
