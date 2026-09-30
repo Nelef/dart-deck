@@ -360,6 +360,10 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
         ask = str(req.get('prompt') or '')[:BUILD_PROMPT_MAX if req.get('build') else 8000]
         if r['session'] and not req.get('plan'):
             ask = f"[이번 부탁의 작업 파일은 ./{r['work']} — 앞 대화에서 쓴 .deckagent-*.html 사본은 지워졌다. 이 파일을 새로 Read 해서 고친다]\n{ask}"
+        # 계획 차례도 앞 대화를 이으면 '고치는 차례'로 착각해 옛 사본을 찾고 쓰기를 시도하다 "권한이 없다"고 답했다(2026-09-30, 작은 수정 → 여러 장).
+        # 계획만 세우는 차례라는 것과 지금 덱을 읽을 파일을 메시지 앞에 박는다
+        if req.get('plan'):
+            ask = f"[이번 차례는 계획만 — 파일을 고치지 않는다. 지금 덱은 ./{r['work']} 를 Read 해서 보고, 고칠 곳을 적은 뒤 「이대로 진행할까요?」로 끝낸다. 사용자가 [진행]을 누르면 다음 차례에 고친다]\n{ask}"
         args = [CLAUDE, '-p', ask, '--output-format', 'stream-json', '--verbose',
                 '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, ''))) + (WEB if web else '') + hint, '--permission-mode', 'default',
                 # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
