@@ -573,7 +573,14 @@
       const grow = () => { ta.style.height = 'auto'; ta.style.height = `${Math.min(160, ta.scrollHeight)}px`; };
       const send = () => { const q = ta.value.trim(); if (q && !K.busy) K.ask(q); };
       ta.oninput = () => { K.draft = ta.value; grow(); K.setSend(); };
-      ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
+      // 엔터 = 보내기, Shift+엔터 = 줄바꿈. 한글 조합 중 엔터는 keydown 이 isComposing 이라 건너뛰는데, 브라우저 · 입력기에 따라 그 엔터가 조합을 끝내며
+      // **줄바꿈을 넣고 끝나** Shift+엔터처럼 줄만 바뀌었다(사용자 지적 2026-09-30 "엔터만 쳤는데 줄바꿈이 될 때가 많다").
+      // 그래서 실제로 줄바꿈이 들어가려는 순간(beforeinput insertLineBreak · insertParagraph)을 한 번 더 잡는다. 두 길이 겹쳐도 한 번만 보낸다
+      let shiftDown = false; let sentAt = 0;
+      const sendOnce = () => { if (Date.now() - sentAt < 300) return; sentAt = Date.now(); send(); };
+      ta.onkeydown = (e) => { shiftDown = e.shiftKey; if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); sendOnce(); } };
+      ta.onkeyup = (e) => { shiftDown = e.shiftKey; };
+      ta.addEventListener('beforeinput', (e) => { if ((e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') && !shiftDown) { e.preventDefault(); sendOnce(); } });
       body.querySelector('.kc-send').onclick = () => { if (K.busy) K.ctrl?.abort(); else send(); };
       body.querySelector('.kc-new').onclick = () => { if (K.busy) K.ctrl?.abort(); K.chat = []; K.draft = ''; K.render(); };
       body.querySelectorAll('[data-kq]').forEach((b) => { b.onclick = () => { if (!K.busy) K.ask(b.dataset.kq); }; });
