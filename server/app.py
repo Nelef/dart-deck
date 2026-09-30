@@ -161,7 +161,7 @@ def shot(req, port):
         # slides: [번호…] 면 여러 장을 한 번에(여러 장 고치기) — jpgs: {번호: 그림}
         many = [int(x) for x in (req.get('slides') or []) if str(x).isdigit()][:8]
         arg = ','.join(map(str, many)) if len(many) > 1 else str(int(req.get('slide') or (many[0] if many else 1)))
-        r = subprocess.run([NODE, SHOT_TOOL, url, arg, img], capture_output=True, text=True, timeout=180, env={**os.environ, 'NODE_PATH': NODE_PATH})
+        r = subprocess.run([NODE, SHOT_TOOL, url, arg, img] + (['all'] if req.get('all') else []), capture_output=True, text=True, timeout=180, env={**os.environ, 'NODE_PATH': NODE_PATH})
         out = json.loads(r.stdout or '{}')
         if os.path.exists(img): out['jpg'] = 'data:image/jpeg;base64,' + base64.b64encode(open(img, 'rb').read()).decode()
         if out.get('shots'):

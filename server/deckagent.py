@@ -337,10 +337,25 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
         # 첨부 그림 — 덱이 /api/asset 로 먼저 올린 img/uploads/ 경로만 받는다(Claude Code 가 작업 폴더 안에서 Read 로 연다)
         files = [f for f in (req.get('files') or []) if isinstance(f, str) and re.fullmatch(r'img/uploads/[0-9a-f]{16}\.(png|jpg|gif|webp)', f) and os.path.exists(os.path.join(cwd, f))][:3]
         send({'rid': rid, 'engine': engine})
+        # ── 빠르게(사용자 지적 2026-09-30 "간단 수정마저 엄청 오래 걸린다" — 제목 한 줄: 28초, 118 에서 45초) ──
+        # ① 고치기 전 화면은 시작하자마자 뒤에서 찍어 둔다(Claude 가 일하는 동안). 예전엔 끝난 뒤 전 · 후를 차례로 찍어 10초
+        pre = {}
+        if not req.get('plan') and not req.get('build'):
+            src0 = open(path, encoding='utf-8').read()
+            def _pre():
+                try: pre['v'] = shot({'file': url_of(path), 'html': src0, 'slide': n}, port); pre['src'] = src0
+                except Exception: pass
+            pre['t'] = threading.Thread(target=_pre, daemon=True); pre['t'].start()
+        # (시도했다 버림 2026-09-30: 지금 페이지의 줄 범위를 알려 주고 그 범위만 Read 하게 — gemma 가 부분 읽기에서 바꿀 글을 틀리게 옮겨
+        #  'String to replace not found' 두 번 · 엉뚱한 요소를 고쳐 28초 → 60초로 오히려 나빠졌다. 파일 통째 Read 가 느려도 정확하다)
+        hint = ''
+        # ③ 작은 수정(글 · 색 · 크기)은 스스로 찍어 보는 확인을 건너뛴다 — 고친 뒤 서버가 전 · 후를 찍어 넘침까지 점검해 사람에게 보인다(6초 절약)
+        if req.get('kind') == '작은 수정' and not req.get('plan'):
+            hint += '\n# 이번 부탁은 작은 수정\n- 글 · 색 · 크기 몇 곳만 바꿨으면 캡처 확인(deck_shot)을 건너뛴다 — 고친 뒤 서버가 화면을 찍어 점검한다. 배치를 바꿨거나 넘칠 것 같으면 한 번만 찍는다.\n'
         # 웹 검색은 Claude 쪽 서버가 도는 도구라 구독 엔진에서만 된다(gemma 는 LiteLLM 경유라 안 된다)
         web = bool(req.get('web')) and engine == 'sub'
         args = [CLAUDE, '-p', str(req.get('prompt') or '')[:BUILD_PROMPT_MAX if req.get('build') else 8000], '--output-format', 'stream-json', '--verbose',
-                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, ''))) + (WEB if web else ''), '--permission-mode', 'default',
+                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, ''))) + (WEB if web else '') + hint, '--permission-mode', 'default',
                 # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
                 '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if web else []),
                 # 웹은 기본으로 막는다 — [웹 검색] 켠 부탁(Claude 구독)에만 열고, WebFetch 는 관문 훅이 검색 결과 주소로 좁힌다
@@ -410,8 +425,12 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
             send({'step': '고치기 전 · 후 화면 찍기'})
             # 바뀐 장마다(지금 장을 앞에, 최대 6장) — 여러 장 고치기(사용자 지정 2026-09-30). 한 번 열어 여러 장을 찍는다(deck_shot 쉼표 목록)
             ks = sorted({names.index(x) + 1 for x in slides if x in names}, key=lambda k: (k != n, k))[:6] or [n]
-            rel = url_of(path)
-            b = shot({'file': rel, 'html': orig, 'slide': ks[0], 'slides': ks}, port); a2 = shot({'file': rel, 'html': new, 'slide': ks[0], 'slides': ks}, port)
+            rel = url_of(path); allp = bool(other)   # 공용 스타일 · 스크립트가 바뀌었으면 모든 장을 점검(다른 장이 깨졌을 수 있다)
+            run_shot = lambda html: shot({'file': rel, 'html': html, 'slide': ks[0], 'slides': ks, 'all': allp}, port)
+            if pre.get('t'): pre['t'].join(60)
+            got = {}; ta = threading.Thread(target=lambda: got.__setitem__('a', run_shot(new)), daemon=True); ta.start()   # 고친 뒤 · (필요하면) 고치기 전을 함께
+            b = pre['v'] if (ks == [n] and not allp and pre.get('v') and pre.get('src') == orig) else run_shot(orig)
+            ta.join(); a2 = got.get('a') or {}
             out['before'] = {k: v for k, v in b.items() if k != 'jpgs'}; out['after'] = {k: v for k, v in a2.items() if k != 'jpgs'}; out['shotSlide'] = ks[0]
             if len(ks) > 1:
                 out['shots'] = [{'n': k, 'name': names[k - 1], 'before': (b.get('jpgs') or {}).get(str(k), ''), 'after': (a2.get('jpgs') or {}).get(str(k), '')} for k in ks]
