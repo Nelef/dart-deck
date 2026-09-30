@@ -134,9 +134,9 @@
   const A = {
     // 엔진 — 고른 적 없으면 구독이 연결돼 있으면 Claude Code, 아니면 gemma
     get engine() { const e = ls.get('deckagent.engine'); return e === 'claude' || e === 'gemma' ? e : (A.me?.claude ? 'claude' : 'gemma'); }, set engine(v) { ls.set('deckagent.engine', v); },
-    get model() { return ls.get('deckagent.model') ?? 'auto'; }, set model(v) { ls.set('deckagent.model', v); },
+    get model() { return ls.get('deckagent.model') ?? 'opus'; }, set model(v) { ls.set('deckagent.model', v); },
     // 노력(effort) — Claude Code --effort. 자동 = 작은 수정 medium · 큰 수정 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
-    get effort() { return ls.get('deckagent.effort') ?? 'auto'; }, set effort(v) { ls.set('deckagent.effort', v); },
+    get effort() { return ls.get('deckagent.effort') ?? 'low'; }, set effort(v) { ls.set('deckagent.effort', v); },
     // 웹 검색 — Claude Code 엔진에서만(검색은 Claude 쪽 도구). 켠 부탁만 검색 · 웹 읽기가 열리고, 가져온 사실엔 출처를 단다(사용자 지정 2026-09-30)
     get web() { return ls.get('deckagent.web') === '1'; }, set web(v) { ls.set('deckagent.web', v ? '1' : null); },
     // 연결 여부 — 토큰 자체는 서버(계정)에만. 'server' 는 자리표시(서버가 이 값을 무시하고 계정 토큰을 붙인다). 끊기 = 서버에서 지운다
@@ -192,7 +192,8 @@
       K.open('ai');
       const q = `받은 정보로 새 발표 자료를 만들어 주세요${b.audience ? ` — 보는 사람: ${b.audience}` : ''}${b.key ? ` · 핵심: ${b.key}` : ''}`;
       A.thread = A.newId();
-      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'high', kind: '새로 만들기' });
+      // 새로 만들기 기본 = Opus · 노력 low(사용자 지정 2026-09-30 "opus effort 낮음이 가장 효율이 좋다" — 같은 설문으로 high 와 견준 기록은 CLAUDE.md)
+      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'low', kind: '새로 만들기' });
       if (A.token) go(); else { A.afterLogin = go; A.login(); }
     },
     // ── 그림 첨부(사용자 지정 2026-09-30) — [그림] 버튼 · 붙여넣기(Ctrl/⌘+V) · 끌어 놓기, 3장까지. 폰 사진이 커서 긴 변 1600px 로 줄인다
@@ -372,7 +373,7 @@
       const plan = g.kind === '여러 장';
       if (how === 'gemma') return A.ask(m.root, { att: g.att, plan, kind: g.kind, noUser: true });
       A.engine = 'claude'; K.render();
-      const go = () => A.ask(m.root, { att: g.att, plan, kind: g.kind, noUser: true, model: A.model === 'auto' ? 'opus' : '', effort: A.effort === 'auto' ? 'high' : '' });
+      const go = () => A.ask(m.root, { att: g.att, plan, kind: g.kind, noUser: true, model: A.model === 'auto' ? 'opus' : '', effort: A.effort === 'auto' ? 'low' : '' });
       if (A.token) go(); else { A.afterLogin = go; A.login(); }
     },
 
