@@ -16,7 +16,28 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* 저장소 없음 */ } } };
   const CSS = `
-  .ka-bar { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-bottom: 1px solid #eceef1; font: 700 12px 'Noto Sans KR', sans-serif; color: #545b66; flex-wrap: wrap; }
+  /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
+     탭이 AI 하나뿐인 덱(noCode)은 「AI 에게 묻기」 알약과 따로 한 줄 먹던 페이지 이름 줄(kstage)을 없애고 윗줄에 합친다 */
+  #kpanel.ka-solo .khead { padding: 10px 10px 10px 16px; gap: 4px; }
+  #kpanel.ka-solo .khead button[data-kt="ai"], #kpanel.ka-solo .khead button[data-kt="code"] { display: none; }
+  #kpanel.ka-solo .kstage { display: none; }
+  #kpanel .ka-ctx { flex: 1; min-width: 0; font: 800 13.5px 'Noto Sans KR', sans-serif; color: #2b3038; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #kpanel .ka-ctx small { color: #9aa1ab; font-weight: 700; margin-right: 6px; }
+  #kpanel .khead .ka-ic { flex: none; width: 34px; height: 34px; padding: 0; border-radius: 10px; background: transparent; color: #545b66; font-size: 17px; line-height: 34px; position: relative; transition: background .15s, transform .08s; }
+  #kpanel .khead .ka-ic:hover { background: #f2f3f6; } #kpanel .khead .ka-ic:active { transform: scale(0.96); }
+  #kpanel .khead .ka-ic .dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 99px; background: #7c3aed; }
+  #kpanel.ka-solo .khead .kx { margin-left: 0; width: 34px; height: 34px; padding: 0; border-radius: 10px; }
+  .ka-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #eceef1; font: 700 12px 'Noto Sans KR', sans-serif; color: #545b66; flex-wrap: nowrap; min-width: 0; position: relative; }
+  .ka-bar .ka-model { min-width: 0; flex: 0 1 auto; padding-right: 2px; }
+  .ka-seg { flex: none; } .ka-seg button { white-space: nowrap; }
+  .ka-seg button .ok { display: inline-block; width: 6px; height: 6px; border-radius: 99px; background: #22c55e; margin-left: 5px; vertical-align: 2px; }
+  .ka-more { margin-left: auto; flex: none; border: 0; background: transparent; border-radius: 8px; width: 30px; height: 28px; font: 900 16px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; }
+  .ka-more:hover { background: #f2f3f6; }
+  .ka-menu { position: absolute; right: 10px; top: calc(100% - 4px); z-index: 5; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(20,24,40,.16); padding: 6px; min-width: 190px; display: none; }
+  .ka-menu.on { display: block; }
+  .ka-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 8px; padding: 9px 12px; font: 700 13px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; }
+  .ka-menu button:hover { background: #f2f3f6; } .ka-menu .sub { font-size: 11.5px; color: #7a828e; padding: 4px 12px 6px; }
+  .ka-connect { margin-left: auto; flex: none; border: 0; background: #16181d; color: #fff; border-radius: 99px; padding: 5px 12px; font: 800 12px 'Noto Sans KR', sans-serif; cursor: pointer; }
   .ka-seg { display: inline-flex; background: #f2f3f6; border-radius: 99px; padding: 2px; }
   .ka-seg button { border: 0; background: transparent; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; }
   .ka-seg button.on { background: #16181d; color: #fff; }
@@ -25,7 +46,7 @@
   .ka-acct ~ .ka-new { margin-left: 0; }
   .ka-acct { margin-left: auto; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; }
   .ka-acct.on { border-color: #d97706; color: #92400e; background: #fffbeb; }
-  .ka-web { border-width: 1px; border-style: solid; border-color: #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; transition: transform .08s, background .15s, color .15s, border-color .15s; }
+  .ka-web { flex: none; border-width: 1px; border-style: solid; border-color: #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; transition: transform .08s, background .15s, color .15s, border-color .15s; }
   .ka-web:hover { background: #f2f3f6; } .ka-web:active { transform: scale(0.98); }
   .ka-web.on { border-color: #416AF0; background: #E8EEFD; color: #416AF0; }
   .ka-steps { margin: 4px 0 8px; font: 600 12.5px/1.6 'Noto Sans KR', sans-serif; color: #545b66; }
@@ -227,25 +248,38 @@
     bar(body) {
       const top = body.querySelector('.kc-top'); if (!top) return;
       const sub = !!A.token; const cc = A.engine === 'claude';
-      const MODELS = [['auto', '자동(추천)'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5'], ['haiku', 'Haiku 4.5'], ['', '계정 기본']];
+      const MODELS = [['auto', '모델 자동'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5'], ['haiku', 'Haiku 4.5'], ['', '계정 기본']];
       const bar = document.createElement('div'); bar.className = 'ka-bar';
-      bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma 26b</button><button data-e="claude" class="${cc ? 'on' : ''}" title="Claude Code — 내 Claude 구독으로">Claude Code</button></span>`
+      bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
         + (cc && sub ? `<select class="ka-model" title="Claude 모델 — 구독 등급에 따라 못 쓰는 것이 있을 수 있다">${MODELS.map(([v, n]) => `<option value="${v}" ${A.model === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
-          + `<select class="ka-model ka-effort" title="노력(effort) — 높을수록 오래 생각하고 사용량이 는다">${[['auto', '노력 자동'], ['low', '노력 low'], ['medium', '노력 medium'], ['high', '노력 high'], ['xhigh', '노력 xhigh'], ['max', '노력 max']].map(([v, n]) => `<option value="${v}" ${A.effort === v ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '')
-        + (cc && sub ? `<button class="ka-web${A.web ? ' on' : ''}" title="켜면 AI 가 웹에서 찾아 넣는다 — 가져온 사실엔 출처를 달고, 검색 결과에 나온 주소만 연다">${A.web ? '✓ 웹 검색' : '웹 검색'}</button>` : '')
-        + (cc ? `<button class="ka-acct${sub ? ' on' : ''}">${sub ? '✓ 구독 연결됨' : 'Claude 구독 연결'}</button>` : '')
-        + (cc && sub ? '<button class="ka-new ka-use" title="남은 사용량">사용량</button>' : '')
-        ;
+          + `<select class="ka-model ka-effort" title="노력(effort) — 높을수록 오래 생각하고 사용량이 는다">${[['auto', '노력 자동'], ['low', '노력 low'], ['medium', '노력 med'], ['high', '노력 high'], ['xhigh', '노력 xhigh'], ['max', '노력 max']].map(([v, n]) => `<option value="${v}" ${A.effort === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
+          + `<button class="ka-web${A.web ? ' on' : ''}" title="켜면 AI 가 웹에서 찾아 넣는다 — 가져온 사실엔 출처를 달고, 검색 결과에 나온 주소만 연다">${A.web ? '✓ 웹' : '웹'}</button>`
+          + `<button class="ka-more" title="사용량 · 구독 연결">⋯</button><div class="ka-menu"><button data-m="use">남은 사용량 보기</button><button data-m="acct">구독 연결 끊기</button><div class="sub">Claude 구독 연결됨</div></div>` : '')
+        + (cc && !sub ? '<button class="ka-connect ka-acct">Claude 구독 연결</button>' : '');
       top.after(bar);
-      // 윗줄(새 대화 버튼만 남음)을 엔진 줄 오른쪽으로 합친다 — 설명 문구를 뺀 뒤 한 줄을 통째로 먹었다(사용자 지정 2026-09-30 설명 문구 삭제)
-      const hs = document.createElement('button'); hs.className = 'ka-hist'; hs.title = '지난 대화 보기 · 바꾸기'; hs.innerHTML = `대화 목록${A.otherRunning ? '<span class="dot"></span>' : ''}`; hs.onclick = () => A.showThreads(); bar.appendChild(hs);
-      const nw = top.querySelector('.kc-new'); if (nw) { nw.classList.add('ka-new'); nw.textContent = '＋'; nw.title = '새 대화'; nw.onclick = () => A.newThread(); bar.appendChild(nw); top.style.display = 'none'; }
+      // 윗줄(khead) — 덱 · 페이지 이름과 아이콘 버튼. render 때마다 다시 붙이니 전 것을 먼저 뗀다
+      const P = document.querySelector('#kpanel'); const head = P?.querySelector('.khead');
+      if (head) {
+        P.classList.toggle('ka-solo', !!K.cfg.noCode);
+        head.querySelectorAll('.ka-ctx, .ka-ic').forEach((e) => e.remove());
+        const kx = head.querySelector('.kx');
+        const ctx = document.createElement('div'); ctx.className = 'ka-ctx'; const cur = K.cfg.current()?.dataset.name || '';
+        ctx.innerHTML = `<small>AI</small>${esc(cur)}`; ctx.title = `${K.cfg.deck} · ${cur}`;
+        const ic = (t, title, fn, dot) => { const x = document.createElement('button'); x.className = 'ka-ic'; x.title = title; x.innerHTML = t + (dot ? '<span class="dot"></span>' : ''); x.onclick = fn; return x; };
+        if (K.cfg.noCode) head.insertBefore(ctx, kx);
+        const th = ic('☰', '대화 목록 — 지난 대화 보기 · 바꾸기', () => A.showThreads(), A.otherRunning); th.classList.add('ka-th'); head.insertBefore(th, kx);
+        head.insertBefore(ic('＋', '새 대화', () => A.newThread()), kx);
+      }
+      top.style.display = 'none';
       bar.querySelectorAll('[data-e]').forEach((b) => { b.onclick = () => { A.engine = b.dataset.e; K.render(); }; });
       const ms = bar.querySelector('.ka-model:not(.ka-effort)'); if (ms) ms.onchange = () => { A.model = ms.value; };
       const es = bar.querySelector('.ka-effort'); if (es) es.onchange = () => { A.effort = es.value; };
-      const us = bar.querySelector('.ka-use'); if (us) us.onclick = () => A.usage();
-      const wb = bar.querySelector('.ka-web'); if (wb) wb.onclick = () => { A.web = !A.web; wb.classList.toggle('on', A.web); wb.textContent = A.web ? '✓ 웹 검색' : '웹 검색'; A.toast(A.web ? '웹 검색 켬 — 필요하면 웹에서 찾아 출처와 함께 넣어요' : '웹 검색 끔'); };
-      const ac = bar.querySelector('.ka-acct'); if (ac) ac.onclick = () => (sub ? (confirm('Claude 구독 연결을 끊을까요? (내 계정에 저장된 연결을 지웁니다)') && (A.token = '', K.render())) : A.login());
+      const wb = bar.querySelector('.ka-web'); if (wb) wb.onclick = () => { A.web = !A.web; wb.classList.toggle('on', A.web); wb.textContent = A.web ? '✓ 웹' : '웹'; A.toast(A.web ? '웹 검색 켬 — 필요하면 웹에서 찾아 출처와 함께 넣어요' : '웹 검색 끔'); };
+      const mn = bar.querySelector('.ka-menu'); const mb = bar.querySelector('.ka-more');
+      if (mb && mn) { mb.onclick = (e) => { e.stopPropagation(); mn.classList.toggle('on'); }; document.addEventListener('click', () => mn.classList.remove('on'), { once: true });
+        mn.querySelector('[data-m="use"]').onclick = () => { mn.classList.remove('on'); A.usage(); };
+        mn.querySelector('[data-m="acct"]').onclick = () => { mn.classList.remove('on'); if (confirm('Claude 구독 연결을 끊을까요? (내 계정에 저장된 연결을 지웁니다)')) { A.token = ''; K.render(); } }; }
+      const ac = bar.querySelector('.ka-connect'); if (ac) ac.onclick = () => A.login();
       // 연결 안 된 Claude Code — 보내기를 막는다(입력은 그대로 두고 연결을 권한다)
       const sendB = body.querySelector('.kc-send'); const ta = body.querySelector('.kc-box textarea');
       if (cc && !sub && ta) { ta.placeholder = 'Claude 구독을 연결하면 보낼 수 있습니다'; }
@@ -461,7 +495,7 @@
       try { A.threads = (await K.post('/api/agent/threads', { file: location.pathname })).threads || []; } catch (e) { return; }
       const other = A.threads.some((t) => t.running && t.id !== A.thread);
       // 다른 방에서 작업 중이면 [대화 목록]에 점 — 패널을 다시 그리지 않고 단추만 고친다(도는 중에 다시 그리면 입력이 끊긴다)
-      A.otherRunning = other; const hb = document.querySelector('#kpanel .ka-hist');
+      A.otherRunning = other; const hb = document.querySelector('#kpanel .ka-th');
       if (hb) { const d = hb.querySelector('.dot'); if (other && !d) hb.insertAdjacentHTML('beforeend', '<span class="dot"></span>'); if (!other && d) d.remove(); }
       if (document.querySelector('#ka-th.on')) A.drawThreads();
     },
