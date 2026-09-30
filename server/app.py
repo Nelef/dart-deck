@@ -484,7 +484,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
             if req.get('build'):
                 dd = os.path.dirname(edit_target(req.get('file')))
-                req.update({'prompt': build_prompt(dd), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'low',
+                req.update({'prompt': build_prompt(dd), 'plan': False, 'model': req.get('model') or 'opus', 'effort': req.get('effort') or 'high',
                             'web': bool((STORE._load(os.path.join(dd, 'brief.json'), {}) or {}).get('web'))})
             return self.agent_stream(req, u)
         # 대화 기록 — 이 계정이 이 덱에 한 부탁들 · 따라 보기 · 멈춤 · 상태(진행 · 취소 · 버림) · 새 대화(숨기기)

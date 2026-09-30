@@ -192,8 +192,9 @@
       K.open('ai');
       const q = `받은 정보로 새 발표 자료를 만들어 주세요${b.audience ? ` — 보는 사람: ${b.audience}` : ''}${b.key ? ` · 핵심: ${b.key}` : ''}`;
       A.thread = A.newId();
-      // 새로 만들기 기본 = Opus · 노력 low(사용자 지정 2026-09-30 "opus effort 낮음이 가장 효율이 좋다" — 같은 설문으로 high 와 견준 기록은 CLAUDE.md)
-      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'low', kind: '새로 만들기' });
+      // 새로 만들기 = Opus · 노력 high — 같은 설문 비교(2026-09-30): low 68초 · high 224초였지만 high 가 표 · 카드가 더 촘촘해
+      // "처음 만들 땐 high 가 낫겠다"(사용자 지정). 그 뒤 패널에서 고치는 부탁은 기본 Opus · low(A.model · A.effort 기본값)
+      const go = () => A.ask(q, { build: true, model: 'opus', effort: 'high', kind: '새로 만들기' });
       if (A.token) go(); else { A.afterLogin = go; A.login(); }
     },
     // ── 그림 첨부(사용자 지정 2026-09-30) — [그림] 버튼 · 붙여넣기(Ctrl/⌘+V) · 끌어 놓기, 3장까지. 폰 사진이 커서 긴 변 1600px 로 줄인다
@@ -268,7 +269,7 @@
     bar(body) {
       const top = body.querySelector('.kc-top'); if (!top) return;
       const sub = !!A.token; const cc = A.engine === 'claude';
-      const MODELS = [['auto', '모델 자동'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5'], ['haiku', 'Haiku 4.5'], ['', '계정 기본']];
+      const MODELS = [['auto', '모델 자동'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5.5'], ['haiku', 'Haiku 4.5'], ['', '계정 기본']];
       const bar = document.createElement('div'); bar.className = 'ka-bar';
       bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
         + (cc && sub ? `<select class="ka-model" title="Claude 모델 — 구독 등급에 따라 못 쓰는 것이 있을 수 있다">${MODELS.map(([v, n]) => `<option value="${v}" ${A.model === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
@@ -394,7 +395,7 @@
         a.agent.files = files;
         const r = await fetch('/api/agent/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: K.ctrl.signal,
           body: JSON.stringify({ file: location.pathname, thread: A.thread || (A.thread = A.newId()), engine: a.agent.engine === 'sub' ? 'claude' : 'gemma', web: !!a.agent.o.web, slide, prompt: q, files, plan: !!o.plan, build: !!o.build, kind: o.kind, session: A.sess?.e === a.agent.engine ? A.sess.id : undefined, model: o.model || (A.model === 'auto' ? '' : A.model) || undefined,
-            effort: (A.effort === 'auto' ? o.effort : A.effort) || undefined }) });
+            effort: (o.build ? o.effort : A.effort === 'auto' ? o.effort : A.effort) || undefined }) });   // 새로 만들기는 패널 선택과 상관없이 자기 값(Opus · high)
         await A.read(r, a, ai);
       } catch (e) {
         // 멈춤 — 연결만 끊으면 서버가 계속 돌린다(창을 닫아도 계속되게 바꿨다) → 멈춤은 서버에 따로 알린다
@@ -447,8 +448,8 @@
     finish(a, ai, t0, live) {
       if (a._gen !== A.gen) { a.streaming = false; return; }   // 다른 방으로 옮긴 뒤 끝난 것 — 새 방 화면 · 바쁨 표시는 건드리지 않는다
       const o = a.agent.o || {};
-      a.streaming = false; if (t0) a.ms = performance.now() - t0; const mm = o.model || (A.model === 'auto' ? '' : A.model); const NM = { opus: 'Opus 5.5', sonnet: 'Sonnet 5', haiku: 'Haiku 4.5' };
-      const ef = A.effort === 'auto' ? o.effort : A.effort;
+      a.streaming = false; if (t0) a.ms = performance.now() - t0; const mm = o.model || (A.model === 'auto' ? '' : A.model); const NM = { opus: 'Opus 5.5', sonnet: 'Sonnet 5.5', haiku: 'Haiku 4.5' };
+      const ef = o.build || A.effort === 'auto' ? o.effort : A.effort;
       // 실제 모델 ID(Claude Code 결과의 modelUsage) — 보조 호출용 작은 모델(haiku)이 같이 찍히면 둘 다
       const used = (a.agent.models || []).join(', ');
       a.model = a.agent.quick ? '빠른 답 · gemma-4-26b' : a.agent.engine === 'gemma' ? `gemma 26b 생각 · 수정${o.kind ? ` (${String(o.kind).replace(/장/g, '페이지')})` : ''}`
