@@ -8,8 +8,8 @@
 //     수정 → gemma 생각 켬으로 사본을 고친다. 고치는 틀은 Claude Code 도구 틀(LiteLLM 경유)을 쓴다 — 하네스 비교에서 같은 gemma 생각으로
 //     이 틀이 17/24, 패널 한 번에 쓰기 + 생각은 빈 답 11/24(생각 3만 자에서 잘림)였다. Claude 계정은 쓰지 않는다.
 //   · Claude Code — 쓰는 사람의 Claude 구독으로만(토큰은 이 브라우저 localStorage 에만 — 부탁할 때 서버로 보내고 서버는 저장하지 않는다).
-//     연결 전에는 보내기를 막는다. 모델은 자동(기본) · Opus · Sonnet · Haiku(구독 등급에 따라 못 쓰는 것이 있을 수 있다).
-//     자동 = 부탁 종류를 gemma 가 먼저 한 단어로 판단해 설명 → Haiku · 작은 수정 → Sonnet · 큰 수정(배치 · 레이아웃 · 새 그림) → Opus —
+//     연결 전에는 보내기를 막는다. 모델 선택 기본은 **Opus 5.5 · 노력 low**(브라우저에 고른 값이 없을 때, 023aa34) — 모델 자동 · Opus · Sonnet · Haiku · 계정 기본(구독 등급에 따라 못 쓰는 것이 있을 수 있다).
+//     「모델 자동」 = 부탁 종류를 gemma 가 먼저 한 단어로 판단해 설명 → Haiku · 작은 수정 → Sonnet(노력 medium) · 큰 수정 / 여러 장 → Sonnet(노력 high) — Opus 는 사람이 고를 때만(b9911ef).
 //     사용자 제안(2026-09-30 "모델 각 선택해서 토큰 절약"). 판단은 로컬 gemma 라 구독 사용량을 쓰지 않는다.
 (() => {
   const K = window.DeckKit; if (!K || window.DeckAgent) return;
@@ -139,7 +139,7 @@
     // 엔진 — 고른 적 없으면 구독이 연결돼 있으면 Claude Code, 아니면 gemma
     get engine() { const e = ls.get('deckagent.engine'); return e === 'claude' || e === 'gemma' ? e : (A.me?.claude ? 'claude' : 'gemma'); }, set engine(v) { ls.set('deckagent.engine', v); },
     get model() { return ls.get('deckagent.model') ?? 'opus'; }, set model(v) { ls.set('deckagent.model', v); },
-    // 노력(effort) — Claude Code --effort. 자동 = 작은 수정 medium · 큰 수정 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
+    // 노력(effort) — Claude Code --effort. 기본 low(고른 값 없을 때). 「노력 자동」 = 작은 수정 medium · 큰 수정 / 여러 장 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
     get effort() { return ls.get('deckagent.effort') ?? 'low'; }, set effort(v) { ls.set('deckagent.effort', v); },
     // 웹 검색 — Claude Code 엔진에서만(검색은 Claude 쪽 도구). 켠 부탁만 검색 · 웹 읽기가 열리고, 가져온 사실엔 출처를 단다(사용자 지정 2026-09-30)
     get web() { return ls.get('deckagent.web') === '1'; }, set web(v) { ls.set('deckagent.web', v ? '1' : null); },
