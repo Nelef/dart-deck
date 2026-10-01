@@ -49,20 +49,13 @@
     const panelBox = () => { if (!document.body.classList.contains('kside')) return { w: 0, h: 0 }; const r = $('#kpanel')?.getBoundingClientRect(); if (!r) return { w: 0, h: 0 }; return r.width >= innerWidth - 2 ? { w: 0, h: r.height } : { w: r.width, h: 0 }; };
     const panelW = () => panelBox().w;
     // AI PPT — 왼쪽 위 로고 = 발표 자료 목록 · 탭 아이콘(사용자 지정 2026-09-30). 덱 HTML 을 고치지 않게 엔진이 붙인다(모양은 css/deck.css 끝)
-    if (!document.querySelector('#ppt-home')) { const a = document.createElement('a'); a.id = 'ppt-home'; a.href = '/'; a.title = '발표 자료 목록'; a.innerHTML = '<img src="/web/ai-ppt.svg" alt="AI PPT">'; document.body.appendChild(a); }
+    // 읽기 모드(공유 주소 /s/<토큰>/, 서버가 window.DECK_VIEW 를 심는다) — 로고는 링크가 아닌 그림, 편집 · AI 는 꺼진다(deckedit · deckkit)
+    const VIEW = !!window.DECK_VIEW; if (VIEW) document.body.classList.add('dview');
+    if (!document.querySelector('#ppt-home')) { const a = document.createElement(VIEW ? 'div' : 'a'); a.id = 'ppt-home'; if (!VIEW) { a.href = '/'; a.title = '발표 자료 목록'; } a.innerHTML = '<img src="/web/ai-ppt.svg" alt="AI PPT">'; document.body.appendChild(a); }
     // 확대 · 축소(휠 · 핀치 · + − 0 · 끌어 이동)는 엔진 기본 — 덱 HTML 에 없어도 붙인다(사용자 지정 2026-09-30). 덱이 뒤에서 직접 불러오면 js/deckzoom.js 가 알아서 한 번만 붙는다
     if (!window.DeckZoom) setTimeout(() => { if (!window.DeckZoom && !document.querySelector('script[src$="deckzoom.js"]')) { const z = document.createElement('script'); z.src = 'js/deckzoom.js'; document.body.appendChild(z); } }, 0);
-    // PDF 로 받기(사용자 지정 2026-10-01) — 서버가 페이지마다 화면 그대로 찍어 묶는다(engine/tools/deck_pdf.cjs · /pdf/<계정>/<덱>.pdf). 바뀌지 않았으면 바로 받는다
-    { const m = location.pathname.match(/^\/d\/([^/]+)\/([^/]+)\//); const bar = $('#bar');
-      if (m && bar && !$('#pdfb')) { const bt = document.createElement('button'); bt.className = 'nb'; bt.id = 'pdfb'; bt.textContent = 'PDF'; bt.title = 'PDF 로 받기 — 보이는 화면 그대로, 페이지마다 한 쪽';
-        bt.style.width = 'auto'; bt.style.padding = '0 12px'; bt.style.fontWeight = '800';
-        bt.onclick = async () => { if (bt.disabled) return; bt.disabled = true; const t0 = Date.now(); const tick = setInterval(() => { bt.textContent = `PDF 만드는 중 ${Math.round((Date.now() - t0) / 1000)}초`; }, 500);
-          try { const r = await fetch(`/pdf/${m[1]}/${m[2]}.pdf`, { cache: 'no-store' }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
-            const blob = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${document.title || 'deck'}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 30000);
-            bt.textContent = 'PDF ✓'; setTimeout(() => { bt.textContent = 'PDF'; }, 2500); }
-          catch (e) { bt.textContent = 'PDF'; alert(`PDF 를 만들지 못했습니다 — ${e.message}`); }
-          finally { clearInterval(tick); bt.disabled = false; } };
-        bar.insertBefore(bt, bar.querySelector('#fs')); } }
+    // 문서 설정(사용자 지정 2026-10-01) — 오른쪽 위 ⚙: 읽기 공유 링크 + PDF 로 받기(js/deckset.js). 주인 · 관리자가 여는 /d/ 주소에서만(읽기 모드 · 서버의 캡처 크롬(webdriver)에선 안 붙음 — 찍은 그림에 단추가 끼지 않게)
+    if (!VIEW && !navigator.webdriver && /^\/d\//.test(location.pathname) && !window.DeckSet) setTimeout(() => { if (!window.DeckSet && !document.querySelector('script[src$="deckset.js"]')) { const z = document.createElement('script'); z.src = 'js/deckset.js'; document.body.appendChild(z); } }, 0);
     if (!document.querySelector('link[rel~="icon"]')) { const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = '/web/favicon.svg'; document.head.appendChild(l); }
     // --fit-top: 위쪽에 비워 둘 높이 — ✎ 편집의 리본(도구 막대)이 무대를 가리지 않게(deckedit 가 편집 중에만 준다, 기본 0 이라 다른 덱은 그대로)
     const fit = () => {

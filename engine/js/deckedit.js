@@ -74,6 +74,7 @@
     keyName: (k) => `${MAC ? '⌘' : 'Ctrl+'}${k}`,
 
     init(cfg) {
+      if (window.DECK_VIEW) return;   // 읽기 모드(공유 주소) — 편집 없음
       E.cfg = cfg;
       const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
       const ov = document.createElement('div'); ov.id = 'de-ov'; E.stage().appendChild(ov);

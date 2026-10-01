@@ -372,6 +372,8 @@
   const K = {
     cfg: null, tab: 'code', chat: [], draft: '', busy: false, ctrl: null,
     init(cfg) {
+      // 읽기 모드(공유 주소) — 세부 카드(popover)는 그대로, 고치기 · AI · 코드 탭은 끈다(서버도 로그인 없으면 거절한다)
+      if (window.DECK_VIEW) { cfg = { ...cfg, editable: false }; const open0 = K.open; K.open = (tab) => { if (tab === 'detail') open0(tab); }; }
       K.cfg = cfg;
       const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
       const p = document.createElement('div'); p.id = 'kpanel';

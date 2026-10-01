@@ -212,3 +212,14 @@ body:not(.dfs):not(.dedit) { --fit-top: 46px; }
 body.dfs #ppt-home, body.dedit #ppt-home { display: none; }
 #bar #home { display: none !important; }
 @media (max-width: 640px) { #ppt-home { left: 10px; top: 8px; height: 26px; padding: 0 11px; } #ppt-home img { height: 12px; } body:not(.dfs):not(.dedit) { --fit-top: 38px; } }
+
+/* ═══ 문서 설정 · 읽기 모드(2026-10-01) ═══
+   ⚙ 문서 설정 = 오른쪽 위 알약(로고와 같은 모양). 판 안의 모양은 js/deckset.js. 편집 중(리본이 그 자리) · 전체화면에서는 숨긴다.
+   읽기 모드(body.dview, 공유 주소) = 고치기 · AI 단추를 뺀다 — 서버도 로그인이 없으면 거절하지만 눌러 볼 수 없게 */
+#ppt-set { position: fixed; right: 14px; top: 9px; z-index: 45; display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 13px; border: 0; border-radius: 99px; background: #fff; color: #16181d;
+  font: 700 12.5px 'Noto Sans KR', sans-serif; cursor: pointer; box-shadow: 0 1px 6px rgba(0,0,0,.2); transition: transform .08s ease, box-shadow .15s ease; }
+#ppt-set:hover { box-shadow: 0 2px 10px rgba(0,0,0,.28); } #ppt-set:active { transform: scale(.98); }
+body.dfs #ppt-set, body.dedit #ppt-set { display: none; }
+@media (max-width: 640px) { #ppt-set { right: 10px; top: 8px; height: 26px; padding: 0 10px; } #ppt-set span { display: none; } }
+body.dview #ppt-home { pointer-events: none; }
+body.dview #k-ai, body.dview #k-code, body.dview #kpanel .khead [data-kt="ai"], body.dview #kpanel .khead [data-kt="code"], body.dview #kpanel .kchips .ai { display: none !important; }

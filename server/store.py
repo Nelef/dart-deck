@@ -2,7 +2,8 @@
 # 계정: data/users.json — 비밀번호는 pbkdf2(sha256, 20만 번) 해시만 저장한다. Claude 구독 토큰은 계정에 묶어 둔다(사용자 지정 2026-09-30
 #   "계정에 묶어 서버에 저장") — 파일 권한 600, 화면 · API 로는 절대 돌려주지 않는다(서버가 Claude Code 를 부를 때만 꺼낸다).
 # 세션: data/sessions.json — 서버를 다시 켜도 로그인이 풀리지 않게. 14일 지나면 만료.
-# 덱: data/decks/<계정>/<덱 ID>/index.html + meta.json(제목 · 만든 날 · 고친 날) + brief.json(처음 만들 때 받은 설문 · 자료)
+# 덱: data/decks/<계정>/<덱 ID>/index.html + meta.json(제목 · 만든 날 · 고친 날 · share) + brief.json(처음 만들 때 받은 설문 · 자료)
+# 읽기 공유(2026-10-01): meta.json 의 share = {token, at}. 토큰 주소(/s/<토큰>/)는 로그인 없이 읽기만 된다. 토큰 → 덱 찾기표는 켤 때 meta 들에서 모은다
 import os, json, hashlib, hmac, secrets, time, threading, re, shutil
 
 LOCK = threading.RLock()
@@ -15,6 +16,10 @@ class Store:
         self.users = self._load(self.users_f, {'users': []})['users']; self.sess = self._load(self.sess_f, {})
         if not self.users:   # 처음 켤 때 관리자 하나 — 이전 프로토타입 와 같게 admin/admin(첫 로그인 뒤 바꾸라고 화면에서 알린다)
             self.add_user('admin', 'admin', 'admin', '관리자', must_change=True)
+        self.shares = {}
+        for x in self.decks():
+            t = (self._load(os.path.join(self.deck_dir(x['owner'], x['id']), 'meta.json'), {}) or {}).get('share', {}).get('token')
+            if t: self.shares[t] = (x['owner'], x['id'])
 
     def _load(self, f, dflt):
         try: return json.load(open(f, encoding='utf-8'))
@@ -106,8 +111,27 @@ class Store:
         f = os.path.join(self.deck_dir(owner, did), 'meta.json'); m = self._load(f, None)
         if not m: raise ValueError('없는 덱')
         m['title'] = title; self._save(f, m)
+    # ── 읽기 공유 ──
+    def share_of(self, owner, did): return ((self._load(os.path.join(self.deck_dir(owner, did), 'meta.json'), {}) or {}).get('share') or {}).get('token') or ''
+    def share_set(self, owner, did, on, renew=False):
+        """on=True 면 토큰을 만들고(이미 있으면 그대로, renew 면 새로 — 옛 주소는 바로 끊김), False 면 끈다. 돌려주는 값 = 지금 토큰('' = 꺼짐)"""
+        with LOCK:
+            f = os.path.join(self.deck_dir(owner, did), 'meta.json'); m = self._load(f, None)
+            if m is None: raise ValueError('없는 덱')
+            old = (m.get('share') or {}).get('token') or ''
+            if not on or renew:
+                self.shares.pop(old, None); m.pop('share', None); old = ''
+            if on and not old:
+                old = secrets.token_urlsafe(18); m['share'] = {'token': old, 'at': int(time.time())}; self.shares[old] = (owner, did)
+            self._save(f, m); return old
+    def share_find(self, token):
+        t = self.shares.get(token)
+        return t if t and os.path.isfile(os.path.join(self.deck_dir(*t), 'index.html')) else None
+
     def delete_deck(self, owner, did):
         d = self.deck_dir(owner, did)
         if not os.path.isdir(d): raise ValueError('없는 덱')
+        try: self.share_set(owner, did, False)   # 휴지통으로 가면 공유 주소도 끊는다(되살려도 새로 켜야)
+        except ValueError: pass
         trash = os.path.join(self.dir, 'trash', owner); os.makedirs(trash, exist_ok=True)   # 바로 지우지 않고 휴지통으로(되살릴 수 있게)
         shutil.move(d, os.path.join(trash, f'{did}-{int(time.time())}'))

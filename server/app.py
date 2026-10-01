@@ -62,6 +62,20 @@ def deck_of(url_path):
     m = DECK_RE.match(urllib.parse.unquote(str(url_path or '').split('?')[0]))
     return (m.group(1), m.group(2), (m.group(3) or '/').lstrip('/')) if m else None
 
+def deck_file(owner, did, rest, engine_top=ENGINE_TOP):
+    """덱 주소의 나머지 경로 → 실제 파일(없거나 폴더 · 바깥이면 None). engine_top 이름은 engine/ 에서, fonts/ 는 data/fonts → engine/fonts 순으로"""
+    top = rest.split('/', 1)[0]
+    if top in engine_top: base = ENGINE
+    elif top == 'fonts': base, rest = (FONT_DIR, rest[6:]) if os.path.exists(os.path.join(FONT_DIR, rest[6:])) else (ENGINE, rest)
+    else: base = STORE.deck_dir(owner, did)
+    p = os.path.realpath(os.path.join(base, rest or 'index.html'))
+    return None if not p.startswith(os.path.realpath(base) + os.sep) or os.path.isdir(p) else p
+
+# 읽기 공유(2026-10-01 사용자 지정 "외부 사람이 볼 수 있는 읽기 모드") — /s/<토큰>/ 은 로그인 없이 덱을 읽기만 한다
+SHARE_RE = re.compile(r'^/s/([A-Za-z0-9_-]{16,64})(/.*)?$')
+SHARE_ENGINE_TOP = ('js', 'css')   # 읽기에 필요한 엔진만(tools · DECK.md 는 안 준다)
+VIEW_FLAG = '<script>window.DECK_VIEW = 1;</script><meta name="robots" content="noindex,nofollow">'   # 엔진(deck · deckedit · deckkit)이 이걸 보고 편집 · AI 를 끈다
+
 def edit_target(rel):
     """덱 주소 → 그 덱의 index.html 절대 경로. 덱 index.html 만 고칠 수 있다(사본 · 그림 · 다른 파일 금지)"""
     d = deck_of(rel)
@@ -298,11 +312,37 @@ def make_pdf(owner, did):
         key = pdf_key(d)
         if os.path.exists(out) and os.path.exists(kf) and open(kf).read() == key: return out, {'cached': True}
         tmp = out + '.tmp'
-        with PDF_SEM: r = subprocess.run([NODE, PDF_TOOL, f'http://127.0.0.1:{PORT}/d/{owner}/{did}/', tmp], capture_output=True, text=True, timeout=900, env={**os.environ, 'NODE_PATH': NODE_PATH})
+        with PDF_SEM:
+            t0 = time.time(); r = subprocess.run([NODE, PDF_TOOL, f'http://127.0.0.1:{PORT}/d/{owner}/{did}/', tmp], capture_output=True, text=True, timeout=900, env={**os.environ, 'NODE_PATH': NODE_PATH}); took = time.time() - t0
         info = json.loads(r.stdout or '{}')
         if not os.path.exists(tmp) or not info.get('pages'): raise ValueError('PDF 를 만들지 못했습니다 — ' + '; '.join(info.get('errors') or [r.stderr[-200:]]))
         os.replace(tmp, out); open(kf, 'w').write(key)
+        try: json.dump({'pages': info['pages'], 'sec': round(took, 1)}, open(os.path.join(d, '.export.info'), 'w'))   # 다음 예상 시간에 쓴다(이 서버의 속도)
+        except OSError: pass
         return out, info
+
+# PDF 예상 시간 = 고정(크롬 켜기 · 글꼴 불러오기) + 페이지당. 처음엔 아래 기본값, 한 번 만들고 나면 그 덱에서 잰 실제 시간으로 이 서버 속도에 맞춘다
+PDF_FIXED_SEC, PDF_PAGE_SEC = 5.0, 1.0   # 실측(2026-10-01 맥, 덱 3개): 11쪽 12초 · 13쪽 17초 · 16쪽 15초 — 서버가 느리면 첫 PDF 뒤부터 그 덱은 실제 속도로 맞춘다
+def slide_count(idx):
+    try: return len(re.findall(r'<section[^>]*class="[^"]*\bslide\b', open(idx, encoding='utf-8').read()))
+    except OSError: return 0
+def pdf_status(owner, did):
+    d = STORE.deck_dir(owner, did); out = os.path.join(d, '.export.pdf'); kf = os.path.join(d, '.export.key')
+    pages = slide_count(os.path.join(d, 'index.html')); base = PDF_FIXED_SEC + PDF_PAGE_SEC * pages
+    cached = os.path.exists(out) and os.path.exists(kf) and open(kf).read() == pdf_key(d)
+    k = 1.0; last = STORE._load(os.path.join(d, '.export.info'), None)
+    if last and last.get('pages') and last.get('sec'): k = max(0.4, min(4.0, last['sec'] / (PDF_FIXED_SEC + PDF_PAGE_SEC * last['pages'])))
+    return {'pages': pages, 'cached': bool(cached), 'estSec': 0 if cached else max(3, round(base * k)), 'bytes': os.path.getsize(out) if cached else 0}
+
+def docset(d, req):
+    """문서 설정 — 읽기 공유 켜기 · 끄기 · 새 주소 + PDF 상태. d = deck_of(file) (권한은 호출 쪽에서 확인)"""
+    owner, did, _ = d; a = req.get('action') or 'get'
+    if a == 'share_on': STORE.share_set(owner, did, True)
+    elif a == 'share_renew': STORE.share_set(owner, did, True, renew=True)
+    elif a == 'share_off': STORE.share_set(owner, did, False)
+    elif a != 'get': raise ValueError('모르는 작업')
+    tok = STORE.share_of(owner, did)
+    return {'ok': True, 'share': f'/s/{tok}/' if tok else '', 'pdf': pdf_status(owner, did)}
 THUMB_SEM = _th.Semaphore(2); THUMB_BUSY = {}; THUMB_LOCK = _th.Lock()
 def thumb_path(owner, did): return os.path.join(STORE.deck_dir(owner, did), '.thumb.jpg')
 def thumb_fresh(owner, did):
@@ -502,6 +542,26 @@ class H(http.server.BaseHTTPRequestHandler):
             p = os.path.realpath(os.path.join(base, rest))
             if not p.startswith(os.path.realpath(base) + os.sep): return self.send_error(404)
             return self.send_file(p, head_only)
+        m = SHARE_RE.match(path)
+        if m:
+            tok, rest = m.group(1), (m.group(2) or '/').lstrip('/'); t = STORE.share_find(tok)
+            if not t:
+                msg = '공유가 끝났거나 없는 주소입니다'.encode('utf-8'); self.send_response(404); self.send_header('Content-Type', 'text/plain; charset=utf-8'); self.send_header('Content-Length', str(len(msg))); self.send_header('Cache-Control', 'no-store'); self.end_headers()
+                if not head_only: self.wfile.write(msg)
+                return
+            if m.group(2) is None: self.send_response(301); self.send_header('Location', path + '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+            # 읽기 전용: 숨김 파일 · 덱 폴더 맨 위의 index.html 말고 다른 파일(meta.json · brief.json = 설문 · 올린 자료)은 주지 않는다
+            if any(seg.startswith('.') for seg in rest.split('/')) or ('/' not in rest and rest not in ('', 'index.html')): return self.send_error(404)
+            p = deck_file(t[0], t[1], rest, SHARE_ENGINE_TOP)
+            if not p: return self.send_error(404)
+            if os.path.basename(p) == 'index.html' and rest in ('', 'index.html'):
+                html = open(p, encoding='utf-8').read(); mh = re.search(r'<head[^>]*>', html, re.I)
+                html = html[:mh.end()] + VIEW_FLAG + html[mh.end():] if mh else VIEW_FLAG + html
+                data = html.encode('utf-8'); self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(data)))
+                self.send_header('Cache-Control', 'no-store'); self.send_header('Referrer-Policy', 'no-referrer'); self.send_header('X-Robots-Tag', 'noindex, nofollow'); self.end_headers()
+                if not head_only: self.wfile.write(data)
+                return
+            return self.send_file(p, head_only)
         d = deck_of(path)
         if d:
             owner, did, rest = d
@@ -514,15 +574,9 @@ class H(http.server.BaseHTTPRequestHandler):
                 if any(seg.startswith('.') for seg in rest.split('/')): return self.send_error(404)
             if not path.endswith('/') and rest == '':
                 self.send_response(301); self.send_header('Location', path + '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
-            top = rest.split('/', 1)[0]
-            if top in ENGINE_TOP: base = ENGINE
-            elif top == 'fonts':
-                base, rest = (FONT_DIR, rest[6:]) if os.path.exists(os.path.join(FONT_DIR, rest[6:])) else (ENGINE, rest)
-            else: base = STORE.deck_dir(owner, did)
-            p = os.path.realpath(os.path.join(base, rest or 'index.html'))
-            if not (p.startswith(os.path.realpath(base) + os.sep)) or os.path.isdir(p): return self.send_error(404)
-            if rest in ('meta.json',) : return self.send_error(404)
-            return self.send_file(p, head_only)
+            if rest == 'meta.json': return self.send_error(404)
+            p = deck_file(owner, did, rest)
+            return self.send_file(p, head_only) if p else self.send_error(404)
         if path == '/favicon.ico': return self.send_error(404)
         return self.send_error(404)
 
@@ -576,11 +630,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self.reply(200, {'ok': True})
             if path == '/api/classify': return self.classify(self.body(20_000))
             if path == '/api/ask': return self.ask(self.body(ASK_MAX_REQ))
-            if path in ('/api/edit', '/api/edit/undo', '/api/shot', '/api/asset', '/api/font'):
+            if path in ('/api/edit', '/api/edit/undo', '/api/shot', '/api/asset', '/api/font', '/api/docset'):
                 # 문서 첨부(25MB → base64 약 34MB)는 /api/asset 만 크게 받는다. 나머지(고치기 · 캡처 · 글꼴)는 12MB 그대로
                 req = self.body(36_000_000 if path == '/api/asset' else 12_000_000); self.deck_access(u, req.get('file'))
                 fn = {'/api/shot': lambda: shot(req, PORT), '/api/asset': lambda: save_asset(req), '/api/font': lambda: cache_font(req),
-                      '/api/edit': lambda: apply_edits(req), '/api/edit/undo': lambda: undo_edit(req)}[path]
+                      '/api/edit': lambda: apply_edits(req), '/api/edit/undo': lambda: undo_edit(req), '/api/docset': lambda: docset(deck_of(req.get('file')), req)}[path]
                 return self.reply(200, fn())
             if path.startswith('/api/agent/'): return self.agent(u, path, self.body(200_000))
             return self.reply(404, {'error': '없는 주소'})
