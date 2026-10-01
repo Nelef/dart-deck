@@ -108,7 +108,9 @@
 
   .ka-att:disabled { opacity: .4; cursor: default; }
   .ka-uthumbs { display: flex; gap: 4px; justify-content: flex-end; margin-top: 6px; } .ka-uthumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
-  .ka-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; } .ka-shots img { width: 100%; display: block; border-radius: 6px; }
+  .ka-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; } .ka-shots.one { grid-template-columns: 1fr; } .ka-shots img { width: 100%; display: block; border-radius: 6px; }
+  .ka-shots .tag { position: absolute; left: 8px; top: 8px; padding: 2px 9px; border-radius: 99px; font: 800 11.5px 'Noto Sans KR', sans-serif; color: #fff; background: #416AF0; } .ka-shots .tag.del { background: #b91c1c; }
+  .ka-more-shots { padding: 0 8px 8px; font: 700 12px 'Noto Sans KR', sans-serif; color: #7a828e; }
   /* 대화 목록(대화방) — 패널 위로 왼쪽에서 밀려 나오는 서랍. TOSS: 행 높이 64 · hover 틴트 · 누르면 scale(0.98) · 뜨는 효과 없음 */
   .ka-hist { position: relative; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; transition: transform .08s, background .15s; }
   .ka-hist:hover { background: #f2f3f6; } .ka-hist:active, .ka-new:active, .ka-acct:active { transform: scale(0.98); }
@@ -481,12 +483,14 @@
       if (j.error) a.err = j.error;
       if (j.stopped) a.stopped = true;
       if (j.done) {
-        Object.assign(a.agent, { done: true, rid: j.rid, changed: j.changed, slides: j.slides || [], other: j.other, sec: j.sec, turns: j.turns, models: j.models || [] });
+        Object.assign(a.agent, { done: true, rid: j.rid, changed: j.changed, slides: j.slides || [], added: j.added || [], removed: j.removed || [], more: j.more || 0, other: j.other, sec: j.sec, turns: j.turns, models: j.models || [] });
         if (j.result) a.text = j.result;   // 마지막 답만 남긴다(중간 설명은 단계로 충분)
-        if (j.shots?.length > 1) a.shots = j.shots;
+        // 미리보기: 두 장 이상이거나 추가 · 삭제 페이지가 낀 경우는 타일로(서버가 이름마다 이전 · 이후 그림을 짝지어 준다). 바뀐 한 장뿐이면 예전처럼 크게
+        if (j.shots?.length > 1 || (j.shots?.length === 1 && j.shots[0].kind !== 'change')) a.shots = j.shots;
         if (j.changed && j.before && j.after) {
           const d = window.DeckCheck ? window.DeckCheck.diff(j.before, j.after) : { problems: [], errors: [] };
-          a.state = { jpg: j.after.jpg, base: j.before.jpg, problems: d.problems, errors: d.errors };
+          const s0 = j.shots?.[0];
+          a.state = { jpg: (s0 && s0.after) || j.after.jpg, base: s0 ? s0.before : j.before.jpg, problems: d.problems, errors: d.errors };
         }
         if (j.applied) { a.agent.applied = j.applied; a.applied = j.applied; a.edit = { file: location.pathname, sha: '', slide: a.slide }; }   // 새 덱 만들기 — 서버가 적용
         if (j.applyErr) a.agent.applyErr = `저장 못 함: ${j.applyErr}`;
@@ -625,9 +629,11 @@
           : `<div class="kc-eda"><button class="go" data-ka="go" data-mi="${i}">진행</button><button data-ka="cancel" data-mi="${i}">취소</button><span>진행하면 계획대로 고치고 화면으로 확인합니다</span></div>`;
       } else if (g.done && g.changed && !m.streaming) {
         const st = m.state; const probs = st ? [...st.errors.map((e) => `스크립트 오류: ${e}`), ...st.problems.slice(0, 6).map((p) => `${p.slide}페이지 ${p.text}`)] : [];
-        card = `<div class="kc-ed"><div class="h">바뀐 페이지: ${esc(g.slides.join(' · ') || '없음')}${g.other ? ' · <span style="color:#b45309">공용 부분(스타일 · 스크립트)도 바뀜</span>' : ''}</div>`
-          + (m.shots?.length > 1
-            ? `<div class="ka-shots">${m.shots.map((s, k) => `<div class="kshot-t" data-kshot="${i}:s${k}" title="누르면 크게 · 이전과 겹쳐 비교"><img src="${s.after}"><span>${s.n}. ${esc(s.name)}</span></div>`).join('')}</div>`
+        const KIND = { add: '추가', del: '삭제' };
+        const names = [...g.slides, ...(g.added || []).map((x) => `${x} (추가)`), ...(g.removed || []).map((x) => `${x} (삭제)`)];
+        card = `<div class="kc-ed"><div class="h">바뀐 페이지${names.length > 1 ? ` ${names.length}개` : ''}: ${esc(names.join(' · ') || '없음')}${g.other ? ' · <span style="color:#b45309">공용 부분(스타일 · 스크립트)도 바뀜</span>' : ''}</div>`
+          + (m.shots?.length
+            ? `<div class="ka-shots${m.shots.length === 1 ? ' one' : ''}">${m.shots.map((s, k) => `<div class="kshot-t" data-kshot="${i}:s${k}" title="누르면 크게${s.before && s.after ? ' · 이전과 겹쳐 비교' : ''}"><img src="${s.after || s.before}">${KIND[s.kind] ? `<b class="tag ${s.kind}">${KIND[s.kind]}</b>` : ''}<span>${s.n}. ${esc(s.name)}</span></div>`).join('')}</div>${g.more ? `<div class="ka-more-shots">외 ${g.more}개 페이지는 생략했습니다 — 적용하면 모두 저장됩니다</div>` : ''}`
             : st?.jpg ? `<div class="kshot-t" data-kshot="${i}:state" title="누르면 크게 · 이전과 겹쳐 비교"><img src="${st.jpg}" style="width:100%;display:block"><span>⤢ 크게 · 이전과 비교</span></div>` : '')
           + (probs.length ? `<pre class="del">${esc(probs.join('\n'))}</pre>` : '') + '</div>'
           + (g.applied ? `<div class="kc-eda">✓ 파일에 저장됨 · 커밋은 직접 <button data-kundo="${i}">되돌리기</button></div>`

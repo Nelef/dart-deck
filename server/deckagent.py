@@ -143,15 +143,20 @@ def changed_parts(orig, new, slide_parts):
     """바뀐 장 이름들 · 그 밖(공용 style · 스크립트 등)이 바뀌었나"""
     names = slide_names(orig); out = []
     rest_o, rest_n = orig, new
+    for nm in slide_names(new):   # 새로 생긴 페이지(원본에 없는 이름)는 공용 부분이 아니다 — 안 떼면 쪽을 더하기만 해도 '공용도 바뀜'으로 모든 장을 점검했다
+        if nm not in names:
+            for a in slide_parts(new, nm):
+                if a: rest_n = rest_n.replace(a, '', 1)
+    new_names = set(slide_names(new))
     for nm in names:
         so, io = slide_parts(orig, nm); sn, inn = slide_parts(new, nm)
-        if so != sn or io != inn: out.append(nm)
+        if (so != sn or io != inn) and nm in new_names: out.append(nm)   # 지워진 페이지는 '바뀐 페이지'가 아니라 삭제(호출 쪽이 따로 센다)
         for a in (so, io):
             if a: rest_o = rest_o.replace(a, '', 1)
         for a in (sn, inn):
             if a: rest_n = rest_n.replace(a, '', 1)
     # 주석만 바뀐 건 공용 변경으로 치지 않는다 — 스크립트 위 장 설명 주석(// ═══ 1. 정답률 …)을 고쳐 '공용 부분도 바뀜'으로 보였다(시험 B1)
-    nc = lambda t: re.sub(r'^\s*//[^\n]*$|<!--[\s\S]*?-->', '', t, flags=re.M)
+    nc = lambda t: re.sub(r'\s+', ' ', re.sub(r'^\s*//[^\n]*$|<!--[\s\S]*?-->', '', t, flags=re.M)).strip()   # 빈 줄 · 들여쓰기만 달라진 것도 공용 변경이 아니다(쪽을 더하면 줄이 늘어 '공용도 바뀜'으로 보였다)
     return out, nc(rest_o) != nc(rest_n)
 
 PLAN = ('이번 차례는 **계획만** 세운다 — 파일을 고치지 않는다(고치기 도구가 막혀 있다). DECK.md 규칙(한 장에 메시지 하나 · 명사형 제목 · 개조식 · 인포그래픽)과 '
@@ -461,17 +466,38 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
                'models': [m for m in (result.get('modelUsage') or {}).keys()]}
         if new != orig:
             send({'step': '고치기 전 · 후 화면 찍기'})
-            # 바뀐 장마다(지금 장을 앞에, 최대 6장) — 여러 장 고치기(사용자 지정 2026-09-30). 한 번 열어 여러 장을 찍는다(deck_shot 쉼표 목록)
-            ks = sorted({names.index(x) + 1 for x in slides if x in names}, key=lambda k: (k != n, k))[:6] or [n]
+            # 미리보기 대상(사용자 지적 2026-10-01 "여러 장 수정인데 한 장만 · 추가된 페이지가 안 나옴"): 바뀐 페이지 + **추가된 페이지** + 삭제된 페이지.
+            # 예전엔 원본 덱의 이름 목록으로만 골라 추가된 페이지가 빠졌고(순수 추가면 엉뚱하게 지금 보던 장 한 장만 나왔다), 이후 그림도 원본 번호로 찍어 페이지가 끼어들면 다른 장이 찍혔다.
+            # 이제 이전 그림은 원본 번호, 이후 그림은 **새 덱의 번호**로 이름마다 짝지어 찍는다
+            old_n, new_n = slide_names(orig), slide_names(new)
+            items = [{'name': nm, 'kind': 'change' if nm in old_n else 'add', 'o': old_n.index(nm) + 1 if nm in old_n else 0, 'w': k}
+                     for k, nm in enumerate(new_n, 1) if nm in slides or nm not in old_n]
+            items += [{'name': nm, 'kind': 'del', 'o': k, 'w': 0} for k, nm in enumerate(old_n, 1) if nm not in new_n]
+            items.sort(key=lambda it: (it['name'] != slide, not it['w'], it['w'] or it['o']))   # 지금 보던 장 먼저, 새 덱 순서, 삭제는 맨 뒤
+            if not items:   # 공용 스타일 · 스크립트만 바뀜 — 지금 장을 본다
+                cur = new_n.index(slide) + 1 if slide in new_n else min(n, max(len(new_n), 1))
+                items = [{'name': slide or (new_n[cur - 1] if new_n else ''), 'kind': 'change', 'o': n, 'w': cur}]
+            SHOT_MAX = 12; more = max(0, len(items) - SHOT_MAX); items = items[:SHOT_MAX]
             rel = url_of(path); allp = bool(other)   # 공용 스타일 · 스크립트가 바뀌었으면 모든 장을 점검(다른 장이 깨졌을 수 있다)
-            run_shot = lambda html: shot({'file': rel, 'html': html, 'slide': ks[0], 'slides': ks, 'all': allp}, port)
+            def run_shots(html, nums):   # 한 번에 8장까지 찍는 도구 — 넘으면 나눠 찍고 합친다. 점검(all)은 첫 묶음에서 한 번
+                nums = nums or [1]; res = None
+                for i in range(0, len(nums), 8):
+                    part = nums[i:i + 8]; r1 = shot({'file': rel, 'html': html, 'slide': part[0], 'slides': part, 'all': allp and i == 0}, port)
+                    if res is None: res = r1; res['jpgs'] = dict(r1.get('jpgs') or ({str(part[0]): r1.get('jpg', '')} if r1.get('jpg') else {}))
+                    else: res['jpgs'].update(r1.get('jpgs') or ({str(part[0]): r1.get('jpg', '')} if r1.get('jpg') else {}))
+                return res
+            o_nums = [it['o'] for it in items if it['o']]; w_nums = [it['w'] for it in items if it['w']]
             if pre.get('t'): pre['t'].join(60)
-            got = {}; ta = threading.Thread(target=lambda: got.__setitem__('a', run_shot(new)), daemon=True); ta.start()   # 고친 뒤 · (필요하면) 고치기 전을 함께
-            b = pre['v'] if (ks == [n] and not allp and pre.get('v') and pre.get('src') == orig) else run_shot(orig)
+            got = {}; ta = threading.Thread(target=lambda: got.__setitem__('a', run_shots(new, w_nums)), daemon=True); ta.start()   # 고친 뒤 · (필요하면) 고치기 전을 함께
+            one_cur = len(items) == 1 and items[0]['kind'] == 'change' and items[0]['o'] == items[0]['w'] == n and not allp and pre.get('v') and pre.get('src') == orig
+            b = pre['v'] if one_cur else run_shots(orig, o_nums)
             ta.join(); a2 = got.get('a') or {}
-            out['before'] = {k: v for k, v in b.items() if k != 'jpgs'}; out['after'] = {k: v for k, v in a2.items() if k != 'jpgs'}; out['shotSlide'] = ks[0]
-            if len(ks) > 1:
-                out['shots'] = [{'n': k, 'name': names[k - 1], 'before': (b.get('jpgs') or {}).get(str(k), ''), 'after': (a2.get('jpgs') or {}).get(str(k), '')} for k in ks]
+            out['before'] = {k: v for k, v in b.items() if k != 'jpgs'}; out['after'] = {k: v for k, v in a2.items() if k != 'jpgs'}; out['shotSlide'] = items[0]['w'] or items[0]['o']
+            bj, aj = (b.get('jpgs') or {}), (a2.get('jpgs') or {})
+            if one_cur: bj = {str(n): b.get('jpg', '')}
+            out['shots'] = [{'n': it['w'] or it['o'], 'name': it['name'], 'kind': it['kind'], 'before': bj.get(str(it['o']), '') if it['o'] else '', 'after': aj.get(str(it['w']), '') if it['w'] else ''} for it in items]
+            out['added'] = [it['name'] for it in items if it['kind'] == 'add']; out['removed'] = [it['name'] for it in items if it['kind'] == 'del']
+            if more: out['more'] = more
             # 새 덱 만들기는 서버가 곧바로 적용한다 — 만드는 사이 사람이 나가 있어도 다시 열면 완성된 덱이 보이게(빈 표지뿐이라 잃을 것이 없고 백업은 남는다)
             if req.get('build'):
                 r['busy'] = False

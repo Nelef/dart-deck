@@ -590,7 +590,7 @@
         const c = e.target.closest('[data-kcopy]'); if (c) { navigator.clipboard?.writeText(K.chat[Number(c.dataset.kcopy)].text); c.textContent = '복사됨'; return; }
         const r = e.target.closest('[data-kretry]'); if (r && !K.busy) { const i = Number(r.dataset.kretry); const q = K.chat[i - 1]?.text; K.chat.splice(i - 1, 2); if (q) K.ask(q); }
         const ap = e.target.closest('[data-kapply]'); if (ap) { K.applyEdit(Number(ap.dataset.kapply), ap); return; }
-        const sv = e.target.closest('[data-kshot]'); if (sv) { const [mi, key] = sv.dataset.kshot.split(':'); const m = K.chat[Number(mi)]; const sh = key[0] === 's' && m?.shots?.[Number(key.slice(1))]; const st = sh ? { jpg: sh.after, base: sh.before } : key === 'pass' ? m?.passState : m?.state; if (st) K.shotView(st, sh ? `${m.root || ''} — ${sh.name}` : m.root || ''); return; }
+        const sv = e.target.closest('[data-kshot]'); if (sv) { const [mi, key] = sv.dataset.kshot.split(':'); const m = K.chat[Number(mi)]; const sh = key[0] === 's' && m?.shots?.[Number(key.slice(1))]; const st = sh ? { jpg: sh.after || sh.before, base: sh.after ? sh.before : '', label: sh.kind === 'del' ? '이전' : '', note: sh.kind === 'add' ? '새로 추가된 페이지입니다 — 비교할 이전 그림이 없어 이후만 보여 줍니다' : sh.kind === 'del' ? '삭제된 페이지입니다 — 적용하면 이 페이지가 없어집니다(이전 그림을 보여 줍니다)' : '' } : key === 'pass' ? m?.passState : m?.state; if (st) K.shotView(st, sh ? `${m.root || ''} — ${sh.name}` : m.root || ''); return; }
         const ra = e.target.closest('[data-kreask]'); if (ra && !K.busy) { K.againEdit(Number(ra.dataset.kreask)); return; }
         const ca = e.target.closest('[data-kcancel]'); if (ca) { K.chat[Number(ca.dataset.kcancel)].cancelled = true; K.updateMsg(Number(ca.dataset.kcancel)); return; }
         const un = e.target.closest('[data-kundo]'); if (un) { K.undoEdit(Number(un.dataset.kundo), un); }
@@ -696,10 +696,10 @@
         v.addEventListener('click', (e) => { if (e.target === v || e.target.closest('.kx2')) v.classList.remove('on'); });
         addEventListener('keydown', (e) => { if (e.key === 'Escape' && v.classList.contains('on')) { e.stopImmediatePropagation(); v.classList.remove('on'); } }, true); }
       const has = !!st.base;
-      v.innerHTML = `<div class="kv-h"><b>미리보기</b><span class="kv-q">${esc(title)}</span><span class="kv-tabs">${has ? '<button data-kv="diff" class="on">바뀐 곳</button><button data-kv="onion">겹쳐 보기</button><button data-kv="before">이전</button>' : ''}<button data-kv="after" class="${has ? '' : 'on'}">이후</button>`
+      v.innerHTML = `<div class="kv-h"><b>미리보기</b><span class="kv-q">${esc(title)}</span><span class="kv-tabs">${has ? '<button data-kv="diff" class="on">바뀐 곳</button><button data-kv="onion">겹쳐 보기</button><button data-kv="before">이전</button>' : ''}<button data-kv="after" class="${has ? '' : 'on'}">${esc(st.label || '이후')}</button>`
         // 섞기 밀대는 [겹쳐 보기] 바로 밑에 띄운다 — 줄 안에 두면 나타날 때 옆 버튼들이 밀렸다(사용자 지적 2026-09-30)
         + `<span class="kv-mix" style="display:none">이전 <input type="range" min="0" max="100" value="50"> 이후</span></span><button class="kx2" title="닫기 (Esc)">✕</button></div>`
-        + `<div class="kv-b"><div class="kv-box"><img class="kv-a" src="${st.jpg}"><img class="kv-0" src="${st.base || ''}" style="display:none"><canvas class="kv-c"></canvas></div></div><div class="kv-f">${has ? '비교 중…' : '이전 그림이 없는 미리보기입니다(새로고침 전에 만든 것) — 이후만 보여 줍니다'}</div>`;
+        + `<div class="kv-b"><div class="kv-box"><img class="kv-a" src="${st.jpg}"><img class="kv-0" src="${st.base || ''}" style="display:none"><canvas class="kv-c"></canvas></div></div><div class="kv-f">${has ? '비교 중…' : esc(st.note || '이전 그림이 없는 미리보기입니다(새로고침 전에 만든 것) — 이후만 보여 줍니다')}</div>`;
       v.classList.add('on');
       const box = v.querySelector('.kv-box'); const A = v.querySelector('.kv-a'); const B0 = v.querySelector('.kv-0'); const C = v.querySelector('.kv-c'); const mix = v.querySelector('.kv-mix'); const foot = v.querySelector('.kv-f');
       const load = (im) => (im.complete && im.naturalWidth ? Promise.resolve() : new Promise((ok) => { im.onload = ok; im.onerror = ok; }));
