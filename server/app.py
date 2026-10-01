@@ -687,6 +687,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 req = self.body(10_000); a = req.get('action')
                 if a == 'add': STORE.add_user(req.get('id'), req.get('pw'), req.get('role'), str(req.get('name') or '')[:40])
                 elif a == 'password': STORE.set_pw(req.get('id'), req.get('pw')); STORE.user(req.get('id'))['mustChange'] = True; STORE.save_users()
+                elif a == 'update': STORE.update_user(req.get('id'), name=req.get('name'), role=req.get('role'), by=u['id'])
                 elif a == 'delete':
                     if req.get('id') == u['id']: raise ValueError('자기 계정은 지울 수 없습니다')
                     STORE.del_user(req.get('id'))

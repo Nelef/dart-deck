@@ -47,6 +47,16 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
 .top h2 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -.02em; margin-right: auto; }
 .top .n { color: var(--mute); font-weight: 700; font-size: 15px; margin-left: 8px; }
 .owner { font-size: 15px; font-weight: 900; margin: 28px 0 10px; color: var(--sub); } .owner span { color: var(--mute); font-weight: 700; margin-left: 6px; }
+/* 사람별 묶음(관리자) — 내 것은 펼쳐 두고 다른 사람 것은 접어 둔다. 펼친 묶음만 카드(썸네일)를 만든다 */
+.gtool { display: flex; gap: 14px; justify-content: flex-end; margin: -6px 0 6px; font-size: 13.5px; }
+.grp { border-top: 1px solid var(--line); } .grp:last-child { border-bottom: 1px solid var(--line); }
+.gh { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; border: 0; background: none; padding: 10px 8px; border-radius: 12px; cursor: pointer; text-align: left; font: inherit; color: var(--ink); }
+.gh:hover { background: var(--bg); }
+.gh .chev { width: 16px; color: var(--mute); font-size: 12px; transition: transform .15s; } .grp.open .chev { transform: rotate(90deg); }
+.gh .gn { font-size: 16px; font-weight: 900; letter-spacing: -.01em; } .gh .gid { color: var(--mute); font-size: 13.5px; font-weight: 600; }
+.gh .gc { color: var(--sub); font-size: 14px; font-weight: 700; } .gh .sp { flex: 1; } .gh .gago { color: var(--mute); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.grp .gb { padding: 2px 0 26px; } .grp:not(.open) .gb { display: none; }
+@media (max-width: 640px) { .gh .gid, .gh .gago { display: none; } }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
 .card { position: relative; border-radius: 16px; background: var(--bg); cursor: pointer; transition: transform .08s, background .15s; overflow: hidden; }
 .card:hover { background: #e9ebef; } .card:active { transform: scale(0.98); }
@@ -78,6 +88,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
 .pill { display: inline-block; border-radius: 99px; padding: 2px 10px; font-size: 12.5px; font-weight: 800; background: var(--bg); color: var(--sub); }
 .pill.on { background: var(--brand-tint); color: var(--brand); } .pill.admin { background: #16181d; color: #fff; }
 .ulist .u { display: flex; align-items: center; gap: 10px; min-height: 60px; border-bottom: 1px solid var(--line); flex-wrap: wrap; padding: 8px 0; }   /* TOSS: 리스트 행 높이 60 */
+.ulist .u.edit { background: var(--bg); border-radius: 12px; padding: 10px 12px; margin: 4px 0; border-bottom: 0; } .ulist .u.edit .f { width: auto; min-width: 0; } .ulist .u .bad { flex-basis: 100%; font-size: 13px; }
 .ulist .u .nm { font-weight: 800; } .ulist .u .id { color: var(--mute); font-size: 13.5px; } .ulist .u .sp { flex: 1; }
 .add { display: grid; grid-template-columns: 1fr 1fr 1fr auto auto; gap: 8px; margin-top: 14px; } @media (max-width: 640px) { .add { grid-template-columns: 1fr 1fr; } }
 .steps { padding-left: 20px; margin: 8px 0; } .note { font-size: 13px; color: var(--warn); background: var(--warn-bg); border-radius: 10px; padding: 9px 12px; margin: 10px 0; }
@@ -224,6 +235,13 @@ addEventListener('popstate', route); addEventListener('hashchange', route);
 
 // ── 목록 ──
 // 발표 자료 목록을 받아 그린다(관리자는 사람별로 묶는다)
+let GROUPS = {}, CARD = null;   // 관리자 목록 — 묶음별 자료와 카드 그리는 함수(접힌 묶음은 펼칠 때 그린다)
+const openMap = () => { try { return JSON.parse(localStorage.getItem('ppt.open') || '{}'); } catch (e) { return {}; } };
+const isOpen = (k) => { const m = openMap(); return k in m ? !!m[k] : k === ME.id; };   // 정해 둔 적 없으면 내 것만 펼침
+const setGrp = (sec, open) => { const k = sec.dataset.k;
+  try { const m = openMap(); m[k] = open; localStorage.setItem('ppt.open', JSON.stringify(m)); } catch (e) { /* 저장소 없음 */ }
+  sec.classList.toggle('open', open); sec.querySelector('.gh').setAttribute('aria-expanded', open);
+  if (open && !sec.querySelector('.grid')) sec.querySelector('.gb').innerHTML = `<div class="grid">${(GROUPS[k] || []).map(CARD).join('')}</div>`; };
 const loadDecks = async () => {
   $('#banners').innerHTML = (ME.mustChange ? '<div class="banner"><span style="flex:1">처음 받은 비밀번호를 쓰고 있습니다 — 바꿔 주세요.</span><button class="btn sm" onclick="openAcct()">비밀번호 바꾸기</button></div>' : '')
     + (!ME.claude ? '<div class="banner"><span style="flex:1">발표 자료를 만들고 고치려면 내 Claude 구독(Pro · Max)을 연결해 주세요.</span><button class="btn sm go" onclick="connectClaude()">Claude 구독 연결</button></div>' : '');
@@ -233,10 +251,16 @@ const loadDecks = async () => {
   if (!ds.length) { $('#decks').innerHTML = '<div class="empty"><h3>아직 발표 자료가 없어요</h3><div>누구에게 무엇을 알려 줄지 알려 주면 AI 가 첫 판을 만들어 드려요</div><button class="btn blue" onclick="goNew()">＋ 새 발표 자료</button></div>'; return; }
   const card = (d) => `<div class="card" data-u="${esc(d.url)}"><div class="th"><div class="bd"></div><div class="tt">${esc(d.title)}</div>${d.thumb ? `<img src="${esc(d.thumb)}" alt="" loading="lazy" onload="this.parentElement.classList.add('ok')" onerror="this.remove()">` : ''}</div>`
     + `<div class="meta"><b>${esc(d.title)}</b>${d.busy ? '<span class="pill on">AI 작업 중</span>' : `<span>${d.pages}페이지 · ${ago(d.updated)}</span>`}</div><button class="mn" data-o="${esc(d.owner)}" data-i="${esc(d.id)}" data-t="${esc(d.title)}" title="더 보기">⋯</button></div>`;
+  CARD = card;
   if (ME.role === 'admin') {
-    const by = {}; ds.forEach((d) => (by[d.owner] ||= []).push(d));
-    const keys = Object.keys(by).sort((a, b) => (a === ME.id ? -1 : b === ME.id ? 1 : a.localeCompare(b)));
-    $('#decks').innerHTML = keys.map((k) => `<div class="owner">${esc(by[k][0].ownerName)}${k === ME.id ? ' (나)' : ''}<span>${by[k].length}개</span></div><div class="grid">${by[k].map(card).join('')}</div>`).join('');
+    const by = {}; ds.forEach((d) => (by[d.owner] ||= []).push(d)); GROUPS = by;
+    const last = (k) => Math.max(...by[k].map((d) => d.updated || 0));
+    const keys = Object.keys(by).sort((a, b) => (a === ME.id ? -1 : b === ME.id ? 1 : last(b) - last(a)));   // 나 먼저, 다음은 최근에 고친 사람 순
+    const grp = (k) => { const open = isOpen(k), busy = by[k].filter((d) => d.busy).length;
+      return `<section class="grp${open ? ' open' : ''}" data-k="${esc(k)}"><button class="gh" aria-expanded="${open}"><span class="chev">▶</span><span class="gn">${esc(by[k][0].ownerName)}${k === ME.id ? ' (나)' : ''}</span><span class="gid">${esc(k)}</span>`
+        + `<span class="gc">${by[k].length}개</span>${busy ? `<span class="pill on">AI 작업 중 ${busy}</span>` : ''}<span class="sp"></span><span class="gago">최근 ${ago(last(k))}</span></button>`
+        + `<div class="gb">${open ? `<div class="grid">${by[k].map(card).join('')}</div>` : ''}</div></section>`; };
+    $('#decks').innerHTML = (keys.length > 1 ? '<div class="gtool"><button class="link" data-all="1">모두 펼치기</button><button class="link" data-all="0">다른 사람 접기</button></div>' : '') + keys.map(grp).join('');
   } else $('#decks').innerHTML = `<div class="grid">${ds.map(card).join('')}</div>`;
   // AI 가 만들거나 고치는 중인 자료가 있으면 20초마다 다시 본다 — 창을 닫았다 와도 서버는 계속 일하고, 끝나면 목록에 반영된다
   clearTimeout(loadDecks.t); if (ds.some((d) => d.busy)) loadDecks.t = setTimeout(() => { if (!$('#list').hidden) loadDecks(); }, 20000);
@@ -245,6 +269,8 @@ document.addEventListener('click', (e) => {
   const mn = e.target.closest('.mn'); const m0 = $('.menu');
   if (m0 && !e.target.closest('.menu')) m0.remove();
   if (mn) { e.stopPropagation(); return deckMenu(mn); }
+  const gh = e.target.closest('.gh'); if (gh) return setGrp(gh.closest('.grp'), !gh.closest('.grp').classList.contains('open'));
+  const all = e.target.closest('[data-all]'); if (all) return document.querySelectorAll('.grp').forEach((g) => setGrp(g, all.dataset.all === '1' || g.dataset.k === ME.id));
   const c = e.target.closest('.card'); if (c && !e.target.closest('.menu')) location.href = c.dataset.u;
 });
 // 카드 메뉴 — 이름 바꾸기 · 지우기
@@ -398,23 +424,37 @@ const connectClaude = async () => {
     } catch (e) { $('#cErr', s).textContent = e.message; go.disabled = false; go.textContent = '연결'; } };
 };
 
-// 사용자 관리(관리자) — 목록 · 추가 · 비밀번호 초기화 · 지우기
+// 사용자 관리(관리자) — 목록 · 수정(이름 · 권한) · 추가 · 비밀번호 초기화 · 지우기. 아이디는 덱 폴더 이름이라 바꾸지 않는다
 const openUsers = async () => {
   const s = sheet('<h3>사용자 관리</h3><div>불러오는 중…</div>', true);
-  // 목록을 다시 그린다
-  const draw = async () => {
-    let us = []; try { us = (await get('/api/users')).users; } catch (e) { s.firstElementChild.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
-    s.firstElementChild.innerHTML = `<h3>사용자 관리</h3><div style="color:var(--sub)">아이디 · 비밀번호로 로그인합니다. 관리자는 모든 사람의 발표 자료를 봅니다.</div>
-      <div class="ulist" style="margin-top:12px">${us.map((u) => `<div class="u"><span class="nm">${esc(u.name)}</span><span class="id">${esc(u.id)}</span>${u.role === 'admin' ? '<span class="pill admin">관리자</span>' : ''}<span class="pill ${u.claude ? 'on' : ''}">${u.claude ? 'Claude 연결' : 'Claude 미연결'}</span><span class="pill">자료 ${u.decks}</span><span class="sp"></span>
-        <button class="btn sm" data-pw="${esc(u.id)}">비밀번호 초기화</button>${u.id === ME.id ? '' : `<button class="btn sm" data-del="${esc(u.id)}" style="color:var(--bad)">지우기</button>`}</div>`).join('')}</div>
-      <div class="sec"><h4>사용자 추가</h4><div class="add"><input class="f" id="uId" placeholder="아이디(영문 소문자 · 숫자)" autocapitalize="none"><input class="f" id="uName" placeholder="이름"><input class="f" id="uPw" placeholder="처음 비밀번호"><select class="f" id="uRole"><option value="user">일반</option><option value="admin">관리자</option></select><button class="btn go" id="uAdd">추가</button></div><div class="bad" id="uErr"></div></div>
-      <div class="row"><button class="btn" id="uX">닫기</button></div>`;
-    $('#uX', s).onclick = () => s.remove();
-    $('#uAdd', s).onclick = async () => { try { await post('/api/users', { action: 'add', id: $('#uId', s).value, name: $('#uName', s).value, pw: $('#uPw', s).value, role: $('#uRole', s).value }); draw(); } catch (e) { $('#uErr', s).textContent = e.message; } };
-    s.querySelectorAll('[data-pw]').forEach((b) => { b.onclick = async () => { const pw = prompt(`${b.dataset.pw} 의 새 비밀번호(4자 이상) — 다음 로그인 때 바꾸라고 알립니다`); if (!pw) return; try { await post('/api/users', { action: 'password', id: b.dataset.pw, pw }); alert('바꿨습니다'); } catch (e) { alert(e.message); } }; });
-    s.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => { if (!confirm(`${b.dataset.del} 계정을 지울까요? (발표 자료 파일은 서버에 남습니다)`)) return; try { await post('/api/users', { action: 'delete', id: b.dataset.del }); draw(); } catch (e) { alert(e.message); } }; });
+  let us = [], editing = '';
+  const row = (u) => {
+    const me = u.id === ME.id;
+    if (u.id === editing) return `<div class="u edit" data-id="${esc(u.id)}"><input class="f" data-f="name" value="${esc(u.name)}" maxlength="40" placeholder="이름"><select class="f" data-f="role" ${me ? 'disabled title="자기 자신의 권한은 바꿀 수 없습니다"' : ''}><option value="user"${u.role === 'user' ? ' selected' : ''}>일반</option><option value="admin"${u.role === 'admin' ? ' selected' : ''}>관리자</option></select>`
+      + `<span class="id">${esc(u.id)}</span><span class="sp"></span><button class="btn sm go" data-save="${esc(u.id)}">저장</button><button class="btn sm" data-cancel="1">취소</button><div class="bad" data-err></div></div>`;
+    return `<div class="u" data-id="${esc(u.id)}"><span class="nm">${esc(u.name)}</span><span class="id">${esc(u.id)}</span>${u.role === 'admin' ? '<span class="pill admin">관리자</span>' : ''}<span class="pill ${u.claude ? 'on' : ''}">${u.claude ? 'Claude 연결' : 'Claude 미연결'}</span><span class="pill">자료 ${u.decks}</span><span class="sp"></span>`
+      + `<button class="btn sm" data-edit="${esc(u.id)}">수정</button><button class="btn sm" data-pw="${esc(u.id)}">비밀번호 초기화</button>${me ? '' : `<button class="btn sm" data-del="${esc(u.id)}" style="color:var(--bad)">지우기</button>`}</div>`; };
+  const renderList = () => {
+    const box = $('#uList', s); box.innerHTML = us.map(row).join('');
+    box.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => { editing = b.dataset.edit; renderList(); box.querySelector('[data-f="name"]')?.focus(); }; });
+    box.querySelectorAll('[data-cancel]').forEach((b) => { b.onclick = () => { editing = ''; renderList(); }; });
+    box.querySelectorAll('[data-save]').forEach((b) => { const r = b.closest('.u'); const save = async () => { try { b.disabled = true;
+        await post('/api/users', { action: 'update', id: b.dataset.save, name: r.querySelector('[data-f="name"]').value, role: r.querySelector('[data-f="role"]').value });
+        editing = ''; await reload(); if (b.dataset.save === ME.id) { ME.name = us.find((x) => x.id === ME.id)?.name || ME.name; $('#who').textContent = `${ME.name} · 관리자`; } loadDecks(); }
+      catch (e) { r.querySelector('[data-err]').textContent = e.message; b.disabled = false; } };
+      b.onclick = save; r.querySelector('[data-f="name"]').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { editing = ''; renderList(); } }); });
+    box.querySelectorAll('[data-pw]').forEach((b) => { b.onclick = async () => { const pw = prompt(`${b.dataset.pw} 의 새 비밀번호(4자 이상) — 다음 로그인 때 바꾸라고 알립니다`); if (!pw) return; try { await post('/api/users', { action: 'password', id: b.dataset.pw, pw }); alert('바꿨습니다'); } catch (e) { alert(e.message); } }; });
+    box.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => { if (!confirm(`${b.dataset.del} 계정을 지울까요? (발표 자료 파일은 서버에 남습니다)`)) return; try { await post('/api/users', { action: 'delete', id: b.dataset.del }); await reload(); } catch (e) { alert(e.message); } }; });
   };
-  draw();
+  const reload = async () => { us = (await get('/api/users')).users; renderList(); };
+  try { us = (await get('/api/users')).users; } catch (e) { s.firstElementChild.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+  s.firstElementChild.innerHTML = `<h3>사용자 관리</h3><div style="color:var(--sub)">아이디 · 비밀번호로 로그인합니다. 관리자는 모든 사람의 발표 자료를 봅니다. 아이디는 바꿀 수 없고 이름 · 권한은 [수정]에서 바꿉니다.</div>
+    <div class="ulist" id="uList" style="margin-top:12px"></div>
+    <div class="sec"><h4>사용자 추가</h4><div class="add"><input class="f" id="uId" placeholder="아이디(영문 소문자 · 숫자)" autocapitalize="none"><input class="f" id="uName" placeholder="이름"><input class="f" id="uPw" placeholder="처음 비밀번호"><select class="f" id="uRole"><option value="user">일반</option><option value="admin">관리자</option></select><button class="btn go" id="uAdd">추가</button></div><div class="bad" id="uErr"></div></div>
+    <div class="row"><button class="btn" id="uX">닫기</button></div>`;
+  $('#uX', s).onclick = () => s.remove();
+  $('#uAdd', s).onclick = async () => { try { await post('/api/users', { action: 'add', id: $('#uId', s).value, name: $('#uName', s).value, pw: $('#uPw', s).value, role: $('#uRole', s).value }); ['#uId', '#uName', '#uPw'].forEach((i) => { $(i, s).value = ''; }); $('#uErr', s).textContent = ''; await reload(); } catch (e) { $('#uErr', s).textContent = e.message; } };
+  renderList();
 };
 $('#bUsers').onclick = openUsers;
 

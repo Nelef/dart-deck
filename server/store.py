@@ -53,6 +53,21 @@ class Store:
             u = self.user(uid)
             if not u: raise ValueError('없는 계정')
             u['pw'] = self.hash_pw(pw); u['mustChange'] = False; self.save_users()
+    def update_user(self, uid, name=None, role=None, by=None):
+        """관리자의 사용자 수정 — 이름 · 권한(일반/관리자). 아이디는 덱 폴더 이름이라 바꾸지 않는다. 자기 권한은 못 바꾸고, 마지막 관리자는 일반으로 못 내린다"""
+        with LOCK:
+            u = self.user(uid)
+            if not u: raise ValueError('없는 계정')
+            if role is not None and role not in ('admin', 'user'): raise ValueError('권한은 일반 또는 관리자')
+            if role is not None and role != u['role']:
+                if uid == by: raise ValueError('자기 자신의 권한은 바꿀 수 없습니다')
+                if u['role'] == 'admin' and sum(1 for x in self.users if x['role'] == 'admin') <= 1: raise ValueError('마지막 관리자는 일반으로 바꿀 수 없습니다')
+            if name is not None:
+                name = re.sub(r'\s+', ' ', str(name)).strip()[:40]
+                if not name: raise ValueError('이름을 적어 주세요')
+                u['name'] = name
+            if role is not None: u['role'] = role
+            self.save_users()
     def del_user(self, uid):
         with LOCK:
             u = self.user(uid)
