@@ -22,6 +22,8 @@ os.environ['NODE_PATH'] = NODE_PATH
 os.environ.setdefault('PPT_DATA_DIR', DATA_DIR)
 import store as storemod, deckagent, importer
 STORE = storemod.Store(DATA_DIR)
+_dropped = STORE.drop_importing()   # 가져오다 서버가 꺼진 반쪽 덱 정리
+if _dropped: sys.stderr.write(f'가져오던 중이던 덱 {_dropped}개를 지웠습니다\n')
 COOKIE = 'ppt_sid'
 
 _fc_spec = _ilu.spec_from_file_location('fontcache', os.path.join(ENGINE, 'tools', 'fontcache.py')); FONTCACHE = _ilu.module_from_spec(_fc_spec); _fc_spec.loader.exec_module(FONTCACHE)
@@ -373,20 +375,72 @@ def make_thumb(owner, did):
 
 # ── 새 덱 ──
 BRIEF_KEYS = ('audience', 'info', 'key', 'pages', 'tone', 'material', 'text')
-def import_deck(user, req):
-    """기존 PPT · PDF → 쪽마다 원본 그림 한 장인 덱(server/importer.py). AI 없이 바로 열린다 — Claude 구독이 없어도 된다"""
+# ── PPT 가져오기: 백그라운드 작업 + 남은 시간(사용자 지정 2026-10-01 "가져오기 누르면 몇 초 남았는지") ──
+# 올리는 동안은 브라우저가 바이트로 계산한다. 올린 뒤에는 서버가 작업(스레드)으로 돌리고 브라우저는 GET /api/import?job=… 으로 단계 · 남은 초를 받는다.
+# 단계 길이 어림 = 고정 + 쪽당(GPU 서버 실측 2026-10-01, 80쪽 18MB: PPT→PDF 23초 · 쪽 그림 18초 · 합 41초). 끝날 때마다 실제/어림 비율을 data/import-stats.json 에 이어 적어 이 서버 속도에 맞춘다
+IMPORTS = {}; IMPORT_SEM = _th.Semaphore(2)   # 변환(LibreOffice)이 무거워 동시에 두 개까지
+IMP_BASE = {'pdf': (5.0, 0.23), 'pages': (1.0, 0.2), 'build': (1.0, 0.03)}   # 단계: (고정초, 쪽당 초)
+IMP_STAT_F = os.path.join(DATA_DIR, 'import-stats.json')
+IMP_LABEL = {'queue': '앞 작업을 기다리는 중', 'pdf': 'PPT 를 PDF 로 바꾸는 중', 'pages': '쪽 그림을 만드는 중', 'build': '덱을 만드는 중', 'done': '완료', 'error': '실패'}
+def imp_k(): return STORE._load(IMP_STAT_F, {}) or {}
+def imp_est(stage, pages, k): fx, pp = IMP_BASE[stage]; return (fx + pp * pages) * (k.get(stage) or 1.0)
+def imp_snap(J):
+    """작업 상태 → 브라우저가 그릴 값(단계 · 한 일/전체 · 남은 초 · 비율)"""
+    now = time.time(); st = J['stage']
+    if st in ('done', 'error'): return {'stage': st, 'label': IMP_LABEL[st], 'pct': 100 if st == 'done' else 0, 'etaSec': 0, 'url': J.get('url'), 'pages': J.get('pages'), 'error': J.get('error')}
+    order = [x for x in ('pdf', 'pages', 'build') if not (x == 'pdf' and J['ext'] == '.pdf')]
+    k = J['k']; pages = J.get('total') or J['pages']; rem = 0.0; late = False
+    for i, x in enumerate(order):
+        if st == 'queue' or (st in order and i > order.index(st)): rem += imp_est(x, pages, k); continue   # 아직 안 한 단계
+        if x != st: continue                                                                               # 끝낸 단계
+        e = imp_est(x, pages, k); el = now - J['stageT0']
+        if x in ('pages', 'build') and J['done'] > 0 and J['total']: r = el / J['done'] * (J['total'] - J['done'])   # 쪽 단위로 진행하는 단계는 지금까지의 실제 속도로
+        else: r = e - el                                                                                   # 길이를 모르는 단계(PPT→PDF)는 어림에서 지난 시간을 뺀다
+        if x == 'pdf' and r < 2: late = el > e; r = 2                                                      # 어림을 넘겨도 0초로 보이지 않게(late 면 「예상보다 오래」)
+        rem += max(r, 0.5)
+    el_all = now - J['t0']
+    return {'stage': st, 'label': IMP_LABEL[st], 'done': J['done'], 'total': J['total'], 'etaSec': None if st == 'queue' else int(round(rem)), 'late': late,
+            'pct': 0 if st == 'queue' else int(min(99, 100 * el_all / max(el_all + rem, 1))), 'elapsed': int(el_all)}
+
+def import_start(user, req):
+    """기존 PPT · PDF → 쪽마다 원본 그림 한 장인 덱(server/importer.py). AI 없이 열린다 — Claude 구독이 없어도 된다. 파일을 받으면 곧바로 작업 번호를 돌려주고 변환은 뒤에서"""
     name = os.path.basename(str(req.get('name') or '')); raw = base64.b64decode(str(req.pop('data', '') or ''), validate=True)   # pop — base64 글(133MB)을 풀자마자 놓는다
+    ext = importer.check(name, raw)
     title = re.sub(r'\s+', ' ', str(req.get('title') or os.path.splitext(name)[0])).strip()[:80] or '가져온 발표 자료'
     tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
-    did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', ''))
+    did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', ''), importing=True)
+    now = time.time(); job = secrets.token_urlsafe(9)
+    for j in [j for j, v in IMPORTS.items() if v['stage'] in ('done', 'error') and now - v['t0'] > 3600]: IMPORTS.pop(j, None)
+    IMPORTS[job] = {'owner': user['id'], 'did': did, 'ext': ext, 'stage': 'queue', 't0': now, 'stageT0': now, 'done': 0, 'total': 0, 'pages': importer.guess_pages(raw, ext), 'k': imp_k(), 'dur': {}}
+    _th.Thread(target=import_run, args=(job, user['id'], did, d, tpl, title, name, raw), daemon=True).start()
+    return {'ok': True, 'job': job, 'url': f'/d/{user["id"]}/{did}/'}
+
+def import_run(job, uid, did, d, tpl, title, name, raw):
+    J = IMPORTS[job]
+    def prog(stage, done=0, total=0):
+        t = time.time()
+        if stage != J['stage']:
+            if J['stage'] in IMP_BASE: J['dur'][J['stage']] = t - J['stageT0']
+            J['stage'] = stage; J['stageT0'] = t
+        J['done'] = done
+        if total: J['total'] = total
     try:
-        html, n, src = importer.build(tpl, title, d, name, raw)
-    except Exception:
-        shutil.rmtree(d, ignore_errors=True); raise
-    open(os.path.join(d, 'index.html'), 'w', encoding='utf-8').write(html)
-    m = STORE._load(os.path.join(d, 'meta.json'), {}); m.update({'from': name, 'imported': src, 'pages': n}); STORE._save(os.path.join(d, 'meta.json'), m)
-    link_engine(d)
-    return {'ok': True, 'url': f'/d/{user["id"]}/{did}/', 'pages': n}
+        with IMPORT_SEM:
+            J['t0'] = J['stageT0'] = time.time()   # 기다린 시간은 세지 않는다
+            html, n, src = importer.build(tpl, title, d, name, raw, prog)
+        open(os.path.join(d, 'index.html'), 'w', encoding='utf-8').write(html)
+        m = STORE._load(os.path.join(d, 'meta.json'), {}); m.pop('importing', None); m.update({'from': name, 'imported': src, 'pages': n}); STORE._save(os.path.join(d, 'meta.json'), m)
+        link_engine(d)
+        J['dur']['build'] = time.time() - J['stageT0']; J.update(stage='done', url=f'/d/{uid}/{did}/', pages=n)
+        try:   # 이번 실제/어림 비율을 이어 적는다(쪽 5장 넘을 때만 — 고정 시간이 큰 작은 파일은 비율이 흔들린다)
+            if n >= 5:
+                k = imp_k()
+                for x, sec in J['dur'].items():
+                    r = sec / max(imp_est(x, n, {}), 0.5); k[x] = round(max(0.3, min(5.0, (k.get(x, 1.0) + r) / 2)), 3)
+                STORE._save(IMP_STAT_F, k)
+        except Exception: pass
+    except Exception as e:
+        shutil.rmtree(d, ignore_errors=True); J.update(stage='error', error=str(e)[:300])
 
 def new_deck(user, req):
     """제목 + 받은 정보(설문 또는 통째 붙여넣기) + 그림 → 표지 한 페이지짜리 덱과 brief.json. 만들기는 덱을 연 뒤 Claude Code 가(?new=1)"""
@@ -508,6 +562,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 x['busy'] = os.path.join(STORE.deck_dir(x['owner'], x['id']), 'index.html') in busy   # Claude 가 고치거나 만드는 중
                 x['thumb'] = f"/thumb/{x['owner']}/{x['id']}.jpg?v={x['updated'] or 0}"   # 덱이 바뀌면 주소가 바뀌어 브라우저가 새로 받는다
             return self.reply(200, {'decks': ds})
+        if path == '/api/import':
+            u = self.me(); J = IMPORTS.get((urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('job') or [''])[0])
+            if not u: return self.reply(401, {'error': '로그인이 필요합니다'})
+            if not J or not self.can(u, J['owner']): return self.reply(404, {'error': '가져오기 작업을 찾을 수 없습니다(서버가 다시 켜졌을 수 있습니다)'})
+            return self.reply(200, {'ok': True, **imp_snap(J)})
         if path == '/api/users':
             u = self.me()
             if not u or u['role'] != 'admin': return self.reply(403, {'error': '관리자만 볼 수 있습니다'})
@@ -636,7 +695,7 @@ class H(http.server.BaseHTTPRequestHandler):
             if path == '/api/decks':
                 req = self.body(MAX_BODY); a = req.get('action')
                 if a == 'create': return self.reply(200, new_deck(u, req))
-                if a == 'import': return self.reply(200, import_deck(u, req))
+                if a == 'import': return self.reply(200, import_start(u, req))
                 owner, did = str(req.get('owner') or ''), str(req.get('id') or '')
                 if not self.can(u, owner) or not re.fullmatch(r'\d{8}-[0-9a-f]{6}', did): return self.reply(403, {'error': '권한이 없습니다'})
                 if a == 'rename': STORE.rename_deck(owner, did, re.sub(r'\s+', ' ', str(req.get('title') or '')).strip()[:80] or '제목 없음')

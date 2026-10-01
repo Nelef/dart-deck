@@ -96,16 +96,23 @@ class Store:
             if owner and o != owner: continue
             for d in sorted(os.listdir(os.path.join(base, o))) if os.path.isdir(os.path.join(base, o)) else []:
                 m = self._load(os.path.join(base, o, d, 'meta.json'), None)
-                if not m: continue
+                if not m or m.get('importing'): continue   # 가져오는 중인 덱은 끝나야 목록에 나온다
                 idx = os.path.join(base, o, d, 'index.html')
                 out.append({'owner': o, 'id': d, 'title': m.get('title') or d, 'created': m.get('created'), 'updated': int(os.path.getmtime(idx)) if os.path.exists(idx) else m.get('created'),
                             'url': f'/d/{o}/{d}/', 'pages': len(re.findall(r'<section[^>]*class="[^"]*\bslide\b', open(idx, encoding='utf-8').read())) if os.path.exists(idx) else 0})
         return sorted(out, key=lambda x: -(x['updated'] or 0))
-    def create_deck(self, owner, title, html):
+    def drop_importing(self):
+        """가져오던 중 서버가 꺼진 덱(meta.importing)은 반쯤 만들어진 채라 지운다 — 켤 때 한 번"""
+        base = os.path.join(self.dir, 'decks'); n = 0
+        for o in os.listdir(base) if os.path.isdir(base) else []:
+            for d in os.listdir(os.path.join(base, o)) if os.path.isdir(os.path.join(base, o)) else []:
+                if (self._load(os.path.join(base, o, d, 'meta.json'), {}) or {}).get('importing'): shutil.rmtree(os.path.join(base, o, d), ignore_errors=True); n += 1
+        return n
+    def create_deck(self, owner, title, html, importing=False):
         did = time.strftime('%Y%m%d') + '-' + secrets.token_hex(3); d = self.deck_dir(owner, did)
         os.makedirs(os.path.join(d, 'img', 'uploads'), exist_ok=True)
         open(os.path.join(d, 'index.html'), 'w', encoding='utf-8').write(html)
-        self._save(os.path.join(d, 'meta.json'), {'title': title, 'owner': owner, 'created': int(time.time())})
+        self._save(os.path.join(d, 'meta.json'), {'title': title, 'owner': owner, 'created': int(time.time()), **({'importing': True} if importing else {})})
         return did, d
     def rename_deck(self, owner, did, title):
         f = os.path.join(self.deck_dir(owner, did), 'meta.json'); m = self._load(f, None)

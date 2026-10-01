@@ -101,6 +101,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
 .thumbs div { position: relative; width: 76px; height: 76px; border-radius: 10px; overflow: hidden; background: var(--bg); } .thumbs img { width: 100%; height: 100%; object-fit: cover; }
 .thumbs button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 99px; background: rgba(22,24,29,.75); color: #fff; font-size: 11px; }
 .gobar { position: sticky; bottom: 0; background: linear-gradient(transparent, #fff 30%); padding: 26px 0 16px; display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.gobar #impBar { flex-basis: 100%; height: 6px; border-radius: 99px; background: var(--line, #e3e6ee); overflow: hidden; margin-bottom: -2px; } .gobar #impBar i { display: block; height: 100%; width: 0; background: var(--brand, #416AF0); transition: width .5s linear; }
 .gobar .btn { height: 52px; font-size: 16px; padding: 0 26px; } .gobar .hint { color: var(--sub); font-size: 13.5px; flex: 1; min-width: 200px; }
 .webopt { display: flex; gap: 10px; align-items: flex-start; margin-top: 22px; padding: 14px 16px; border-radius: 14px; background: var(--bg); cursor: pointer; font-size: 14.5px; color: var(--sub); transition: background .15s; }
 .webopt:hover { background: #e9ebef; } .webopt b { color: var(--ink); } .webopt input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--brand); flex: none; }
@@ -181,7 +182,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
     <label class="webopt"><input type="checkbox" id="nWeb"> <span><b>부족한 자료는 웹에서 찾아 보강</b> — 배경 · 최신 사실 · 공개 통계를 찾아 넣고 페이지마다 출처를 답니다</span></label>
     </div>
     <div class="cc" id="nCC" hidden><span style="flex:1">새 발표 자료는 Claude Code 가 만듭니다 — 먼저 내 Claude 구독을 연결해 주세요.</span><button class="btn sm go" id="nConnect">Claude 구독 연결</button></div>
-    <div class="gobar"><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code(Sonnet 5.5)가 만들기 시작합니다 · 창을 닫아도 계속 만듭니다</span><span class="bad" id="nErr"></span></div>
+    <div class="gobar"><div id="impBar" hidden><i></i></div><button class="btn go" id="nGo">만들기 시작</button><span class="hint">열리자마자 Claude Code(Sonnet 5.5)가 만들기 시작합니다 · 창을 닫아도 계속 만듭니다</span><span class="bad" id="nErr"></span></div>
   </div>
 </div>
 
@@ -321,13 +322,35 @@ $('#nGo').onclick = async () => {
   catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '만들기 시작'; }
 };
 
-// 기존 PPT · PDF 를 가져와 연다(서버가 쪽마다 그림으로 바꾼다 — 몇십 초)
+// 기존 PPT · PDF 를 가져와 연다(사용자 지정 2026-10-01 "몇 초 남았는지"). ① 올리는 동안 = 보낸 바이트로 남은 초 ② 서버가 뒤에서 변환 — 단계 · 쪽 · 남은 초를 0.7초마다 받는다.
+//   변환 길이 어림은 서버(imp_snap)가 실측으로 계산한다. 창을 닫아도 서버는 계속 변환한다(끝나면 목록에 나온다)
+const fmtSec = (s) => (s < 60 ? `${Math.max(1, Math.round(s))}초` : `${Math.floor(s / 60)}분 ${Math.round(s % 60)}초`);
+const upload = (body, onprog) => new Promise((res, rej) => { const x = new XMLHttpRequest(); x.open('POST', '/api/decks'); x.setRequestHeader('Content-Type', 'application/json');
+  x.upload.onprogress = (e) => { if (e.lengthComputable) onprog(e.loaded, e.total); };
+  x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) { /* 아래 */ } if (x.status >= 200 && x.status < 300 && !j.error) res(j); else rej(new Error(j.error || `HTTP ${x.status}`)); };
+  x.onerror = () => rej(new Error('올리지 못했습니다 — 네트워크를 확인해 주세요')); x.send(body); });
 const importPpt = async () => {
   $('#nErr').textContent = ''; if (!NW.imp) { $('#nErr').textContent = '가져올 파일을 골라 주세요'; return; }
-  const b = $('#nGo'); b.disabled = true; const t0 = Date.now(); const tick = setInterval(() => { b.textContent = `가져오는 중… ${Math.round((Date.now() - t0) / 1000)}초`; }, 500);
-  try { const j = await post('/api/decks', { action: 'import', title: $('#nTitle').value.trim(), name: NW.imp.name, data: NW.imp.data.split(',')[1] }); location.href = j.url; }
-  catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '가져오기'; }
-  finally { clearInterval(tick); }
+  const b = $('#nGo'), hint = document.querySelector('#new .gobar .hint'), bar = $('#impBar'), hint0 = hint.textContent;
+  const show = (btn, msg, pct) => { b.textContent = btn; hint.textContent = msg; bar.hidden = false; bar.firstElementChild.style.width = `${pct}%`; };
+  b.disabled = true; show('올리는 중…', '파일을 서버로 올리는 중', 0);
+  try {
+    const t0 = Date.now();
+    const j = await upload(JSON.stringify({ action: 'import', title: $('#nTitle').value.trim(), name: NW.imp.name, data: NW.imp.data.split(',')[1] }), (ld, tt) => {
+      const el = (Date.now() - t0) / 1000, pc = Math.round(100 * ld / tt), eta = el > 0.8 && ld > 0 ? (tt - ld) / (ld / el) : null;
+      show(`올리는 중 ${pc}%`, `파일을 서버로 올리는 중 · ${pc}%${eta != null && pc < 100 ? ` · 남은 약 ${fmtSec(eta)}` : ''}`, pc * 0.15); });   // 올리기는 막대의 앞 15% — 변환이 대부분의 시간
+    show('변환 시작…', '서버에서 변환을 시작합니다', 15); let fails = 0;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 700));
+      let s; try { const r = await fetch('/api/import?job=' + encodeURIComponent(j.job), { cache: 'no-store' }); s = await r.json(); if (!r.ok) throw new Error(s.error || `HTTP ${r.status}`); fails = 0; }
+      catch (e) { if (++fails > 6) throw new Error(`진행을 확인하지 못했습니다 — ${e.message}. 목록을 새로고침해 보세요(변환은 서버에서 계속됩니다)`); continue; }
+      if (s.stage === 'error') throw new Error(s.error || '가져오지 못했습니다');
+      if (s.stage === 'done') { show('열기…', '완료 — 여는 중', 100); location.href = s.url; return; }
+      const pg = s.total ? ` · ${s.done}/${s.total}쪽` : '';
+      const left = s.stage === 'queue' ? '' : s.late ? ' · 예상보다 조금 더 걸리는 중' : s.etaSec != null ? ` · 남은 약 ${fmtSec(s.etaSec)}` : '';
+      show(s.stage === 'queue' ? '대기 중…' : `변환 중 ${s.pct}%${s.etaSec != null && !s.late ? ` · ${fmtSec(s.etaSec)}` : ''}`, `${s.label}${pg}${left}`, 15 + s.pct * 0.85);
+    }
+  } catch (e) { $('#nErr').textContent = e.message; b.disabled = false; b.textContent = '가져오기'; hint.textContent = hint0; bar.hidden = true; }
 };
 
 // ── 창 ──

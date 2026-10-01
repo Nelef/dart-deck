@@ -6,11 +6,28 @@
 #   · 페이지는 data-frozen(스크립트가 다시 그리지 않음) + data-import(몇 번째 원본 쪽인지). 고치고 싶은 페이지만 Claude 가 우리 엔진 HTML 로 바꾼다
 # 왜 그림인가: 글상자 · 도형을 HTML 로 옮기는 규칙 변환은 차트 · 스마트아트 · 효과에서 모양이 어긋난다 — "그대로"가 먼저라 그림으로 들여오고,
 #   편집이 필요한 페이지만 바꾸는 쪽을 골랐다(사용자 선택 2026-09-30). 한계: 그림 페이지의 글은 ✎ 편집으로 못 고친다 · 동영상 · 애니메이션은 빠진다
-import os, re, json, shutil, hashlib, subprocess, tempfile, zipfile, posixpath, html as htmlmod
+import os, re, io, json, time, shutil, hashlib, subprocess, tempfile, zipfile, posixpath, html as htmlmod
 import xml.etree.ElementTree as ET
 
 MAX = 100_000_000   # 2026-10-01 40MB → 100MB(사용자 지정). 변환 시간 상한도 같이 늘렸다
 SOFFICE = os.environ.get('PPT_SOFFICE') or shutil.which('soffice') or shutil.which('libreoffice') or ('/Applications/LibreOffice.app/Contents/MacOS/soffice' if os.path.exists('/Applications/LibreOffice.app/Contents/MacOS/soffice') else '')
+
+def check(name, raw):
+    """올린 파일이 가져올 수 있는 것인지 — 덱을 만들기 전에 빠르게 거른다. 돌려주는 값 = 확장자"""
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in ('.pptx', '.ppt', '.pdf'): raise ValueError('PPT(pptx · ppt)나 PDF 만 가져올 수 있습니다')
+    if not raw or len(raw) > MAX: raise ValueError('파일이 비었거나 100MB 를 넘습니다')
+    return ext
+
+def guess_pages(raw, ext):
+    """변환 전에 쪽 수를 어림 — 남은 시간 예상에만 쓴다(pptx = 슬라이드 목록, pdf = /Type /Page 수, ppt = 크기로 어림). 진짜 쪽 수는 PDF 가 나온 뒤 pdfinfo 로 다시 안다"""
+    try:
+        if ext == '.pptx':
+            return max(1, len(re.findall(rb'<p:sldId ', zipfile.ZipFile(io.BytesIO(raw)).read('ppt/presentation.xml'))))
+        if ext == '.pdf': return max(1, len(re.findall(rb'/Type\s*/Page[^s]', raw)))
+    except Exception:
+        pass
+    return max(5, int(len(raw) / 250_000))
 
 def _notes(pptx):
     """pptx 발표자 메모 — {슬라이드 번호: 글}"""
@@ -92,9 +109,23 @@ def to_pdf(src, work):
     if r.returncode != 0 or not os.path.exists(pdf): raise ValueError(f'PPT 를 PDF 로 바꾸지 못했습니다 — {(r.stderr or r.stdout)[-200:]}')
     return pdf
 
-def pages(pdf, work):
-    """PDF → 쪽 그림(JPEG) 경로 목록 + 쪽마다 글"""
-    subprocess.run(['pdftoppm', '-jpeg', '-jpegopt', 'quality=88', '-scale-to-x', '2400', '-scale-to-y', '-1', pdf, os.path.join(work, 'p')], check=True, timeout=1800)
+def pdf_pages(pdf):
+    try: return int(re.search(r'Pages:\s+(\d+)', subprocess.run(['pdfinfo', pdf], capture_output=True, text=True, timeout=60).stdout).group(1))
+    except Exception: return 0
+
+def pages(pdf, work, progress=None):
+    """PDF → 쪽 그림(JPEG) 경로 목록 + 쪽마다 글. progress('pages', 만든 쪽, 전체 쪽) 을 0.3초마다 알린다(만든 그림 파일 수를 센다)"""
+    total = pdf_pages(pdf)
+    if progress: progress('pages', 0, total)
+    errf = os.path.join(work, 'pdftoppm.err'); t0 = time.time()
+    with open(errf, 'wb') as ef:
+        proc = subprocess.Popen(['pdftoppm', '-jpeg', '-jpegopt', 'quality=88', '-scale-to-x', '2400', '-scale-to-y', '-1', pdf, os.path.join(work, 'p')], stderr=ef)
+        while True:
+            try: proc.wait(timeout=0.3); break
+            except subprocess.TimeoutExpired:
+                if progress: progress('pages', len([f for f in os.listdir(work) if re.fullmatch(r'p-\d+\.jpg', f)]), total)
+                if time.time() - t0 > 1800: proc.kill(); raise ValueError('쪽 그림을 만드는 데 너무 오래 걸려 멈췄습니다')
+    if proc.returncode != 0: raise ValueError('쪽 그림을 만들지 못했습니다 — ' + open(errf, encoding='utf-8', errors='replace').read()[-160:].strip())
     imgs = sorted([f for f in os.listdir(work) if re.fullmatch(r'p-\d+\.jpg', f)], key=lambda f: int(re.search(r'(\d+)', f).group(1)))
     txt = ''
     try: txt = subprocess.run(['pdftotext', '-layout', '-enc', 'UTF-8', pdf, '-'], capture_output=True, text=True, timeout=300).stdout
@@ -109,17 +140,18 @@ def _name(text, k, used):
     while n in used: n += "'"
     used.add(n); return n
 
-def build(tpl, title, deck_dir, name, raw):
-    """올린 파일 → 덱 HTML(문자열) + 쪽 수. 그림은 deck_dir/img/uploads/, 원본은 deck_dir/files/"""
-    ext = os.path.splitext(name)[1].lower()
-    if ext not in ('.pptx', '.ppt', '.pdf'): raise ValueError('PPT(pptx · ppt)나 PDF 만 가져올 수 있습니다')
-    if not raw or len(raw) > MAX: raise ValueError('파일이 비었거나 100MB 를 넘습니다')
+def build(tpl, title, deck_dir, name, raw, progress=None):
+    """올린 파일 → 덱 HTML(문자열) + 쪽 수. 그림은 deck_dir/img/uploads/, 원본은 deck_dir/files/.
+    progress(단계, 한 일, 전체) — 단계: pdf(PPT→PDF, 길이를 모름) · pages(쪽 그림) · build(덱 만들기)"""
+    ext = check(name, raw); P = progress or (lambda *a: None)
     work = tempfile.mkdtemp(prefix='pptimp-')
     try:
         src = os.path.join(work, 'src' + ext); open(src, 'wb').write(raw)
+        if ext != '.pdf': P('pdf', 0, 0)
         pdf = src if ext == '.pdf' else to_pdf(src, work)
-        imgs, texts = pages(pdf, work)
+        imgs, texts = pages(pdf, work, P)
         if not imgs: raise ValueError('쪽을 하나도 읽지 못했습니다')
+        P('build', 0, len(imgs))
         notes = _notes(src) if ext == '.pptx' else {}
         up = os.path.join(deck_dir, 'img', 'uploads'); os.makedirs(up, exist_ok=True)
         media, mskip = slide_media(src, up) if ext == '.pptx' else ({}, {})
@@ -127,7 +159,7 @@ def build(tpl, title, deck_dir, name, raw):
         keep = hashlib.sha1(raw).hexdigest()[:16] + ext; shutil.copy(src, os.path.join(fd, keep))   # 원본은 그대로 남긴다(다시 가져오기 · AI 참고)
         used = set(); secs = []; ppt = {}
         for k, (im, tx) in enumerate(zip(imgs, texts), 1):
-            b = open(im, 'rb').read(); fn = hashlib.sha1(b).hexdigest()[:16] + '.jpg'; open(os.path.join(up, fn), 'wb').write(b)
+            P('build', k, len(imgs)); b = open(im, 'rb').read(); fn = hashlib.sha1(b).hexdigest()[:16] + '.jpg'; open(os.path.join(up, fn), 'wb').write(b)
             if notes.get(k): tx = (tx + '\n\n(발표자 메모)\n' + notes[k]).strip()
             n = _name(tx, k, used); ppt[n] = {'no': k, 'img': f'img/uploads/{fn}', 'text': tx[:6000]}
             if media.get(k): ppt[n]['media'] = media[k]
