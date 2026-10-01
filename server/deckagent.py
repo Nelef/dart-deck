@@ -195,6 +195,9 @@ def system_prompt(work, slide, n, port, files=(), plan=False, base='/', docs=())
             # 가져온 PPT(server/importer.py) — 쪽마다 원본 그림 한 장. 고치고 싶은 페이지만 이 규칙으로 HTML 로 바꾼다(사용자 선택 2026-09-30)
             'data-import 가 붙은 장은 기존 PPT · PDF 에서 **그림으로 가져온 페이지**다(<img class="ppt-page"> 한 장, 그 쪽 글은 파일 아래 const PPT[장 이름].text). '
             '그 장을 고치거나 「편집 가능하게」 바꿔 달라면: 그 그림을 Read 로 열어 보고, PPT 글을 글자 그대로 써서 같은 내용 · 같은 배치 · 비슷한 색의 이 엔진 HTML(글상자 · 표 · Viz 그림)로 다시 쓴다 — '
+            # 사진 원본(importer.slide_media, 사용자 지적 2026-10-01) — 쪽 그림에 구워진 사진은 못 쓰니 PPT 안의 원본 파일을 그대로 쓴다
+            '그 쪽에 PPT 안에 들어 있던 사진이 있으면 const PPT[장 이름].media 에 원본 파일 경로(img/uploads/…)가 나온다 — 쪽 그림에서 사진을 오려 쓰지 말고 이 파일을 Read 로 열어 어느 것인지 확인한 뒤 <img src="…"> 로 그대로 쓴다'
+            '(PPT 에서 잘라 쓴 사진은 원본 전체라 object-fit: cover · object-position 으로 맞춘다. media 에 없는 그림 · 도형 · 차트는 쪽 그림을 보고 Viz 부품이나 HTML 로 다시 그린다. mediaSkipped 가 있으면 그 개수만큼은 웹에서 못 쓰는 형식이라 뺐으니 쪽 그림을 보고 처리한다). '
             '이 장은 DECK.md 스타일보다 **원본 모양이 먼저**다. 다 쓰면 그 section 의 data-import · class ppt-img 와 그림을 없앤다(data-frozen 은 두어도 된다). 다른 가져온 장은 건드리지 않는다. '
             '색은 var(--c-*), 글자 크기는 var(--fs-*) 변수만. 그림 부품은 js/deckviz.js 의 Viz.* (인자 모양을 먼저 읽는다). '
             # 이모지 금지(사용자 지정 2026-10-01) — 덱 글꼴에 없어 컴퓨터마다 그림이 다르고 PDF 도 달라진다. 화면 점검(DeckCheck)도 이모지를 문제로 잡는다
