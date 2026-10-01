@@ -9,7 +9,7 @@
 import os, re, json, shutil, hashlib, subprocess, tempfile, zipfile, posixpath, html as htmlmod
 import xml.etree.ElementTree as ET
 
-MAX = 40_000_000
+MAX = 100_000_000   # 2026-10-01 40MB → 100MB(사용자 지정). 변환 시간 상한도 같이 늘렸다
 SOFFICE = os.environ.get('PPT_SOFFICE') or shutil.which('soffice') or shutil.which('libreoffice') or ('/Applications/LibreOffice.app/Contents/MacOS/soffice' if os.path.exists('/Applications/LibreOffice.app/Contents/MacOS/soffice') else '')
 
 def _notes(pptx):
@@ -82,19 +82,19 @@ def to_pdf(src, work):
     # 먼저 UNO 스크립트(lo_convert.py — 한 · 영 사이 자동 간격을 끄고 내보냄). python3-uno 가 없거나 실패하면 그냥 --convert-to
     if subprocess.run(['python3', '-c', 'import uno'], capture_output=True).returncode == 0:
         try:
-            subprocess.run(['python3', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lo_convert.py'), SOFFICE, src, pdf, work], capture_output=True, timeout=600)
+            subprocess.run(['python3', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lo_convert.py'), SOFFICE, src, pdf, work], capture_output=True, timeout=1500)
             if os.path.exists(pdf) and os.path.getsize(pdf) > 0: return pdf
         except Exception:
             pass
     prof = 'file://' + os.path.join(work, 'lo-profile')
     r = subprocess.run([SOFFICE, f'-env:UserInstallation={prof}', '--headless', '--norestore', '--convert-to', 'pdf', '--outdir', work, src],
-                       capture_output=True, text=True, timeout=600)
+                       capture_output=True, text=True, timeout=1500)
     if r.returncode != 0 or not os.path.exists(pdf): raise ValueError(f'PPT 를 PDF 로 바꾸지 못했습니다 — {(r.stderr or r.stdout)[-200:]}')
     return pdf
 
 def pages(pdf, work):
     """PDF → 쪽 그림(JPEG) 경로 목록 + 쪽마다 글"""
-    subprocess.run(['pdftoppm', '-jpeg', '-jpegopt', 'quality=88', '-scale-to-x', '2400', '-scale-to-y', '-1', pdf, os.path.join(work, 'p')], check=True, timeout=900)
+    subprocess.run(['pdftoppm', '-jpeg', '-jpegopt', 'quality=88', '-scale-to-x', '2400', '-scale-to-y', '-1', pdf, os.path.join(work, 'p')], check=True, timeout=1800)
     imgs = sorted([f for f in os.listdir(work) if re.fullmatch(r'p-\d+\.jpg', f)], key=lambda f: int(re.search(r'(\d+)', f).group(1)))
     txt = ''
     try: txt = subprocess.run(['pdftotext', '-layout', '-enc', 'UTF-8', pdf, '-'], capture_output=True, text=True, timeout=300).stdout
@@ -113,7 +113,7 @@ def build(tpl, title, deck_dir, name, raw):
     """올린 파일 → 덱 HTML(문자열) + 쪽 수. 그림은 deck_dir/img/uploads/, 원본은 deck_dir/files/"""
     ext = os.path.splitext(name)[1].lower()
     if ext not in ('.pptx', '.ppt', '.pdf'): raise ValueError('PPT(pptx · ppt)나 PDF 만 가져올 수 있습니다')
-    if not raw or len(raw) > MAX: raise ValueError('파일이 비었거나 40MB 를 넘습니다')
+    if not raw or len(raw) > MAX: raise ValueError('파일이 비었거나 100MB 를 넘습니다')
     work = tempfile.mkdtemp(prefix='pptimp-')
     try:
         src = os.path.join(work, 'src' + ext); open(src, 'wb').write(raw)

@@ -375,7 +375,7 @@ def make_thumb(owner, did):
 BRIEF_KEYS = ('audience', 'info', 'key', 'pages', 'tone', 'material', 'text')
 def import_deck(user, req):
     """기존 PPT · PDF → 쪽마다 원본 그림 한 장인 덱(server/importer.py). AI 없이 바로 열린다 — Claude 구독이 없어도 된다"""
-    name = os.path.basename(str(req.get('name') or '')); raw = base64.b64decode(str(req.get('data') or ''), validate=True)
+    name = os.path.basename(str(req.get('name') or '')); raw = base64.b64decode(str(req.pop('data', '') or ''), validate=True)   # pop — base64 글(133MB)을 풀자마자 놓는다
     title = re.sub(r'\s+', ' ', str(req.get('title') or os.path.splitext(name)[0])).strip()[:80] or '가져온 발표 자료'
     tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
     did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', ''))
@@ -434,7 +434,12 @@ def build_prompt(deck_dir):
           '마지막 답: 만든 페이지 목록(번호. 제목)과, 자료가 부족해 자리표시로 둔 곳.']
     return '\n'.join(L)
 
-MAX_BODY = 40_000_000   # 새 덱(그림 6장)이 가장 크다
+IMPORT_MAX = importer.MAX            # PPT 가져오기 파일 상한(100MB, 2026-10-01 사용자 지정 — 40MB 에서 올림)
+MAX_BODY = IMPORT_MAX * 4 // 3 + 1_000_000   # 가져오기 본문 = base64(×4/3) + 제목 등 — /api/decks 만 이만큼 받는다. 새 덱(그림 6장)은 이보다 작다
+def body_cap(path, logged_in):
+    """요청 본문 상한 — 본문을 먼저 다 읽으므로(아래 do_POST) 길을 먼저 좁힌다: 로그인 전엔 작게(로그인 · 불러오기 기록뿐), 로그인 뒤에도 큰 본문은 /api/decks · /api/asset 만"""
+    if not logged_in: return 100_000
+    return {'/api/decks': MAX_BODY, '/api/asset': 36_000_000}.get(path, 12_000_000)
 
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
@@ -450,7 +455,8 @@ class H(http.server.BaseHTTPRequestHandler):
     def body(self, limit):
         n = len(self._raw)
         if n <= 0 or n > limit: raise ValueError('본문 크기')
-        return json.loads(self._raw.decode('utf-8'))
+        j = json.loads(self._raw.decode('utf-8')); self._raw = b''   # 큰 본문(가져오기 100MB)이 요청 내내 메모리를 쥐지 않게
+        return j
     def sid(self):
         for part in (self.headers.get('Cookie') or '').split(';'):
             k, _, v = part.strip().partition('=')
@@ -586,7 +592,16 @@ class H(http.server.BaseHTTPRequestHandler):
         # 본문은 늘 먼저 다 읽는다 — 로그인 전(401)처럼 읽지 않고 답하면 남은 본문이 같은 연결의 다음 요청 앞에 붙어
         # 'Unsupported method ({"file":…}GET)' 501 로 깨졌다(캡처용 크롬이 덱 사본을 열 때 실측 2026-09-30)
         n = int(self.headers.get('Content-Length') or 0)
-        if n > MAX_BODY: self.close_connection = True; return self.reply(413, {'error': '본문이 너무 큽니다'})
+        logged = bool(self.me()); cap = body_cap(path, logged)
+        if n > cap:
+            if not logged and n <= MAX_BODY:   # 로그인이 풀린 채 큰 파일을 올린 경우 — 메모리에 담지 않고 흘려보낸 뒤 401(바로 끊으면 브라우저엔 '네트워크 오류'로만 보인다)
+                left = n
+                while left > 0:
+                    chunk = self.rfile.read(min(left, 1 << 20))
+                    if not chunk: break
+                    left -= len(chunk)
+                return self.reply(401, {'error': '로그인이 필요합니다 — 새로고침해 다시 로그인해 주세요'})
+            self.close_connection = True; return self.reply(413 if logged else 401, {'error': '본문이 너무 큽니다' if logged else '로그인이 필요합니다 — 새로고침해 다시 로그인해 주세요'})
         self._raw = self.rfile.read(n) if n > 0 else b''
         try:
             if path == '/api/login':
@@ -619,7 +634,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 else: raise ValueError('모르는 작업')
                 return self.reply(200, {'ok': True})
             if path == '/api/decks':
-                req = self.body(40_000_000); a = req.get('action')
+                req = self.body(MAX_BODY); a = req.get('action')
                 if a == 'create': return self.reply(200, new_deck(u, req))
                 if a == 'import': return self.reply(200, import_deck(u, req))
                 owner, did = str(req.get('owner') or ''), str(req.get('id') or '')

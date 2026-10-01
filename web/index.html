@@ -164,7 +164,7 @@ header .who { color: var(--sub); font-weight: 700; font-size: 14px; margin-right
     </div>
     <!-- 기존 PPT 가져오기(사용자 지정 2026-09-30) — 쪽마다 원본 모양 그대로의 그림으로. AI 없이 바로 열린다 · 고치고 싶은 페이지만 [편집 가능하게 바꾸기] -->
     <div id="mImport" hidden>
-      <label class="l">가져올 파일<span>PPT(pptx · ppt) 또는 PDF — 40MB 까지</span></label>
+      <label class="l">가져올 파일<span>PPT(pptx · ppt) 또는 PDF — 100MB 까지</span></label>
       <div class="drop" id="iDrop">여기로 끌어 놓거나 눌러서 고르기</div>
       <input type="file" id="iFile" accept=".pptx,.ppt,.pdf,application/pdf" hidden>
       <div class="ifile" id="iName"></div>
@@ -275,7 +275,7 @@ const setMode = (m) => { NW.mode = m; $('#nTabs').querySelectorAll('button').for
 $('#nTabs').onclick = (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); };
 // 가져올 파일 — 하나만. 제목이 비었으면 파일 이름으로
 const pickImp = (f) => { if (!f) return; if (!/\.(pptx|ppt|pdf)$/i.test(f.name)) { $('#nErr').textContent = 'PPT(pptx · ppt)나 PDF 만 가져올 수 있어요'; return; }
-  if (f.size > 40e6) { $('#nErr').textContent = '40MB 를 넘는 파일은 가져올 수 없어요'; return; }
+  if (f.size > 100e6) { $('#nErr').textContent = '100MB 를 넘는 파일은 가져올 수 없어요'; return; }
   const rd = new FileReader(); rd.onload = () => { NW.imp = { name: f.name, data: rd.result }; $('#iName').textContent = `${f.name} · ${(f.size / 1e6).toFixed(1)}MB`; $('#nErr').textContent = '';
     if (!$('#nTitle').value.trim()) $('#nTitle').value = f.name.replace(/\.(pptx|ppt|pdf)$/i, '').slice(0, 80); }; rd.readAsDataURL(f); };
 $('#iDrop').onclick = () => $('#iFile').click(); $('#iFile').onchange = () => { pickImp($('#iFile').files[0]); $('#iFile').value = ''; };
