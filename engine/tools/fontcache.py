@@ -34,7 +34,29 @@ def fetch(families, css_name):
     open(os.path.join(FONTS, f'{css_name}.css'), 'w', encoding='utf-8').write(head + out)
     return len(jobs), sum(sizes)
 
+MONO_MARK = '/* ── 코드 글꼴의 한글 — JetBrains Mono 에는 한글이 없어 코드 칸 한글이 컴퓨터 글꼴(맥 Apple SD Gothic · 윈도 맑은 고딕)로 달라졌다.'
+# 한글 · 한자 · 가나 · 전각 기호 영역만 — 문장부호 · 화살표 · 빼기표(U+2000 대)는 JetBrains Mono 제 글자를 그대로 쓴다
+KO_BLOCKS = [(0x1100, 0x11FF), (0x2E80, 0x9FFF), (0xA960, 0xA97F), (0xAC00, 0xD7FF), (0xF900, 0xFAFF), (0xFE30, 0xFE4F), (0xFF00, 0xFFEF)]
+def _clip(r):
+    a, _, b = r[2:].partition('-'); a = int(a, 16); b = int(b, 16) if b else a
+    out = [(max(a, x), min(b, y)) for x, y in KO_BLOCKS if max(a, x) <= min(b, y)]
+    return ', '.join(f'U+{x:X}' if x == y else f'U+{x:X}-{y:X}' for x, y in out)
+
+def mono_ko():
+    """base.css 끝에 'JetBrains Mono' 이름으로 Noto Sans KR 의 한글 · 한자 조각을 덧붙인다(U+1100 이상만 — 영문 · 숫자는 JetBrains Mono 그대로).
+    덱을 고치지 않고 코드 칸 한글이 어느 컴퓨터에서나 Noto Sans KR 로 같게 그려진다(2026-10-01). 다시 돌려도 한 번만 붙는다"""
+    f = os.path.join(FONTS, 'base.css'); css = open(f, encoding='utf-8').read()
+    if MONO_MARK in css: css = css[:css.index(MONO_MARK)].rstrip() + '\n'
+    faces = re.findall(r"@font-face \{\s*font-family: 'Noto Sans KR';\s*font-style: normal;\s*font-weight: (\d+);.*?src: url\(([^)]+)\) format\('woff2'\);\s*unicode-range: ([^;]+);\s*\}", css, re.S)
+    L = [MONO_MARK + ' 우리 한글 글꼴로 채운다(fontcache.py mono_ko) ── */']
+    for w, url, rng in faces:
+        if w not in ('400', '500', '700'): continue
+        keep = [x for r in rng.split(',') for x in [_clip(r.strip())] if x]
+        if keep: L.append(f"@font-face {{\n  font-family: 'JetBrains Mono';\n  font-style: normal;\n  font-weight: {w};\n  font-display: swap;\n  src: url({url}) format('woff2');\n  unicode-range: {', '.join(keep)};\n}}")
+    open(f, 'w', encoding='utf-8').write(css + '\n'.join(L) + '\n'); return len(L) - 1
+
 if __name__ == '__main__':
-    if sys.argv[1:2] == ['base']: n, b = fetch(BASE, 'base')
+    if sys.argv[1:2] == ['monoko']: print('코드 글꼴 한글', mono_ko(), '개'); sys.exit(0)
+    if sys.argv[1:2] == ['base']: n, b = fetch(BASE, 'base'); mono_ko()
     else: fam = sys.argv[1]; n, b = fetch([(fam, sys.argv[2] if len(sys.argv) > 2 else None)], slug(fam))
     print(f'{n}개 · {b / 1e6:.1f}MB → {FONTS}')

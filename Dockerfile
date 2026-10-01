@@ -16,6 +16,8 @@ COPY server ./server
 # 기존 PPT 가져오기 — 서버에 없는 윈도 글꼴(맑은 고딕 · Arial …)을 비슷한 글꼴로(없으면 중국어 글꼴로 바뀌어 줄이 겹쳤다)
 RUN cp server/fonts-ko.conf /etc/fonts/local.conf && fc-cache -f >/dev/null
 COPY engine ./engine
+# PDF 로 받기 — 가변 글꼴을 굵기별 고정 글꼴로(engine/tools/fontprint.py · fonttools). 크롬이 가변 글꼴을 PDF 에 Type 3 로 넣어 커지고 흐려서
+RUN python3 -m venv /opt/fonttools && /opt/fonttools/bin/pip install --no-cache-dir fonttools==4.60.2 brotli==1.2.0 && /opt/fonttools/bin/python engine/tools/fontprint.py
 COPY web ./web
 
 ENV PPT_PORT=8900 PPT_DATA_DIR=/data DISABLE_AUTOUPDATER=1 PYTHONUNBUFFERED=1 DECK_LITE_BIN=/opt/litellm/bin/litellm

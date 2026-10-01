@@ -278,13 +278,15 @@ PDF_TOOL = os.path.join(ENGINE, 'tools', 'deck_pdf.cjs')
 PDF_LOCKS = {}; PDF_SEM = _th.Semaphore(2)   # 크롬이 하나에 300MB 안팎 — 동시에 두 개까지(나머지는 줄을 선다)
 
 def pdf_key(d):
-    """PDF 가 옛것인지 — 덱 파일(index.html · data · img · 글꼴 링크 밖) 중 가장 늦게 바뀐 시각 + 엔진(js · css)이 바뀐 시각"""
+    """PDF 가 옛것인지 — 덱 파일(index.html · data · img) 중 가장 늦게 바뀐 시각 + 엔진(js · css · tools · 글꼴 CSS)이 바뀐 시각"""
     ts = [os.path.getmtime(os.path.join(d, 'index.html'))]
     for sub in ('data', 'img', 'fonts'):
         for root, _, fs in os.walk(os.path.join(d, sub)):
             ts += [os.path.getmtime(os.path.join(root, f)) for f in fs if not f.startswith('.')]
-    for sub in ('js', 'css'):
+    for sub in ('js', 'css', 'tools'):   # PDF 도구 · 엔진이 바뀌면 다시 만든다
         for root, _, fs in os.walk(os.path.join(ENGINE, sub)): ts += [os.path.getmtime(os.path.join(root, f)) for f in fs]
+    for f in ('fonts/base.css', 'fonts/print/print.css'):
+        if os.path.exists(os.path.join(ENGINE, f)): ts.append(os.path.getmtime(os.path.join(ENGINE, f)))
     return str(round(max(ts), 3))
 
 def make_pdf(owner, did):
