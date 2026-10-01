@@ -43,7 +43,6 @@
   .ka-webin.on { background: #E8EEFD; color: #416AF0; }
   #kpanel.ka-solo .khead .kx { margin-left: 0; width: 34px; height: 34px; padding: 0; border-radius: 10px; }
   .ka-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #eceef1; font: 700 12px 'Noto Sans KR', sans-serif; color: #545b66; flex-wrap: nowrap; min-width: 0; position: relative; }
-  .ka-bar .ka-model { min-width: 0; flex: 0 1 auto; padding-right: 2px; }
   .ka-seg { flex: none; } .ka-seg button { white-space: nowrap; }
   .ka-seg button .ok { display: inline-block; width: 6px; height: 6px; border-radius: 99px; background: #22c55e; margin-left: 5px; vertical-align: 2px; }
   .ka-more { margin-left: auto; flex: none; border: 0; background: transparent; border-radius: 8px; width: 30px; height: 28px; font: 900 16px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; }
@@ -56,7 +55,23 @@
   .ka-seg { display: inline-flex; background: #f2f3f6; border-radius: 99px; padding: 2px; }
   .ka-seg button { border: 0; background: transparent; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; }
   .ka-seg button.on { background: #16181d; color: #fff; }
-  .ka-model { border: 1px solid #e3e6ea; border-radius: 99px; padding: 3px 8px; font: 700 12px 'Noto Sans KR', sans-serif; background: #fff; color: #2b3038; }
+  /* 모델 · 노력 — 한 단추(지금 설정을 보여 줌)를 누르면 판이 열려 둘을 함께 고른다(사용자 지정 2026-10-01 "모델 선택과 노력 수치를 한 버튼으로") */
+  .ka-mdl { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #e3e6ea; border-radius: 99px; background: #fff; color: #2b3038; font: 800 12px 'Noto Sans KR', sans-serif; cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s, transform .08s; }
+  .ka-mdl span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ka-mdl i { flex: none; font-style: normal; color: #9aa1ab; font-size: 9px; transition: transform .15s; }
+  .ka-mdl:hover { background: #f7f8fa; } .ka-mdl:active { transform: scale(0.98); } .ka-mdl.on { border-color: #416AF0; box-shadow: 0 0 0 3px rgba(65,106,240,.12); } .ka-mdl.on i { transform: rotate(180deg); }
+  .ka-mpop { position: absolute; left: 12px; top: calc(100% - 2px); z-index: 6; width: min(340px, calc(100% - 24px)); max-height: min(70dvh, 560px); overflow-y: auto; background: #fff; border-radius: 14px; box-shadow: 0 12px 34px rgba(20,24,40,.22); padding: 12px 12px 10px; display: none; font: 600 12.5px/1.45 'Noto Sans KR', sans-serif; color: #2b3038; }
+  .ka-mpop.on { display: block; }
+  @media (max-width: 640px) { .ka-mpop { max-height: max(180px, calc(var(--kh, 58dvh) - 110px)); } }   /* 폰은 아래에서 올라오는 판 안 — 판 높이 안에서 스크롤 */
+  .ka-mpop h5 { margin: 2px 2px 6px; font: 900 11.5px 'Noto Sans KR', sans-serif; color: #7a828e; letter-spacing: .02em; } .ka-mpop h5 ~ h5, .ka-mpop .chips ~ h5 { margin-top: 12px; }
+  .ka-mpop .opt { display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 7px 8px; cursor: pointer; font: inherit; color: inherit; }
+  .ka-mpop .opt:hover { background: #f2f3f6; } .ka-mpop .opt.on { background: #f3f6ff; }
+  .ka-mpop .opt .rd { flex: none; width: 15px; height: 15px; margin-top: 2px; border-radius: 99px; border: 2px solid #c9ced6; box-sizing: border-box; } .ka-mpop .opt.on .rd { border-color: #416AF0; background: radial-gradient(#416AF0 42%, transparent 46%); }
+  .ka-mpop .opt b { display: block; font-weight: 800; } .ka-mpop .opt small { display: block; color: #7a828e; font-weight: 600; font-size: 11.5px; }
+  .ka-mpop .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px; }
+  .ka-mpop .chips button { border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 11px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; } .ka-mpop .chips button:hover { background: #f2f3f6; }
+  .ka-mpop .chips button.on { background: #16181d; border-color: #16181d; color: #fff; }
+  .ka-mpop .efnote { margin: 7px 2px 0; color: #545b66; font-size: 11.8px; font-weight: 600; }
+  .ka-mpop .mfoot { margin: 10px 2px 0; padding-top: 9px; border-top: 1px solid #eceef1; color: #8b929c; font-size: 11.5px; font-weight: 600; }
   .ka-new { margin-left: auto; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; width: 28px; height: 26px; padding: 0; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; }
   .ka-acct ~ .ka-new { margin-left: 0; }
   .ka-acct { margin-left: auto; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; }
@@ -278,11 +293,14 @@
     bar(body) {
       const top = body.querySelector('.kc-top'); if (!top) return;
       const sub = !!A.token; const cc = A.engine === 'claude';
-      const MODELS = [['auto', '모델 자동'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5.5'], ['haiku', 'Haiku 4.5'], ['', '계정 기본']];
+      // [값, 이름, 설명] — 값 ''(계정 기본)은 --model 을 주지 않는다. 구독 등급에 따라 못 쓰는 모델이 있을 수 있다
+      const MODELS = [['auto', '모델 자동', '설명은 Haiku · 수정은 Sonnet — 부탁 종류를 보고 알아서'], ['opus', 'Opus 5.5', '가장 강하지만 느리고 사용량이 많음'], ['sonnet', 'Sonnet 5.5', '균형 — 새로 만들기도 이 모델'], ['haiku', 'Haiku 4.5', '빠르고 가벼움 — 설명 위주'], ['', '계정 기본', '내 구독 계정에 정해 둔 모델']];
+      // [값, 칩 글자, 단추 글자, 설명] — 노력(effort)이 높을수록 오래 생각하고 사용량이 는다
+      const EFFORTS = [['auto', '자동', '자동', '작은 수정은 medium · 큰 수정 · 여러 페이지는 high · 설명은 지정하지 않음'], ['low', 'low', 'low', '가장 빠름 — 간단한 글 고치기'], ['medium', 'medium', 'med', '보통 — 대부분의 수정 (기본)'],
+        ['high', 'high', 'high', '오래 생각함 — 큰 수정 · 레이아웃, 사용량이 늘어남'], ['xhigh', 'xhigh', 'xhigh', '더 깊게 — 매우 오래 걸리고 사용량이 많음'], ['max', 'max', 'max', '최대 — 가장 오래 걸리고 사용량이 가장 많음']];
       const bar = document.createElement('div'); bar.className = 'ka-bar';
       bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
-        + (cc && sub ? `<select class="ka-model" title="Claude 모델 — 구독 등급에 따라 못 쓰는 것이 있을 수 있다">${MODELS.map(([v, n]) => `<option value="${v}" ${A.model === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
-          + `<select class="ka-model ka-effort" title="노력(effort) — 높을수록 오래 생각하고 사용량이 는다">${[['auto', '노력 자동'], ['low', '노력 low'], ['medium', '노력 med'], ['high', '노력 high'], ['xhigh', '노력 xhigh'], ['max', '노력 max']].map(([v, n]) => `<option value="${v}" ${A.effort === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`
+        + (cc && sub ? `<button class="ka-mdl" title="모델 · 노력(effort) 고르기"><span></span><i>▼</i></button><div class="ka-mpop" role="dialog" aria-label="모델 · 노력"></div>`
           + `<button class="ka-more" title="사용량 · 구독 연결">⋯</button><div class="ka-menu"><button data-m="use">남은 사용량 보기</button><button data-m="acct">구독 연결 끊기</button><div class="sub">Claude 구독 연결됨</div></div>` : '')
         + (cc && !sub ? '<button class="ka-connect ka-acct">Claude 구독 연결</button>' : '');
       top.after(bar);
@@ -301,8 +319,26 @@
       }
       top.style.display = 'none';
       bar.querySelectorAll('[data-e]').forEach((b) => { b.onclick = () => { A.engine = b.dataset.e; K.render(); }; });
-      const ms = bar.querySelector('.ka-model:not(.ka-effort)'); if (ms) ms.onchange = () => { A.model = ms.value; };
-      const es = bar.querySelector('.ka-effort'); if (es) es.onchange = () => { A.effort = es.value; };
+      // 모델 · 노력 단추 + 판 — 고르면 바로 적용(판은 열어 둔 채 단추 글만 바뀐다), 바깥을 누르거나 Esc 면 닫는다
+      const mb0 = bar.querySelector('.ka-mdl'), pop = bar.querySelector('.ka-mpop');
+      if (mb0 && pop) {
+        const mi = Math.max(0, MODELS.findIndex((m) => m[0] === A.model)); const ei = Math.max(0, EFFORTS.findIndex((x) => x[0] === A.effort));
+        const paint = () => {
+          const m = MODELS.find((x) => x[0] === A.model) || MODELS[mi], f = EFFORTS.find((x) => x[0] === A.effort) || EFFORTS[ei];
+          mb0.querySelector('span').textContent = A.model === 'auto' && A.effort === 'auto' ? '모델 · 노력 자동' : `${m[1]} · ${A.effort === 'auto' ? '노력 자동' : f[2]}`;
+          mb0.title = `모델 ${m[1]} · 노력 ${f[1]} — 눌러서 바꾸기`;
+          pop.innerHTML = '<h5>모델</h5>' + MODELS.map(([v, n, d]) => `<button class="opt${A.model === v ? ' on' : ''}" data-mv="${v}"><span class="rd"></span><span><b>${n}</b><small>${d}</small></span></button>`).join('')
+            + '<h5>노력 (effort)</h5><div class="chips">' + EFFORTS.map(([v, n]) => `<button class="${A.effort === v ? 'on' : ''}" data-ev="${v}">${n}</button>`).join('') + `</div><div class="efnote">${f[3]}</div>`
+            + '<div class="mfoot">새로 만들기는 이 설정과 상관없이 Sonnet 5.5 로 합니다(설문에서 고른 빠르게 · 자세하게).</div>';
+        };
+        paint();
+        mb0.onclick = (e) => { e.stopPropagation(); const on = !pop.classList.contains('on'); pop.classList.toggle('on', on); mb0.classList.toggle('on', on); };
+        pop.onclick = (e) => { e.stopPropagation(); const o = e.target.closest('[data-mv]'), f = e.target.closest('[data-ev]'); if (o) A.model = o.dataset.mv; if (f) A.effort = f.dataset.ev; if (o || f) paint(); };
+        if (!A._mpBound) { A._mpBound = true;
+          const shut = () => document.querySelectorAll('.ka-mpop.on').forEach((x) => { x.classList.remove('on'); x.parentElement?.querySelector('.ka-mdl')?.classList.remove('on'); });
+          document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.ka-mpop, .ka-mdl')) shut(); }, true);
+          document.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); }, true); }
+      }
       const mn = bar.querySelector('.ka-menu'); const mb = bar.querySelector('.ka-more');
       if (mb && mn) { mb.onclick = (e) => { e.stopPropagation(); mn.classList.toggle('on'); }; document.addEventListener('click', () => mn.classList.remove('on'), { once: true });
         mn.querySelector('[data-m="use"]').onclick = () => { mn.classList.remove('on'); A.usage(); };
