@@ -35,6 +35,10 @@
       // 화면에 '${PARTS.map((o) => …)}' 가 찍힌 채 자가검증을 통과). 코드를 보여 주려고 둔 칸(pre · code · .code · .mono)은 뺀다
       if (/\$\{[^}]*\}|=>\s*[`({]|\.(map|join|forEach)\(/.test(n.textContent) && !n.parentElement.closest('pre, code, .code, .mono'))
         out.push({ kind: 'code', key: `code|${label(n.parentElement)}`, text: `${label(n.parentElement)} 에 스크립트 코드가 글자로 보임 — 「${n.textContent.trim().slice(0, 40)}」` });
+      // 이모지 — 운영체제마다 그림이 다르고(맥 · 윈도 · 서버) PDF 도 달라진다. 덱 글꼴에 없어 컴퓨터 글꼴로 그려진다(사용자 지정 2026-10-01 "이모지는 AI 가 못 만들게").
+      //   기본 모양이 그림 글자인 것(Emoji_Presentation)과 그림으로 바꾸는 표시(U+FE0F)를 잡는다 — ✓ · ★ · → 같은 기호 글자는 덱 글꼴(Noto Sans Symbols)에 있어 괜찮다
+      const emo = n.textContent.match(/\p{Emoji_Presentation}|\p{Extended_Pictographic}\uFE0F|.\uFE0F?\u20E3/gu);
+      if (emo) out.push({ kind: 'emoji', key: `emoji|${label(n.parentElement)}`, text: `${label(n.parentElement)} 에 이모지 ${[...new Set(emo)].join(' ')} — 쓰지 않는다(SVG 아이콘이나 ✓ · ● · ▶ 같은 기호로)` });
       // 줄마다 글자 **몸통**만 — 글꼴 상자(위아래 여백 포함)로 잡으면 줄 간격이 촘촘한 곳(큰 숫자 위 이름표)이 원본에서도 전부 겹침으로 걸렸다
       const rg = doc.createRange(); rg.selectNodeContents(n);
       for (const q of rg.getClientRects()) { if (q.width < 2 || q.height < 2) continue;
