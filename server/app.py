@@ -114,7 +114,7 @@ def ver_chg(prev, new):
     ch, other = deckagent.changed_parts(prev, new, slide_parts); on, nn = deckagent.slide_names(prev), deckagent.slide_names(new)
     add = [x for x in nn if x not in on]; rem = [x for x in on if x not in nn]
     first = next((i + 1 for i, x in enumerate(nn) if x in ch or x in add), 0)
-    return {'c': ch[:6], 'nc': len(ch), 'a': add[:6], 'r': rem[:6], 'o': bool(other), 'f': first}
+    return {'c': ch[:6], 'nc': len(ch), 'a': add[:6], 'na': len(add), 'r': rem[:6], 'nr': len(rem), 'o': bool(other), 'f': first}   # 이름은 6개까지, 개수(nc · na · nr)는 전부
 
 def ver_snap(path, new, before, who, kind, label=''):
     try: vers.snapshot(os.path.dirname(path), new, before, who, kind, label, diff=ver_chg)
@@ -138,7 +138,7 @@ def ver_restore(owner, did, vid, who):
 def ver_list(owner, did):
     d = STORE.deck_dir(owner, did); names = {x['id']: x.get('name') or x['id'] for x in STORE.users}
     out = []
-    for x in vers.listing(d):
+    for x in vers.listing(d, diff=ver_chg):
         out.append({'id': x['id'], 't': x['t'], 'user': x.get('u') or '', 'userName': names.get(x.get('u') or '', x.get('u') or ''), 'kind': x.get('k'), 'label': x.get('l') or '',
                     'current': bool(x.get('current')), 'same': bool(x.get('same')), 'chg': x.get('chg') or {}, 'first': x.get('f') or 0, 'size': x.get('z') or 0})
     return {'ok': True, 'versions': out}

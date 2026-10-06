@@ -93,7 +93,8 @@ def snapshot(d, text, before, who, kind, label='', diff=None, t=None):
         if diff and prev is not None:
             try:
                 c = diff(prev, text) or {}
-                if c: it['chg'] = {k: c[k] for k in ('c', 'a', 'r', 'o', 'nc') if c.get(k)}; it['f'] = int(c.get('f') or 0)
+                if c: it['chg'] = {k: c[k] for k in ('c', 'a', 'r', 'o', 'nc', 'na', 'nr') if c.get(k)}; it['f'] = int(c.get('f') or 0)
+                it['cd'] = 1
             except Exception: pass
         items.append(it); _prune(d, idx, now); _save(d, idx); return vid
 
@@ -101,11 +102,29 @@ def _created(d):
     try: return int((json.load(open(os.path.join(d, 'meta.json'), encoding='utf-8')) or {}).get('created') or 0)
     except (OSError, ValueError): return 0
 
-def listing(d):
-    """새 것부터. 맨 위는 지금 덱 — 기록의 마지막과 같은 상태면 그 항목이 current, 아니면 기록 없는 current 를 따로 붙인다"""
+BACKFILL_MAX = 30   # 한 번 열 때 옛 기록의 바뀐 페이지 요약을 채우는 최대 개수(덱이 크면 비교가 느려서 나눠서 — 열 때마다 이어 채운다)
+
+def _backfill(d, idx, diff):
+    """요약(chg)이 없는 기록 — 옛 .edits 에서 들여온 것 등 — 을 바로 앞 기록과 비교해 채운다. 새 것부터, 한 번에 BACKFILL_MAX 개"""
+    items = idx['items']; n = 0; changed = False
+    for i in range(len(items) - 1, 0, -1):
+        if items[i].get('cd'): continue
+        if n >= BACKFILL_MAX: break
+        n += 1; a, b = read(d, items[i - 1]['id']), read(d, items[i]['id'])
+        try: c = diff(a, b) if a is not None and b is not None else {}
+        except Exception: c = {}
+        if c: items[i]['chg'] = {k: c[k] for k in ('c', 'a', 'r', 'o', 'nc', 'na', 'nr') if c.get(k)}; items[i]['f'] = int(c.get('f') or 0)
+        items[i]['cd'] = 1; changed = True
+    return changed
+
+def listing(d, diff=None):
+    """새 것부터. 맨 위는 지금 덱 — 기록의 마지막과 같은 상태면 그 항목이 current, 아니면 기록 없는 current 를 따로 붙인다.
+    diff 가 있으면 요약이 없는 옛 기록을 일부 채운다"""
     with LOCK:
-        idx = _load(d)
-        if not idx.get('legacy'): _legacy(d, idx); _save(d, idx)
+        idx = _load(d); dirty = False
+        if not idx.get('legacy'): _legacy(d, idx); dirty = True
+        if diff and _backfill(d, idx, diff): dirty = True
+        if dirty: _save(d, idx)
         items = [dict(x) for x in idx['items']]
     try: cur = open(os.path.join(d, 'index.html'), encoding='utf-8').read(); mt = int(os.path.getmtime(os.path.join(d, 'index.html')))
     except OSError: cur, mt = None, 0

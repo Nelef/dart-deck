@@ -36,8 +36,9 @@
   const fmt = (t) => { const d = new Date(t * 1000), h = d.getHours(); return `${d.getMonth() + 1}월 ${d.getDate()}일 ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const day = (t) => { const d = new Date(t * 1000), n = new Date(), k = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`; const y = new Date(n); y.setDate(n.getDate() - 1);
     return k(d) === k(n) ? '오늘' : k(d) === k(y) ? '어제' : `${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`; };
-  const chg = (v) => { const c = v.chg || {}, p = []; if (c.nc) p.push(`수정 ${c.nc}`); if (c.a?.length) p.push(`추가 ${c.a.length}`); if (c.r?.length) p.push(`삭제 ${c.r.length}`); if (c.o) p.push('공용 부분'); return p.join(' · '); };
-  const chgTip = (v) => { const c = v.chg || {}, p = []; if (c.c?.length) p.push(`수정: ${c.c.join(', ')}`); if (c.a?.length) p.push(`추가: ${c.a.join(', ')}`); if (c.r?.length) p.push(`삭제: ${c.r.join(', ')}`); return p.join('\n'); };
+  const chg = (v) => { const c = v.chg || {}, p = [], na = c.na ?? c.a?.length ?? 0, nr = c.nr ?? c.r?.length ?? 0; if (c.nc) p.push(`수정 ${c.nc}`); if (na) p.push(`추가 ${na}`); if (nr) p.push(`삭제 ${nr}`); if (c.o) p.push('공용 부분'); return p.join(' · '); };
+  const more = (arr, n) => (n > arr.length ? ` 외 ${n - arr.length}개` : '');
+  const chgTip = (v) => { const c = v.chg || {}, p = []; if (c.c?.length) p.push(`수정: ${c.c.join(', ')}${more(c.c, c.nc || 0)}`); if (c.a?.length) p.push(`추가: ${c.a.join(', ')}${more(c.a, c.na || 0)}`); if (c.r?.length) p.push(`삭제: ${c.r.join(', ')}${more(c.r, c.nr || 0)}`); return p.join('\n'); };
   const post = async (body) => { const r = await fetch('/api/versions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: FILE, ...body }) });
     const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`); return j; };
   const S = { list: [], sel: '' }; let root = null;
