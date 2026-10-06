@@ -135,6 +135,33 @@ def ver_restore(owner, did, vid, who):
     ver_snap(path, new, cur, who, 'restore', f"「{lt.tm_mon}월 {lt.tm_mday}일 {'오전' if lt.tm_hour < 12 else '오후'} {lt.tm_hour % 12 or 12}:{lt.tm_min:02d}」 버전으로 복원")
     return {'ok': True}
 
+def ver_compare(owner, did, vid):
+    """고른 버전 ↔ 지금 덱을 **합쳐서** 비교(사용자 지정 2026-10-06) — 그 버전 이후 쌓인 변경 전부. 페이지 이름으로 짝지어 수정 · 추가 · 삭제를 센다.
+    o = 그 버전에서의 번호, w = 지금 덱에서의 번호(없으면 0). 옛 버전에 있던 페이지가 지금은 없으면 삭제, 지금만 있으면 추가"""
+    d = STORE.deck_dir(owner, did); old = vers.read(d, vid)
+    if old is None: raise ValueError('그 버전을 찾을 수 없습니다(보관 기간이 지났을 수 있습니다)')
+    cur = open(os.path.join(d, 'index.html'), encoding='utf-8').read()
+    ch, other = deckagent.changed_parts(old, cur, slide_parts); on, nn = deckagent.slide_names(old), deckagent.slide_names(cur)
+    items = [{'name': nm, 'kind': 'change' if nm in on else 'add', 'o': on.index(nm) + 1 if nm in on else 0, 'w': k} for k, nm in enumerate(nn, 1) if nm in ch or nm not in on]
+    items += [{'name': nm, 'kind': 'del', 'o': k, 'w': 0} for k, nm in enumerate(on, 1) if nm not in nn]
+    cnt = lambda k: sum(1 for x in items if x['kind'] == k)
+    return {'ok': True, 'same': vers.sha(old) == vers.sha(cur), 'other': bool(other), 'nc': cnt('change'), 'na': cnt('add'), 'nr': cnt('del'), 'pagesThen': len(on), 'pagesNow': len(nn), 'items': items[:300]}
+
+def ver_shots(owner, did, vid, names):
+    """비교 목록에서 고른 페이지(8개까지)의 화면 — 그 버전 · 지금을 나란히 찍는다(비교 화면 「바뀐 곳 · 겹쳐 보기」 재료)"""
+    d = STORE.deck_dir(owner, did); cmp = ver_compare(owner, did, vid); want = [str(x) for x in (names or [])][:8]
+    items = [x for x in cmp['items'] if x['name'] in want]
+    if not items: return {'ok': True, 'shots': []}
+    old = vers.read(d, vid); cur = open(os.path.join(d, 'index.html'), encoding='utf-8').read(); rel = f'/d/{owner}/{did}/'
+    def run(html, nums):
+        nums = [n for n in nums if n]
+        if not nums: return {}
+        r = shot({'file': rel, 'html': html, 'slide': nums[0], 'slides': nums}, PORT)
+        return r.get('jpgs') or ({str(nums[0]): r.get('jpg', '')} if r.get('jpg') else {})
+    got = {}; t = _th.Thread(target=lambda: got.__setitem__('w', run(cur, [x['w'] for x in items])), daemon=True); t.start()
+    before = run(old, [x['o'] for x in items]); t.join(); after = got.get('w') or {}
+    return {'ok': True, 'shots': [{**x, 'before': before.get(str(x['o']), '') if x['o'] else '', 'after': after.get(str(x['w']), '') if x['w'] else ''} for x in items]}
+
 def ver_list(owner, did):
     d = STORE.deck_dir(owner, did); names = {x['id']: x.get('name') or x['id'] for x in STORE.users}
     out = []
@@ -379,6 +406,8 @@ def ver_post(d, req, who):
     owner, did, _ = d; a = req.get('action')
     if a == 'restore': return ver_restore(owner, did, str(req.get('id') or ''), who)
     if a == 'list': return ver_list(owner, did)
+    if a == 'compare': return ver_compare(owner, did, str(req.get('id') or ''))
+    if a == 'shots': return ver_shots(owner, did, str(req.get('id') or ''), req.get('names') if isinstance(req.get('names'), list) else [])
     raise ValueError('모르는 작업')
 
 def docset(d, req):
