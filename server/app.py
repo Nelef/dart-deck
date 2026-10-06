@@ -943,6 +943,6 @@ if __name__ == '__main__':
     os.makedirs(DECKS, exist_ok=True)
     for dd in glob.glob(os.path.join(DECKS, '*', '*')):
         if os.path.isdir(dd): link_engine(dd)
-    with S(('0.0.0.0', PORT), H) as s:
+    with S((os.environ.get('PPT_HOST', '0.0.0.0'), PORT), H) as s:   # PPT_HOST=127.0.0.1 이면 이 컴퓨터에서만(이 맥은 Tailscale 이 tailnet 주소의 8900 을 GPU 서버으로 넘겨 0.0.0.0 으로는 못 연다)
         sys.stderr.write(f'AI PPT http://0.0.0.0:{PORT} · 데이터 {DATA_DIR}\n'); sys.stderr.flush()
         s.serve_forever()
