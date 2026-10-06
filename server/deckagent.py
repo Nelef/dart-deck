@@ -513,6 +513,8 @@ def restore(rid, path):
         RUNS[rid] = {'file': path, 'work': m['work'], 'sha0': m.get('sha0'), 'session': m.get('sess') or '', 't': time.time(), 'engine': 'sub'}
     return RUNS.get(rid)
 
+VERSION_HOOK = None   # app.ver_snap(path, 새 내용, 이전 내용, 계정, 종류, 설명) — 적용한 수정안을 버전 기록으로 남긴다(2026-10-06)
+
 def apply(req, backup_name, path=None):
     rid = str(req.get('rid') or ''); r = RUNS.get(rid) or restore(rid, path)
     if not r: raise ValueError('이 수정안이 서버에 없습니다(오래됨) — 다시 부탁해 주세요')
@@ -524,6 +526,9 @@ def apply(req, backup_name, path=None):
     os.makedirs(os.path.dirname(backup_name(path)), exist_ok=True)
     bak = f"{backup_name(path)}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
     open(bak, 'w', encoding='utf-8').write(text); open(path, 'w', encoding='utf-8').write(new)
+    if VERSION_HOOK:
+        mt = meta_of(path, rid) or {}; build = bool((mt.get('o') or {}).get('build')); pr = re.sub(r'\s+', ' ', str(mt.get('prompt') or '')).strip()[:70]
+        VERSION_HOOK(path, new, text, mt.get('owner') or '', 'build' if build else 'ai', 'AI 가 새로 만듦' if build else ('AI 수정' + (f' — {pr}' if pr else '')))
     discard(req)
     meta_update(os.path.join(logdir_of(path), f'{rid}.json'), {'state': {**((meta_of(path, rid) or {}).get('state') or {}), 'applied': os.path.basename(bak)}})
     return {'ok': True, 'backup': os.path.basename(bak)}

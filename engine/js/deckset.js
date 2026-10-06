@@ -1,5 +1,6 @@
 // 문서 설정 — 오른쪽 위 ⚙ 단추와 판(사용자 지정 2026-10-01 "화면 우측상단에 문서 설정 · 거기서 PDF 다운로드, 예상 시간도").
 //   · 읽기 공유: 링크를 만들면 받은 누구나 로그인 없이 이 자료를 보기만 한다(서버 /s/<토큰>/, 고치기 · AI 없음). 새 주소로 바꾸기 · 끄기
+//   · 버전 기록: 저장할 때마다 남은 옛 버전을 보고 복원(js/deckver.js)
 //   · PDF 로 받기: 서버가 페이지마다 화면 그대로 찍어 묶는다(/pdf/<계정>/<덱>.pdf). 예상 시간은 서버가 쪽수 + 그 덱에서 전에 잰 속도로 알려 준다
 // js/deck.js 가 주인 · 관리자의 /d/ 주소에서만 불러온다. 서버 API = POST /api/docset {file, action: get | share_on | share_off | share_renew}
 (() => {
@@ -39,6 +40,7 @@
   const draw = () => {
     const s = S.st; const url = shareUrl(); const p = S.pdf;
     let h = '<h3>문서 설정</h3>';
+    h += '<div class="ds-sec"><h4>버전 기록</h4><p>직접 고치거나 AI 가 고칠 때마다 그 시점의 발표 자료가 기록됩니다. 옛 버전을 보고 그 버전으로 되돌릴 수 있어요.</p><button class="pri" data-a="ver">버전 기록 보기</button></div>';
     h += '<div class="ds-sec"><h4>읽기 공유</h4><p>링크를 받은 누구나 로그인 없이 이 자료를 <b>보기만</b> 할 수 있습니다. 고치기 · AI 는 쓸 수 없습니다.</p>';
     if (!s) h += '<small>불러오는 중…</small>';
     else if (!url) h += '<button class="pri" data-a="share_on">읽기 링크 만들기</button>';
@@ -77,6 +79,10 @@
     }
     if (a === 'share_off' && !confirm('읽기 공유를 끌까요? 지금 링크로는 더 볼 수 없게 됩니다.')) return;
     if (a === 'share_renew' && !confirm('새 주소로 바꿀까요? 이전 링크는 바로 막힙니다.')) return;
+    if (a === 'ver') {   // 버전 기록 — 전체 화면 보기(js/deckver.js, 처음 누를 때 불러온다)
+      toggle(false); const go = () => window.DeckVer?.open();
+      if (window.DeckVer) return go(); const z = document.createElement('script'); z.src = 'js/deckver.js'; z.onload = go; z.onerror = () => alert('버전 기록을 불러오지 못했습니다'); document.body.appendChild(z); return;
+    }
     if (a === 'pdf') return pdf();
     S.busy = true; S.err = '';
     try { S.st = await post(a); } catch (e) { S.err = e.message; }

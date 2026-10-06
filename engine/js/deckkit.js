@@ -780,7 +780,7 @@
     async applyEdit(i, btn) {
       const m = K.chat[i]; btn.disabled = true; m.editErr = '';
       const items = m.passState ? m.passState.chain : m.edits.items.map(({ kind, find, replace }) => ({ kind, find, replace }));   // 자가검증을 거쳤으면 원본부터의 수정 사슬 전부
-      try { const j = await K.post('/api/edit', { file: m.edit.file, sha: m.edit.sha, slide: m.edit.slide, edits: items });
+      try { const j = await K.post('/api/edit', { file: m.edit.file, sha: m.edit.sha, slide: m.edit.slide, edits: items, src: 'ai', note: String(m.root || '').slice(0, 70) });   // src · note — 버전 기록에 「AI 수정 — 부탁 내용」으로 남는다
         m.applied = j.backup; K.keepChat(); location.reload();
       } catch (e) { m.editErr = `저장 못 함: ${e.message}`; K.updateMsg(i); }
     },

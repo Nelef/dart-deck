@@ -20,7 +20,7 @@ NODE_PATH = os.path.join(ROOT, 'node_modules')
 SHOT_KEY = secrets.token_hex(16); os.environ['DECK_SHOT_KEY'] = SHOT_KEY
 os.environ['NODE_PATH'] = NODE_PATH
 os.environ.setdefault('PPT_DATA_DIR', DATA_DIR)
-import store as storemod, deckagent, importer
+import store as storemod, deckagent, importer, versions as vers
 STORE = storemod.Store(DATA_DIR)
 _dropped = STORE.drop_importing()   # 가져오다 서버가 꺼진 반쪽 덱 정리
 if _dropped: sys.stderr.write(f'가져오던 중이던 덱 {_dropped}개를 지웠습니다\n')
@@ -75,6 +75,7 @@ def deck_file(owner, did, rest, engine_top=ENGINE_TOP):
 
 # 읽기 공유(2026-10-01 사용자 지정 "외부 사람이 볼 수 있는 읽기 모드") — /s/<토큰>/ 은 로그인 없이 덱을 읽기만 한다
 SHARE_RE = re.compile(r'^/s/([A-Za-z0-9_-]{16,64})(/.*)?$')
+VIEW_RE = re.compile(r'^/v/([a-z0-9][a-z0-9_.-]{1,31})/(\d{8}-[0-9a-f]{6})/(current|\d{9,11}-[0-9a-f]{4})(/.*)?$')   # /v/<계정>/<덱>/<버전>/ — 버전 미리보기
 SHARE_ENGINE_TOP = ('js', 'css')   # 읽기에 필요한 엔진만(tools · DECK.md 는 안 준다)
 VIEW_FLAG = '<script>window.DECK_VIEW = 1;</script><meta name="robots" content="noindex,nofollow">'   # 엔진(deck · deckedit · deckkit)이 이걸 보고 편집 · AI 를 끈다
 
@@ -107,7 +108,42 @@ def link_engine(deck_dir):
             if not os.path.exists(l): os.symlink(t, l)
         except OSError as e: sys.stderr.write(f'링크 실패 {l}: {e}\n')
 
-def apply_edits(req):
+# ── 버전 기록(사용자 지정 2026-10-06 "구글 되돌리기처럼") — 저장이 일어나는 곳마다 ver_snap 으로 그 시점의 덱을 남긴다(server/versions.py) ──
+def ver_chg(prev, new):
+    """두 버전 사이 바뀐 페이지 요약 — 목록에 「수정 2 · 추가 1」로 보인다. f = 처음 바뀐 페이지(미리보기를 거기서 연다)"""
+    ch, other = deckagent.changed_parts(prev, new, slide_parts); on, nn = deckagent.slide_names(prev), deckagent.slide_names(new)
+    add = [x for x in nn if x not in on]; rem = [x for x in on if x not in nn]
+    first = next((i + 1 for i, x in enumerate(nn) if x in ch or x in add), 0)
+    return {'c': ch[:6], 'nc': len(ch), 'a': add[:6], 'r': rem[:6], 'o': bool(other), 'f': first}
+
+def ver_snap(path, new, before, who, kind, label=''):
+    try: vers.snapshot(os.path.dirname(path), new, before, who, kind, label, diff=ver_chg)
+    except Exception as e: sys.stderr.write(f'버전 기록 실패 {path}: {e}\n')   # 기록이 실패해도 저장은 그대로 된다
+
+deckagent.VERSION_HOOK = ver_snap   # AI 수정 적용(deckagent.apply)이 부른다
+
+def ver_restore(owner, did, vid, who):
+    """고른 버전으로 되돌린다. 복원 직전 상태도 버전으로 남는다(복원도 되돌릴 수 있게) — 옛 되돌리기용 .edits 백업도 평소처럼 하나 만든다"""
+    d = STORE.deck_dir(owner, did); path = os.path.join(d, 'index.html'); it = vers.get(d, vid); new = vers.read(d, vid)
+    if not it or new is None: raise ValueError('그 버전을 찾을 수 없습니다(보관 기간이 지났을 수 있습니다)')
+    cur = open(path, encoding='utf-8').read()
+    if vers.sha(new) == vers.sha(cur): raise ValueError('이미 현재 버전입니다')
+    os.makedirs(os.path.dirname(backup_name(path)), exist_ok=True)
+    open(f"{backup_name(path)}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak", 'w', encoding='utf-8').write(cur)
+    open(path, 'w', encoding='utf-8').write(new)
+    lt = time.localtime(it['t'])
+    ver_snap(path, new, cur, who, 'restore', f"「{lt.tm_mon}월 {lt.tm_mday}일 {'오전' if lt.tm_hour < 12 else '오후'} {lt.tm_hour % 12 or 12}:{lt.tm_min:02d}」 버전으로 복원")
+    return {'ok': True}
+
+def ver_list(owner, did):
+    d = STORE.deck_dir(owner, did); names = {x['id']: x.get('name') or x['id'] for x in STORE.users}
+    out = []
+    for x in vers.listing(d):
+        out.append({'id': x['id'], 't': x['t'], 'user': x.get('u') or '', 'userName': names.get(x.get('u') or '', x.get('u') or ''), 'kind': x.get('k'), 'label': x.get('l') or '',
+                    'current': bool(x.get('current')), 'same': bool(x.get('same')), 'chg': x.get('chg') or {}, 'first': x.get('f') or 0, 'size': x.get('z') or 0})
+    return {'ok': True, 'versions': out}
+
+def apply_edits(req, by=''):
     path = edit_target(req.get('file'))
     text = open(path, encoding='utf-8').read()
     if hashlib.sha256(text.encode('utf-8')).hexdigest() != req.get('sha'):
@@ -148,15 +184,18 @@ def apply_edits(req):
     bak = f"{backup_name(path)}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
     open(bak, 'w', encoding='utf-8').write(text)
     open(path, 'w', encoding='utf-8').write(new)
+    note = re.sub(r'\s+', ' ', str(req.get('note') or '')).strip()[:70]
+    ver_snap(path, new, text, by, 'ai' if req.get('src') == 'ai' else 'edit', ('AI 수정' + (f' — {note}' if note else '')) if req.get('src') == 'ai' else ('직접 수정' + (f' — {slide}' if slide else '')))
     return {'ok': True, 'backup': os.path.basename(bak), 'changed': len(edits)}
 
-def undo_edit(req):
+def undo_edit(req, by=''):
     path = edit_target(req.get('file'))
     baks = sorted(glob.glob(backup_name(path) + '.*.bak'))
     if not baks:
         raise ValueError('되돌릴 백업이 없습니다')
-    text = open(baks[-1], encoding='utf-8').read()
+    text = open(baks[-1], encoding='utf-8').read(); cur = open(path, encoding='utf-8').read()
     open(path, 'w', encoding='utf-8').write(text)
+    ver_snap(path, text, cur, by, 'undo', '직전으로 되돌리기')
     os.rename(baks[-1], baks[-1] + '.restored')   # 한 번 쓴 백업은 다음 되돌리기에서 빠지게(지우지는 않는다)
     return {'ok': True, 'restored': os.path.basename(baks[-1])}
 
@@ -336,6 +375,12 @@ def pdf_status(owner, did):
     if last and last.get('pages') and last.get('sec'): k = max(0.4, min(4.0, last['sec'] / (PDF_FIXED_SEC + PDF_PAGE_SEC * last['pages'])))
     return {'pages': pages, 'cached': bool(cached), 'estSec': 0 if cached else max(3, round(base * k)), 'bytes': os.path.getsize(out) if cached else 0}
 
+def ver_post(d, req, who):
+    owner, did, _ = d; a = req.get('action')
+    if a == 'restore': return ver_restore(owner, did, str(req.get('id') or ''), who)
+    if a == 'list': return ver_list(owner, did)
+    raise ValueError('모르는 작업')
+
 def docset(d, req):
     """문서 설정 — 읽기 공유 켜기 · 끄기 · 새 주소 + PDF 상태. d = deck_of(file) (권한은 호출 쪽에서 확인)"""
     owner, did, _ = d; a = req.get('action') or 'get'
@@ -431,6 +476,7 @@ def import_run(job, uid, did, d, tpl, title, name, raw):
         open(os.path.join(d, 'index.html'), 'w', encoding='utf-8').write(html)
         m = STORE._load(os.path.join(d, 'meta.json'), {}); m.pop('importing', None); m.update({'from': name, 'imported': src, 'pages': n}); STORE._save(os.path.join(d, 'meta.json'), m)
         link_engine(d)
+        ver_snap(os.path.join(d, 'index.html'), html, None, uid, 'import', f'「{name}」에서 가져옴 — {n}쪽')
         J['dur']['build'] = time.time() - J['stageT0']; J.update(stage='done', url=f'/d/{uid}/{did}/', pages=n)
         try:   # 이번 실제/어림 비율을 이어 적는다(쪽 5장 넘을 때만 — 고정 시간이 큰 작은 파일은 비율이 흔들린다)
             if n >= 5:
@@ -455,6 +501,7 @@ def new_deck(user, req):
     tpl = open(os.path.join(ENGINE, 'template.html'), encoding='utf-8').read()
     did, d = STORE.create_deck(user['id'], title, tpl.replace('{{TITLE}}', htmlmod.escape(title)).replace('{{SUB}}', htmlmod.escape(brief['key'][:120] or brief['audience'][:120])))
     link_engine(d)
+    ver_snap(os.path.join(d, 'index.html'), open(os.path.join(d, 'index.html'), encoding='utf-8').read(), None, user['id'], 'create', '새 발표 자료 — 표지')
     files = []; docs = []
     for f in (req.get('files') or [])[:6]:
         try:
@@ -545,6 +592,21 @@ class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write(f"{datetime.datetime.now().strftime('%H:%M:%S')} {self.client_address[0]} {fmt % args}\n"); sys.stderr.flush()
 
+    def serve_view(self, owner, did, rest, head_only, html_src=None):
+        """덱을 읽기 전용으로 준다(공유 주소 · 버전 미리보기 공용). 숨김 파일 · 덱 폴더 맨 위의 index.html 말고 다른 파일(meta.json · brief.json = 설문 · 올린 자료)은 주지 않는다.
+        html_src 가 있으면 index.html 대신 그 내용(옛 버전)"""
+        if any(seg.startswith('.') for seg in rest.split('/')) or ('/' not in rest and rest not in ('', 'index.html')): return self.send_error(404)
+        p = deck_file(owner, did, rest, SHARE_ENGINE_TOP)
+        if not p: return self.send_error(404)
+        if os.path.basename(p) == 'index.html' and rest in ('', 'index.html'):
+            html = html_src if html_src is not None else open(p, encoding='utf-8').read(); mh = re.search(r'<head[^>]*>', html, re.I)
+            html = html[:mh.end()] + VIEW_FLAG + html[mh.end():] if mh else VIEW_FLAG + html
+            data = html.encode('utf-8'); self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'no-store'); self.send_header('Referrer-Policy', 'no-referrer'); self.send_header('X-Robots-Tag', 'noindex, nofollow'); self.end_headers()
+            if not head_only: self.wfile.write(data)
+            return
+        return self.send_file(p, head_only)
+
     # ── GET ──
     def do_HEAD(self): self.do_GET(head_only=True)
     def do_GET(self, head_only=False):
@@ -562,6 +624,12 @@ class H(http.server.BaseHTTPRequestHandler):
                 x['busy'] = os.path.join(STORE.deck_dir(x['owner'], x['id']), 'index.html') in busy   # Claude 가 고치거나 만드는 중
                 x['thumb'] = f"/thumb/{x['owner']}/{x['id']}.jpg?v={x['updated'] or 0}"   # 덱이 바뀌면 주소가 바뀌어 브라우저가 새로 받는다
             return self.reply(200, {'decks': ds})
+        if path == '/api/versions':
+            u = self.me()
+            if not u: return self.reply(401, {'error': '로그인이 필요합니다'})
+            try: d = self.deck_access(u, (urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('file') or [''])[0])
+            except PermissionError as e: return self.reply(403, {'error': str(e)})
+            return self.reply(200, ver_list(d[0], d[1]))
         if path == '/api/import':
             u = self.me(); J = IMPORTS.get((urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('job') or [''])[0])
             if not u: return self.reply(401, {'error': '로그인이 필요합니다'})
@@ -615,18 +683,17 @@ class H(http.server.BaseHTTPRequestHandler):
                 if not head_only: self.wfile.write(msg)
                 return
             if m.group(2) is None: self.send_response(301); self.send_header('Location', path + '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
-            # 읽기 전용: 숨김 파일 · 덱 폴더 맨 위의 index.html 말고 다른 파일(meta.json · brief.json = 설문 · 올린 자료)은 주지 않는다
-            if any(seg.startswith('.') for seg in rest.split('/')) or ('/' not in rest and rest not in ('', 'index.html')): return self.send_error(404)
-            p = deck_file(t[0], t[1], rest, SHARE_ENGINE_TOP)
-            if not p: return self.send_error(404)
-            if os.path.basename(p) == 'index.html' and rest in ('', 'index.html'):
-                html = open(p, encoding='utf-8').read(); mh = re.search(r'<head[^>]*>', html, re.I)
-                html = html[:mh.end()] + VIEW_FLAG + html[mh.end():] if mh else VIEW_FLAG + html
-                data = html.encode('utf-8'); self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(data)))
-                self.send_header('Cache-Control', 'no-store'); self.send_header('Referrer-Policy', 'no-referrer'); self.send_header('X-Robots-Tag', 'noindex, nofollow'); self.end_headers()
-                if not head_only: self.wfile.write(data)
-                return
-            return self.send_file(p, head_only)
+            return self.serve_view(t[0], t[1], rest, head_only)
+        # 버전 미리보기(사용자 지정 2026-10-06) — 로그인한 주인 · 관리자만. 그 버전의 덱을 읽기 전용으로(공유 주소와 같은 모양)
+        m = VIEW_RE.match(path)
+        if m:
+            owner, did, vid, rest = m.group(1), m.group(2), m.group(3), (m.group(4) or '/').lstrip('/'); u = self.me()
+            if not u: self.send_response(302); self.send_header('Location', '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+            if not self.can(u, owner): return self.send_error(403, 'no access')
+            if m.group(4) is None: self.send_response(301); self.send_header('Location', path + '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+            html = vers.read(STORE.deck_dir(owner, did), vid)
+            if html is None: return self.send_error(404)
+            return self.serve_view(owner, did, rest, head_only, html)
         d = deck_of(path)
         if d:
             owner, did, rest = d
@@ -705,11 +772,12 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self.reply(200, {'ok': True})
             if path == '/api/classify': return self.classify(self.body(20_000))
             if path == '/api/ask': return self.ask(self.body(ASK_MAX_REQ))
-            if path in ('/api/edit', '/api/edit/undo', '/api/shot', '/api/asset', '/api/font', '/api/docset'):
+            if path in ('/api/edit', '/api/edit/undo', '/api/shot', '/api/asset', '/api/font', '/api/docset', '/api/versions'):
                 # 문서 첨부(25MB → base64 약 34MB)는 /api/asset 만 크게 받는다. 나머지(고치기 · 캡처 · 글꼴)는 12MB 그대로
                 req = self.body(36_000_000 if path == '/api/asset' else 12_000_000); self.deck_access(u, req.get('file'))
                 fn = {'/api/shot': lambda: shot(req, PORT), '/api/asset': lambda: save_asset(req), '/api/font': lambda: cache_font(req),
-                      '/api/edit': lambda: apply_edits(req), '/api/edit/undo': lambda: undo_edit(req), '/api/docset': lambda: docset(deck_of(req.get('file')), req)}[path]
+                      '/api/edit': lambda: apply_edits(req, u['id']), '/api/edit/undo': lambda: undo_edit(req, u['id']), '/api/docset': lambda: docset(deck_of(req.get('file')), req),
+                      '/api/versions': lambda: ver_post(deck_of(req.get('file')), req, u['id'])}[path]
                 return self.reply(200, fn())
             if path.startswith('/api/agent/'): return self.agent(u, path, self.body(200_000))
             return self.reply(404, {'error': '없는 주소'})
