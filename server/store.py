@@ -16,10 +16,13 @@ class Store:
         self.users = self._load(self.users_f, {'users': []})['users']; self.sess = self._load(self.sess_f, {})
         if not self.users:   # 처음 켤 때 관리자 하나 — 이전 프로토타입 와 같게 admin/admin(첫 로그인 뒤 바꾸라고 화면에서 알린다)
             self.add_user('admin', 'admin', 'admin', '관리자', must_change=True)
-        self.shares = {}
+        self.shares = {}; self.pins = {}   # shares: 토큰 → (계정, 덱) 「최신」 링크 · pins: 토큰 → (계정, 덱, 버전 id) 「그 버전에 고정」 링크(2026-10-07)
         for x in self.decks():
-            t = (self._load(os.path.join(self.deck_dir(x['owner'], x['id']), 'meta.json'), {}) or {}).get('share', {}).get('token')
+            m = self._load(os.path.join(self.deck_dir(x['owner'], x['id']), 'meta.json'), {}) or {}
+            t = (m.get('share') or {}).get('token')
             if t: self.shares[t] = (x['owner'], x['id'])
+            for pn in m.get('pins') or []:
+                if pn.get('token') and pn.get('ver'): self.pins[pn['token']] = (x['owner'], x['id'], pn['ver'])
 
     def _load(self, f, dflt):
         try: return json.load(open(f, encoding='utf-8'))
@@ -147,13 +150,43 @@ class Store:
                 old = secrets.token_urlsafe(18); m['share'] = {'token': old, 'at': int(time.time())}; self.shares[old] = (owner, did)
             self._save(f, m); return old
     def share_find(self, token):
-        t = self.shares.get(token)
-        return t if t and os.path.isfile(os.path.join(self.deck_dir(*t), 'index.html')) else None
+        t = self.shares.get(token) or (self.pins.get(token) or (None,))[:2]
+        return tuple(t) if t and len(t) == 2 and os.path.isfile(os.path.join(self.deck_dir(*t), 'index.html')) else None
+    def share_ver(self, token):
+        """고정 링크면 그 버전 id, 최신 링크면 None"""
+        return (self.pins.get(token) or (None, None, None))[2]
+    def pins_of(self, owner, did):
+        return [dict(x) for x in ((self._load(os.path.join(self.deck_dir(owner, did), 'meta.json'), {}) or {}).get('pins') or [])]
+    def pin_add(self, owner, did, ver, by=''):
+        """버전 하나에 고정한 읽기 링크 — 같은 버전이면 있던 링크를 그대로(토큰이 늘어나지 않게). 돌려주는 값 = 토큰"""
+        with LOCK:
+            f = os.path.join(self.deck_dir(owner, did), 'meta.json'); m = self._load(f, None)
+            if m is None: raise ValueError('없는 덱')
+            pins = m.setdefault('pins', [])
+            for x in pins:
+                if x.get('ver') == ver: return x['token']
+            tok = secrets.token_urlsafe(18); pins.append({'token': tok, 'ver': ver, 'at': int(time.time()), 'by': by}); self.pins[tok] = (owner, did, ver); self._save(f, m); return tok
+    def pin_remove(self, owner, did, token):
+        """고정 링크 끄기. 돌려주는 값 = (끈 링크의 버전, 같은 버전에 남은 링크가 있나)"""
+        with LOCK:
+            f = os.path.join(self.deck_dir(owner, did), 'meta.json'); m = self._load(f, None)
+            if m is None: raise ValueError('없는 덱')
+            gone = next((x for x in m.get('pins') or [] if x.get('token') == token), None)
+            if not gone: raise ValueError('없는 링크')
+            m['pins'] = [x for x in m['pins'] if x.get('token') != token]
+            if not m['pins']: m.pop('pins')
+            self.pins.pop(token, None); self._save(f, m); return gone['ver'], any(x.get('ver') == gone['ver'] for x in m.get('pins') or [])
+    def share_clear(self, owner, did):
+        """최신 링크 · 고정 링크를 모두 끊는다(덱을 휴지통으로 보낼 때)"""
+        with LOCK:
+            f = os.path.join(self.deck_dir(owner, did), 'meta.json'); m = self._load(f, None)
+            if m is None: return
+            for x in m.get('pins') or []: self.pins.pop(x.get('token'), None)
+            self.shares.pop((m.get('share') or {}).get('token') or '', None); m.pop('share', None); m.pop('pins', None); self._save(f, m)
 
     def delete_deck(self, owner, did):
         d = self.deck_dir(owner, did)
         if not os.path.isdir(d): raise ValueError('없는 덱')
-        try: self.share_set(owner, did, False)   # 휴지통으로 가면 공유 주소도 끊는다(되살려도 새로 켜야)
-        except ValueError: pass
+        self.share_clear(owner, did)   # 휴지통으로 가면 공유 주소(최신 · 버전 고정)도 모두 끊는다(되살려도 새로 켜야)
         trash = os.path.join(self.dir, 'trash', owner); os.makedirs(trash, exist_ok=True)   # 바로 지우지 않고 휴지통으로(되살릴 수 있게)
         shutil.move(d, os.path.join(trash, f'{did}-{int(time.time())}'))

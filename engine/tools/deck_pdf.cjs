@@ -17,6 +17,7 @@ const { chromium } = (() => { try { return require('playwright'); } catch (e) { 
 const KEY = process.env.DECK_SHOT_KEY || '';
 const [url, out] = process.argv.slice(2); const MODE = process.env.MODE === 'image' ? 'image' : 'vector';
 const SCALE = Math.max(1, Math.min(3, Number(process.env.SCALE) || 2));
+const FLAT = process.env.FLAT === '1';   // 그림자 · 필터를 없앤다 — 이 PDF 를 LibreOffice 로 PPT 로 바꿀 때 상자 그림자가 검은 덩어리가 됐다(2026-10-07 실측)
 const STILL = '#ppt-home, #bar, body > *:not(#view) { display: none !important; } #view > *:not(#stage) { display: none !important; } #tip { display: none !important; } body { --fit-top: 0px !important; --fit-left: 0px !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }';
 
 // 페이지 i 를 마지막 단계까지 펼치고 움직임이 멎을 때까지
@@ -42,6 +43,7 @@ const settle = async (p, i) => {
     await p.waitForFunction(() => window.__deckReady, null, { timeout: 15000 }).catch(() => {});
     await p.emulateMedia({ media: 'screen' });
     await p.addStyleTag({ content: STILL });
+    if (FLAT) await p.addStyleTag({ content: '*, *::before, *::after { box-shadow: none !important; text-shadow: none !important; filter: none !important; backdrop-filter: none !important; }' });
     if (MODE === 'vector') await p.addStyleTag({ url: new URL('/fonts/print/print.css', url).href }).catch((e) => errors.push(`PDF 글꼴 없음(가변 글꼴로 — 커진다): ${e.message.slice(0, 80)}`));
     await p.evaluate(async () => { document.body.classList.add('dfs'); window.DeckZoom?.reset?.(); dispatchEvent(new Event('resize')); await document.fonts.ready; });
     const n = await p.evaluate(() => deck.slides.length);

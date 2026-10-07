@@ -1,6 +1,7 @@
 // 버전 기록 — 구글 문서의 「버전 기록」처럼(사용자 지정 2026-10-06 "ppt 수정이 일어나면 구글 되돌리기처럼 되돌릴 수 있게").
 //   왼쪽 = 고른 버전의 덱(읽기 전용 미리보기 /v/<계정>/<덱>/<버전>/ — 넘겨 볼 수 있다), 오른쪽 = 날짜별 목록(시간 · 한 일 · 바뀐 페이지 · 누가).
 //   위 탭 [현재와 비교] = 고른 버전 이후 쌓인 변경을 **합쳐서** — 수정 · 추가 · 삭제 페이지 목록(타일) → 누르면 「바뀐 곳 · 겹쳐 보기」 비교 화면(DeckKit.shotView, 이전 = 그 버전 · 이후 = 현재)
+//   헤더 [⋯]: 이 버전 공유 링크(그 버전에 고정, 2026-10-07) · 이 버전으로 새 발표 자료 · PPT(화면 그대로 / 글자 편집 가능 베타) · PDF 로 받기
 //   [이 버전 복원하기]는 복원 직전 상태도 새 버전으로 남기므로 복원도 되돌릴 수 있다. 서버: js/deckset.js 의 「버전 기록 보기」가 연다.
 //   API GET /api/versions?file= · POST /api/versions {file, action: restore, id}. 저장은 server/versions.py(.versions/, gzip, 30일 전부 + 이후 하루 1개, 최대 200개)
 (() => {
@@ -16,6 +17,15 @@
   #dver .vt span { display: block; color: #7a828e; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #dver .vrestore { flex: none; height: 44px; padding: 0 22px; border: 0; border-radius: 99px; background: #1a56db; color: #fff; font: 800 14.5px 'Noto Sans KR', sans-serif; cursor: pointer; transition: background .15s, transform .08s; }
   #dver .vrestore:hover { background: #1647b8; } #dver .vrestore:active { transform: scale(0.98); } #dver .vrestore:disabled { opacity: .55; cursor: default; } #dver .vrestore[hidden] { display: none; }
+  #dver .vmore { position: relative; flex: none; } #dver .vdots { width: 44px; height: 44px; border: 0; border-radius: 99px; background: #f2f3f6; font-size: 20px; font-weight: 900; cursor: pointer; color: #16181d; } #dver .vdots:hover { background: #e6e8ec; }
+  #dver .vmenu { position: absolute; right: 0; top: 52px; z-index: 5; min-width: 300px; background: #fff; border-radius: 14px; box-shadow: 0 12px 34px rgba(20,24,40,.22); padding: 6px; display: none; } #dver .vmenu.on { display: block; }
+  #dver .vmenu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 9px 12px; cursor: pointer; font: inherit; color: #16181d; } #dver .vmenu button:hover { background: #f2f3f6; } #dver .vmenu button:disabled { opacity: .5; cursor: default; }
+  #dver .vmenu b { display: block; font-size: 13.5px; font-weight: 800; } #dver .vmenu small { display: block; color: #7a828e; font-size: 12px; font-weight: 600; } #dver .vmenu hr { border: 0; border-top: 1px solid #eceef1; margin: 4px 6px; }
+  #dver .vdlg { position: absolute; inset: 0; z-index: 6; background: rgba(10,12,16,.5); display: none; align-items: center; justify-content: center; padding: 16px; } #dver .vdlg.on { display: flex; }
+  #dver .vdlg .bx { width: min(520px, 100%); background: #fff; border-radius: 18px; padding: 22px 22px 18px; } #dver .vdlg h4 { margin: 0 0 6px; font-size: 17px; font-weight: 800; } #dver .vdlg p { margin: 0 0 12px; color: #545b66; font-size: 13px; }
+  #dver .vdlg .url { display: flex; gap: 6px; } #dver .vdlg input { flex: 1; min-width: 0; font: 500 13px ui-monospace, Menlo, monospace; padding: 10px 12px; border: 1px solid #d5d9e2; border-radius: 10px; background: #f7f8fa; }
+  #dver .vdlg button { height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: #f2f3f6; font: 800 13.5px 'Noto Sans KR', sans-serif; cursor: pointer; color: #16181d; } #dver .vdlg button.pri { background: #1a56db; color: #fff; } #dver .vdlg .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  #dver .vi .vpin { margin-left: 8px; padding: 1px 8px; border-radius: 99px; background: #e8eefd; color: #1a56db; font-size: 11.5px; font-weight: 800; }
   #dver .vb { flex: 1; min-height: 0; display: flex; }
   #dver .vmain { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #0f1115; }
   #dver .vtabs { flex: none; display: flex; gap: 6px; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e6e8ec; overflow-x: auto; }
@@ -64,11 +74,15 @@
   const build = () => {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     root = document.createElement('div'); root.id = 'dver';
-    root.innerHTML = '<div class="vh"><button class="vback" title="닫기 (Esc)">←</button><div class="vt"><b>버전 기록</b><span></span></div><button class="vrestore" hidden>이 버전 복원하기</button></div>'
+    root.innerHTML = '<div class="vh"><button class="vback" title="닫기 (Esc)">←</button><div class="vt"><b>버전 기록</b><span></span></div><button class="vrestore" hidden>이 버전 복원하기</button><div class="vmore"><button class="vdots" title="더 보기">⋯</button><div class="vmenu"><button data-m="share"><b>이 버전 공유 링크 만들기</b><small>덱을 고쳐도 이 버전 그대로 보이는 읽기 링크</small></button><button data-m="copy"><b>이 버전으로 새 발표 자료 만들기</b><small>이 버전을 복사해 내 새 발표 자료로</small></button><hr><button data-m="pptx"><b>PPT 로 받기 · 화면 그대로</b><small>페이지마다 그림 한 장 — 가장 똑같지만 글자는 못 고침</small></button><button data-m="pptx-edit"><b>PPT 로 받기 · 글자 편집 가능 (베타)</b><small>굵은 글씨 · 간격 · 일부 모양이 달라질 수 있어요</small></button><button data-m="pdf"><b>PDF 로 받기</b><small>글자를 선택 · 검색할 수 있는 PDF</small></button></div></div></div><div class="vdlg"><div class="bx"></div></div>'
       + '<div class="vb"><div class="vmain"><div class="vtabs"><button data-t="view" class="on">이 버전 보기</button><button data-t="cmp" hidden>현재와 비교</button></div><div class="vstage"><iframe class="vfr" title="버전 미리보기"></iframe><div class="vcmp"></div></div></div><aside class="vside"><h4>버전 기록</h4><div class="vlist"></div></aside></div>';
     document.body.appendChild(root);
     root.querySelector('.vback').onclick = () => close();
     root.querySelector('.vrestore').onclick = restore;
+    root.querySelector('.vdots').onclick = (e) => { e.stopPropagation(); root.querySelector('.vmenu').classList.toggle('on'); };
+    root.querySelector('.vmenu').onclick = (e) => { const b = e.target.closest('[data-m]'); if (b) { root.querySelector('.vmenu').classList.remove('on'); onMenu(b.dataset.m); } };
+    root.addEventListener('pointerdown', (e) => { if (!e.target.closest('.vmore')) root.querySelector('.vmenu').classList.remove('on'); }, true);
+    root.querySelector('.vdlg').onclick = (e) => { if (e.target === root.querySelector('.vdlg') || e.target.closest('[data-x]')) root.querySelector('.vdlg').classList.remove('on'); };
     root.querySelector('.vtabs').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) tab(b.dataset.t); };
     root.querySelector('.vcmp').onclick = onCmp;
     root.querySelector('.vlist').onclick = (e) => { const b = e.target.closest('[data-id]'); if (b) pick(b.dataset.id); };
@@ -80,7 +94,7 @@
     for (const v of S.list) {
       const dy = day(v.t); if (dy !== last) { h += `<div class="vday">${dy}</div>`; last = dy; }
       const cg = chg(v);
-      h += `<button class="vi${v.id === S.sel ? ' on' : ''}" data-id="${esc(v.id)}"${chgTip(v) ? ` title="${esc(chgTip(v))}"` : ''}><span class="vtm">${fmt(v.t)}</span>${v.current ? '<span class="vcur">현재 버전</span>' : v.same ? '<span class="vcur">현재와 같음</span>' : ''}`
+      h += `<button class="vi${v.id === S.sel ? ' on' : ''}" data-id="${esc(v.id)}"${chgTip(v) ? ` title="${esc(chgTip(v))}"` : ''}><span class="vtm">${fmt(v.t)}</span>${v.current ? '<span class="vcur">현재 버전</span>' : v.same ? '<span class="vcur">현재와 같음</span>' : ''}${v.pinned ? '<span class="vpin">공유 중</span>' : ''}`
         + `${v.label ? `<span class="vlb">${esc(v.label)}</span>` : ''}${cg ? `<span class="vcg">${esc(cg)}</span>` : ''}<span class="vwho"><i style="background:${color(v.user || v.kind)}"></i>${esc(v.userName || '이전 기록')}</span></button>`;
     }
     box.innerHTML = h;
@@ -148,6 +162,41 @@
     const b = root.querySelector('.vrestore'); b.disabled = true; b.textContent = '복원하는 중…';
     try { await post({ action: 'restore', id: v.id }); location.reload(); }
     catch (e) { alert(`복원하지 못했습니다 — ${e.message}`); b.disabled = false; b.textContent = '이 버전 복원하기'; }
+  };
+  // ── 더 보기 메뉴: 공유 링크 · 새 발표 자료 · 내보내기 ──
+  const postDoc = async (action, extra) => { const r = await fetch('/api/docset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: FILE, action, ...extra }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`); return j; };
+  const dlg = (html) => { const d = root.querySelector('.vdlg'); d.querySelector('.bx').innerHTML = html; d.classList.add('on'); return d; };
+  const copyText = async (text) => { try { await navigator.clipboard.writeText(text); return true; } catch (e) { const t = document.createElement('input'); t.value = text; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e2) { /* 아래 */ } t.remove(); return ok; } };
+  const busy = (on, msg) => { root.querySelectorAll('.vmenu button, .vdots, .vrestore').forEach((b) => { b.disabled = !!on; }); if (msg !== undefined) root.querySelector('.vt span').dataset.msg = msg; };
+  const download = async (kind) => {
+    const v = S.list.find((x) => x.id === S.sel); if (!v) return; const N = { pdf: 'PDF', pptx: 'PPT', 'pptx-edit': 'PPT(편집 가능)' }[kind]; const sub = root.querySelector('.vt span'), keep = sub.textContent; const t0 = Date.now(); busy(true);
+    const iv = setInterval(() => { sub.textContent = `${N} 만드는 중… ${Math.round((Date.now() - t0) / 1000)}초 (쪽수에 따라 20~60초 안팎, 같은 내용이면 다음엔 바로)`; }, 500);
+    try {
+      const r = await fetch(`/export/${OWN}/${DID}/${encodeURIComponent(v.current ? 'current' : v.id)}/${kind}`, { cache: 'no-store' }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+      const cd = r.headers.get('Content-Disposition') || ''; const nm = decodeURIComponent((cd.match(/filename\*=UTF-8''([^;]+)/) || [])[1] || '') || `deck.${kind === 'pdf' ? 'pdf' : 'pptx'}`;
+      const blob = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nm; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+      sub.textContent = `${N} 받음 — ${nm}`; setTimeout(() => { if (sub.textContent.startsWith(N)) sub.textContent = keep; }, 4000);
+    } catch (e) { sub.textContent = keep; alert(`${N} 를 만들지 못했습니다 — ${e.message}`); }
+    clearInterval(iv); busy(false);
+  };
+  const onMenu = async (m2) => {
+    const v = S.list.find((x) => x.id === S.sel); if (!v) return;
+    if (m2 === 'pptx' || m2 === 'pptx-edit' || m2 === 'pdf') return download(m2);
+    if (m2 === 'share') {
+      busy(true);
+      try {
+        const j = await postDoc('pin_on', { ver: v.id }); const pin = j.pins.find((x) => x.token === j.pin) || j.pins[0]; const url = location.origin + pin.path;
+        const d = dlg(`<h4>이 버전 공유 링크</h4><p>「${esc(fmt(v.t))}」 버전을 <b>읽기만</b> 할 수 있는 링크입니다. 로그인 없이 열리고, 이 뒤에 덱을 고쳐도 이 버전 그대로 보입니다. 끄려면 ⚙ 문서 설정 → 읽기 공유 → 「버전에 고정한 링크」에서 끌 수 있어요.</p><div class="url"><input readonly value="${esc(url)}"><button class="pri" data-c="1">복사</button></div><div class="row"><a href="${esc(pin.path)}" target="_blank" rel="noopener" style="align-self:center;color:#1a56db;font-weight:800;text-decoration:none">열어 보기 ↗</a><button data-x="1">닫기</button></div>`);
+        d.querySelector('input').select(); d.querySelector('[data-c]').onclick = async (e) => { e.target.textContent = (await copyText(url)) ? '복사됨 ✓' : '선택됨 — Ctrl+C'; };
+        const r = await fetch('/api/versions?file=' + encodeURIComponent(FILE), { cache: 'no-store' }); const jj = await r.json(); S.list = jj.versions || S.list; render();
+      } catch (e) { alert(`공유 링크를 만들지 못했습니다 — ${e.message}`); }
+      busy(false); return;
+    }
+    if (m2 === 'copy') {
+      const t = prompt('새 발표 자료 이름', `${(document.title || '발표 자료').slice(0, 60)} (복사본)`); if (t === null) return;
+      busy(true); try { const j = await post({ action: 'copy', id: v.id, title: t }); location.href = j.url; } catch (e) { alert(`새 발표 자료를 만들지 못했습니다 — ${e.message}`); busy(false); }
+    }
   };
   const close = () => { root.classList.remove('on'); root.querySelector('.vfr').src = 'about:blank'; };
   const open = async () => {

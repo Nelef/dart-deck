@@ -18,6 +18,8 @@ RUN cp server/fonts-ko.conf /etc/fonts/local.conf && fc-cache -f >/dev/null
 COPY engine ./engine
 # PDF 로 받기 — 가변 글꼴을 굵기별 고정 글꼴로(engine/tools/fontprint.py · fonttools). 크롬이 가변 글꼴을 PDF 에 Type 3 로 넣어 커지고 흐려서
 RUN python3 -m venv /opt/fonttools && /opt/fonttools/bin/pip install --no-cache-dir fonttools==4.60.2 brotli==1.2.0 && /opt/fonttools/bin/python engine/tools/fontprint.py
+# PPT 로 받기(화면 그대로) — 페이지 그림을 .pptx 로 묶는다(server/pptx_build.py · python-pptx). 글자 편집 가능 PPT 는 위의 LibreOffice 가 PDF 를 바꾼다
+RUN python3 -m venv /opt/pptx && /opt/pptx/bin/pip install --no-cache-dir python-pptx==1.0.2
 COPY web ./web
 
 ENV PPT_PORT=8900 PPT_DATA_DIR=/data DISABLE_AUTOUPDATER=1 PYTHONUNBUFFERED=1 DECK_LITE_BIN=/opt/litellm/bin/litellm

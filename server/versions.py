@@ -9,7 +9,7 @@ import os, re, json, time, gzip, glob, hashlib, secrets, threading, datetime
 LOCK = threading.RLock()
 KEEP_ALL_SEC = 30 * 86400
 KEEP_MAX = 200
-KINDS = ('create', 'import', 'build', 'ai', 'edit', 'undo', 'restore', 'legacy')   # 만듦 · 가져옴 · AI 가 새로 만듦 · AI 수정 · 직접 수정 · 되돌리기 · 복원 · 옛 기록
+KINDS = ('create', 'import', 'build', 'ai', 'edit', 'undo', 'restore', 'legacy', 'share', 'copy')   # 만듦 · 가져옴 · AI 가 새로 만듦 · AI 수정 · 직접 수정 · 되돌리기 · 복원 · 옛 기록
 ID_RE = re.compile(r'\d{9,11}-[0-9a-f]{4}')
 
 def vdir(d): return os.path.join(d, '.versions')
@@ -66,9 +66,10 @@ def _prune(d, idx, now):
     items = sorted(idx['items'], key=lambda x: x['t']); keep = []; seen_day = set()
     for x in reversed(items):   # 새 것부터
         day = datetime.date.fromtimestamp(x['t']).isoformat()
+        if x.get('pin'): keep.append(x); continue   # 공유 링크가 가리키는 버전은 늘 남긴다(개수 상한에도 안 걸린다)
         if now - x['t'] <= KEEP_ALL_SEC or x is items[-1]: keep.append(x)
         elif day not in seen_day: keep.append(x); seen_day.add(day)   # 30일 지난 것은 하루의 마지막 것만
-        if len(keep) >= KEEP_MAX: break
+        if sum(1 for k in keep if not k.get('pin')) >= KEEP_MAX: break
     gone = {x['id'] for x in items} - {x['id'] for x in keep}
     for vid in gone:
         try: os.remove(os.path.join(vdir(d), f'{vid}.html.gz'))
@@ -136,6 +137,17 @@ def listing(d, diff=None):
         if out and out[0]['h'] == hc: out[0]['current'] = True
         else: out.insert(0, {'id': 'current', 't': mt, 'u': '', 'k': 'legacy', 'l': '현재 상태(기록 없음)', 'current': True, 'same': True})
     return out
+
+def set_pin(d, vid, on):
+    """공유 링크가 가리키는 버전 표시 — 켜 있으면 보관 정리에서 안 지운다"""
+    with LOCK:
+        idx = _load(d)
+        for x in idx['items']:
+            if x['id'] == vid:
+                if on: x['pin'] = 1
+                else: x.pop('pin', None)
+                _save(d, idx); return True
+    return False
 
 def get(d, vid):
     for x in listing(d):

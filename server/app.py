@@ -6,7 +6,7 @@
 #   권한: 덱 주인 또는 관리자만. 캡처 도구(서버 안에서 도는 크롬)는 이 컴퓨터에서 온 요청 + 서버가 켤 때 만든 캡처 키(x-shot-key)로 들어온다 —
 #         localhost 라는 것만으로 열어 주면 같은 컴퓨터의 역방향 프록시를 거친 모든 요청이 로그인 없이 통과한다
 #   Claude 구독 토큰은 계정에 묶어 서버에만 둔다(store.py) — 화면 · 응답 · 로그로 내보내지 않는다(로그에는 길이만)
-import os, re, sys, json, glob, uuid, time, base64, hashlib, secrets, datetime, subprocess, shutil, socketserver, http.server, urllib.request, urllib.parse, mimetypes, html as htmlmod
+import os, re, sys, json, glob, uuid, time, base64, hashlib, secrets, datetime, subprocess, shutil, tempfile, socketserver, http.server, urllib.request, urllib.parse, mimetypes, html as htmlmod
 import importlib.util as _ilu
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
@@ -162,12 +162,34 @@ def ver_shots(owner, did, vid, names):
     before = run(old, [x['o'] for x in items]); t.join(); after = got.get('w') or {}
     return {'ok': True, 'shots': [{**x, 'before': before.get(str(x['o']), '') if x['o'] else '', 'after': after.get(str(x['w']), '') if x['w'] else ''} for x in items]}
 
+def _link_or_copy(src, dst):
+    """덱의 사진 · 쪽 그림은 한 번 쓰면 안 바뀌는 파일이라 같은 디스크면 하드링크(용량 0), 안 되면 복사"""
+    try: os.link(src, dst)
+    except OSError: shutil.copy2(src, dst)
+
+def ver_copy(user, owner, did, vid, title):
+    """고른 버전을 **새 발표 자료**로(사용자 지정 2026-10-07) — 그 버전의 HTML + 사진 · 데이터 폴더. 새 덱은 이 사람 것이고 버전 기록은 새로 시작한다(brief · 옛 기록은 안 가져옴)"""
+    d = STORE.deck_dir(owner, did); html = vers.read(d, vid); it = ver_item(d, vid)
+    if html is None or not it: raise ValueError('그 버전을 찾을 수 없습니다(보관 기간이 지났을 수 있습니다)')
+    meta = STORE._load(os.path.join(d, 'meta.json'), {}) or {}; t0 = meta.get('title') or did
+    lt = time.localtime(it['t']); when = f"{lt.tm_mon}월 {lt.tm_mday}일 {'오전' if lt.tm_hour < 12 else '오후'} {lt.tm_hour % 12 or 12}:{lt.tm_min:02d}"
+    title = re.sub(r'\s+', ' ', str(title or '')).strip()[:80] or f'{t0} (복사본)'
+    new_did, nd = STORE.create_deck(user['id'], title, html)
+    for sub in sorted(os.listdir(d)):
+        sp = os.path.join(d, sub)
+        if sub.startswith('.') or sub in ('index.html', 'meta.json', 'brief.json') or os.path.islink(sp) or not os.path.isdir(sp): continue   # 숨김 · 엔진 링크 · 설문 자료는 제외
+        shutil.copytree(sp, os.path.join(nd, sub), copy_function=_link_or_copy, symlinks=True, dirs_exist_ok=True)
+    link_engine(nd)
+    m = STORE._load(os.path.join(nd, 'meta.json'), {}); m['copiedFrom'] = {'owner': owner, 'deck': did, 'ver': vid, 'at': int(time.time())}; STORE._save(os.path.join(nd, 'meta.json'), m)
+    ver_snap(os.path.join(nd, 'index.html'), html, None, user['id'], 'copy', f'「{t0}」 {when} 버전에서 복사')
+    return {'ok': True, 'id': new_did, 'url': f'/d/{user["id"]}/{new_did}/', 'title': title}
+
 def ver_list(owner, did):
     d = STORE.deck_dir(owner, did); names = {x['id']: x.get('name') or x['id'] for x in STORE.users}
     out = []
     for x in vers.listing(d, diff=ver_chg):
         out.append({'id': x['id'], 't': x['t'], 'user': x.get('u') or '', 'userName': names.get(x.get('u') or '', x.get('u') or ''), 'kind': x.get('k'), 'label': x.get('l') or '',
-                    'current': bool(x.get('current')), 'same': bool(x.get('same')), 'chg': x.get('chg') or {}, 'first': x.get('f') or 0, 'size': x.get('z') or 0})
+                    'current': bool(x.get('current')), 'same': bool(x.get('same')), 'pinned': bool(x.get('pin')), 'chg': x.get('chg') or {}, 'first': x.get('f') or 0, 'size': x.get('z') or 0})
     return {'ok': True, 'versions': out}
 
 def apply_edits(req, by=''):
@@ -359,9 +381,9 @@ THUMB_TOOL = os.path.join(ENGINE, 'tools', 'deck_thumb.cjs')
 PDF_TOOL = os.path.join(ENGINE, 'tools', 'deck_pdf.cjs')
 PDF_LOCKS = {}; PDF_SEM = _th.Semaphore(2)   # 크롬이 하나에 300MB 안팎 — 동시에 두 개까지(나머지는 줄을 선다)
 
-def pdf_key(d):
-    """PDF 가 옛것인지 — 덱 파일(index.html · data · img) 중 가장 늦게 바뀐 시각 + 엔진(js · css · tools · 글꼴 CSS)이 바뀐 시각"""
-    ts = [os.path.getmtime(os.path.join(d, 'index.html'))]
+def pdf_key(d, index=True):
+    """PDF 가 옛것인지 — 덱 파일(index.html · data · img) 중 가장 늦게 바뀐 시각 + 엔진(js · css · tools · 글꼴 CSS)이 바뀐 시각. index=False 면 index.html 은 뺀다(버전 내보내기는 HTML 내용 해시를 따로 쓴다)"""
+    ts = [os.path.getmtime(os.path.join(d, 'index.html'))] if index else [0]
     for sub in ('data', 'img', 'fonts'):
         for root, _, fs in os.walk(os.path.join(d, sub)):
             ts += [os.path.getmtime(os.path.join(root, f)) for f in fs if not f.startswith('.')]
@@ -389,6 +411,84 @@ def make_pdf(owner, did):
         except OSError: pass
         return out, info
 
+# ── 내보내기(사용자 지정 2026-10-07 "ppt 로 변환 · 버전별") — 현재 덱이든 옛 버전이든 같은 방식: 그 HTML 을 숨김 미리보기 파일로 두고 캡처 도구가 연다 ──
+#   pdf = 벡터 PDF(위와 같음) · pptx = 페이지마다 화면 그림 한 장(deck_pptx.cjs → pptx_build.py, 화면과 같은 모양) ·
+#   pptx-edit = 글자 편집 가능(베타): 그림자를 뺀 벡터 PDF → LibreOffice(PDF 가져오기 → pptx). 글상자 · 도형으로 나오지만 굵은 글씨 · 글자 간격이 조금 달라진다(실측 2026-10-07)
+EXPORTS = {'pdf': ('pdf', 'application/pdf'), 'pptx': ('pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'), 'pptx-edit': ('pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')}
+PPTX_PY = os.environ.get('PPTX_PY') or ('/opt/pptx/bin/python' if os.path.exists('/opt/pptx/bin/python') else sys.executable)
+PPTX_BUILD = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pptx_build.py'); PPTX_TOOL = os.path.join(ENGINE, 'tools', 'deck_pptx.cjs')
+EXPORT_KEEP = 8   # 덱마다 만들어 둔 내보내기 파일은 가장 최근 8개까지
+
+def export_key(d, html): return vers.sha(html)[:16] + '-' + pdf_key(d, index=False)
+
+def _run_tool(cmd, timeout, env=None):
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env={**os.environ, 'NODE_PATH': NODE_PATH, **(env or {})})
+    try: return json.loads(r.stdout or '{}'), r
+    except ValueError: return {}, r
+
+def make_export(owner, did, vid, kind):
+    """덱의 한 버전(또는 current)을 kind 로 내보낸다 → (파일 경로, 정보). 같은 내용 · 같은 엔진이면 전에 만든 것을 쓴다(덱 폴더 .export/)"""
+    if kind not in EXPORTS: raise ValueError('모르는 형식')
+    d = STORE.deck_dir(owner, did); html = vers.read(d, vid)
+    if html is None: raise ValueError('그 버전을 찾을 수 없습니다(보관 기간이 지났을 수 있습니다)')
+    ext = EXPORTS[kind][0]; exp = os.path.join(d, '.export'); os.makedirs(exp, exist_ok=True)
+    out = os.path.join(exp, f'{kind}-{vid}.{ext}'); kf = out + '.key'; lock = PDF_LOCKS.setdefault((owner, did, vid, kind), _th.Lock())
+    title = (STORE._load(os.path.join(d, 'meta.json'), {}) or {}).get('title') or did
+    with lock:
+        key = export_key(d, html)
+        if os.path.exists(out) and os.path.exists(kf) and open(kf).read() == key: return out, {'cached': True}
+        tag = uuid.uuid4().hex[:10]; page = os.path.join(d, f'.deckpreview-exp-{tag}.html'); work = tempfile.mkdtemp(prefix='export-', dir=TMP_DIR if os.path.isdir(TMP_DIR) else None); tmp = out + '.tmp'
+        open(page, 'w', encoding='utf-8').write(html); url = f'http://127.0.0.1:{PORT}{url_of(page)}'
+        try:
+            with PDF_SEM:
+                t0 = time.time(); pages = 0
+                if kind == 'pdf':
+                    info, r = _run_tool([NODE, PDF_TOOL, url, tmp], 900); pages = info.get('pages') or 0
+                    if not os.path.exists(tmp) or not pages: raise ValueError('PDF 를 만들지 못했습니다 — ' + '; '.join(info.get('errors') or [r.stderr[-200:]]))
+                elif kind == 'pptx':
+                    info, r = _run_tool([NODE, PPTX_TOOL, url, work], 900); pages = info.get('pages') or 0
+                    if not pages: raise ValueError('페이지 그림을 찍지 못했습니다 — ' + '; '.join(info.get('errors') or [r.stderr[-200:]]))
+                    b = subprocess.run([PPTX_PY, PPTX_BUILD, work, tmp, title], capture_output=True, text=True, timeout=600)
+                    if b.returncode != 0 or not os.path.exists(tmp): raise ValueError('PPT 로 묶지 못했습니다 — ' + (b.stderr or b.stdout)[-200:])
+                else:
+                    if not importer.SOFFICE: raise ValueError('이 서버에는 PPT 변환 도구(LibreOffice)가 없습니다')
+                    pdf = os.path.join(work, 'flat.pdf'); info, r = _run_tool([NODE, PDF_TOOL, url, pdf], 900, {'FLAT': '1'}); pages = info.get('pages') or 0
+                    if not os.path.exists(pdf) or not pages: raise ValueError('PDF 를 만들지 못했습니다 — ' + '; '.join(info.get('errors') or [r.stderr[-200:]]))
+                    c = subprocess.run([importer.SOFFICE, f'-env:UserInstallation=file://{os.path.join(work, "lo-profile")}', '--headless', '--norestore', '--infilter=impress_pdf_import', '--convert-to', 'pptx', '--outdir', work, pdf], capture_output=True, text=True, timeout=600)
+                    made = os.path.join(work, 'flat.pptx')
+                    if not os.path.exists(made): raise ValueError('PPT 로 바꾸지 못했습니다 — ' + (c.stderr or c.stdout)[-200:])
+                    shutil.move(made, tmp)
+                took = time.time() - t0
+            os.replace(tmp, out); open(kf, 'w').write(key)
+            try:   # 다음 예상 시간에 쓴다(이 서버의 속도) + 오래된 파일 정리
+                ip = os.path.join(exp, 'info.json'); inf = STORE._load(ip, {}) or {}; inf[kind] = {'pages': pages, 'sec': round(took, 1)}; json.dump(inf, open(ip, 'w'))
+                fs = sorted([f for f in os.listdir(exp) if f.endswith(('.pdf', '.pptx'))], key=lambda f: -os.path.getmtime(os.path.join(exp, f)))
+                for f in fs[EXPORT_KEEP:]:
+                    for g in (f, f + '.key'):
+                        try: os.remove(os.path.join(exp, g))
+                        except OSError: pass
+            except Exception: pass
+            return out, {'cached': False, 'pages': pages, 'sec': round(took, 1)}
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+            for f in (page, tmp):
+                try: os.remove(f)
+                except OSError: pass
+
+# 내보내기 예상 시간 = 고정 + 페이지당(맥 실측으로 정한 기본값 — 만든 뒤에는 그 덱에서 잰 실제 속도로 맞춘다)
+EXP_BASE = {'pdf': (5.0, 1.0), 'pptx': (6.0, 1.5), 'pptx-edit': (9.0, 1.2)}
+def exp_cached(d, kind):
+    """지금 덱의 kind 내보내기를 이미 만들어 뒀나(내용 · 엔진이 같으면 바로 받는다)"""
+    try:
+        out = os.path.join(d, '.export', f'{kind}-current.{EXPORTS[kind][0]}'); kf = out + '.key'
+        return os.path.exists(out) and os.path.exists(kf) and open(kf).read() == export_key(d, open(os.path.join(d, 'index.html'), encoding='utf-8').read())
+    except OSError: return False
+
+def exp_est(d, kind, pages):
+    fx, pp = EXP_BASE[kind]; base = fx + pp * pages; k = 1.0; last = ((STORE._load(os.path.join(d, '.export', 'info.json'), {}) or {}).get(kind))
+    if last and last.get('pages') and last.get('sec'): k = max(0.4, min(4.0, last['sec'] / (fx + pp * last['pages'])))
+    return max(3, round(base * k))
+
 # PDF 예상 시간 = 고정(크롬 켜기 · 글꼴 불러오기) + 페이지당. 처음엔 아래 기본값, 한 번 만들고 나면 그 덱에서 잰 실제 시간으로 이 서버 속도에 맞춘다
 PDF_FIXED_SEC, PDF_PAGE_SEC = 5.0, 1.0   # 실측(2026-10-01 맥, 덱 3개): 11쪽 12초 · 13쪽 17초 · 16쪽 15초 — 서버가 느리면 첫 PDF 뒤부터 그 덱은 실제 속도로 맞춘다
 def slide_count(idx):
@@ -403,22 +503,51 @@ def pdf_status(owner, did):
     return {'pages': pages, 'cached': bool(cached), 'estSec': 0 if cached else max(3, round(base * k)), 'bytes': os.path.getsize(out) if cached else 0}
 
 def ver_post(d, req, who):
-    owner, did, _ = d; a = req.get('action')
+    owner, did, _ = d; a = req.get('action'); who_user = STORE.user(who)
     if a == 'restore': return ver_restore(owner, did, str(req.get('id') or ''), who)
     if a == 'list': return ver_list(owner, did)
     if a == 'compare': return ver_compare(owner, did, str(req.get('id') or ''))
+    if a == 'copy': return ver_copy(who_user, owner, did, str(req.get('id') or ''), req.get('title'))
     if a == 'shots': return ver_shots(owner, did, str(req.get('id') or ''), req.get('names') if isinstance(req.get('names'), list) else [])
     raise ValueError('모르는 작업')
 
-def docset(d, req):
+def docset(d, req, who=''):
     """문서 설정 — 읽기 공유 켜기 · 끄기 · 새 주소 + PDF 상태. d = deck_of(file) (권한은 호출 쪽에서 확인)"""
-    owner, did, _ = d; a = req.get('action') or 'get'
+    owner, did, _ = d; a = req.get('action') or 'get'; newpin = ''
     if a == 'share_on': STORE.share_set(owner, did, True)
     elif a == 'share_renew': STORE.share_set(owner, did, True, renew=True)
     elif a == 'share_off': STORE.share_set(owner, did, False)
+    elif a == 'pin_on': newpin = pin_on(owner, did, str(req.get('ver') or ''), who)
+    elif a == 'pin_off': pin_off(owner, did, str(req.get('token') or ''))
     elif a != 'get': raise ValueError('모르는 작업')
     tok = STORE.share_of(owner, did)
-    return {'ok': True, 'share': f'/s/{tok}/' if tok else '', 'pdf': pdf_status(owner, did)}
+    pst = pdf_status(owner, did); dd = STORE.deck_dir(owner, did)
+    return {'ok': True, 'share': f'/s/{tok}/' if tok else '', 'pin': newpin, 'pins': pins_info(owner, did), 'pdf': pst, 'export': {k: {'estSec': exp_est(dd, k, pst['pages']), 'cached': exp_cached(dd, k)} for k in ('pptx', 'pptx-edit')}}
+
+# ── 버전별 공유 링크(사용자 지정 2026-10-07 "링크 공유는 버전별로 저장") — /s/<토큰>/ 이 그 버전의 덱을 읽기 전용으로 보여 준다. 그 뒤에 덱을 고쳐도 링크는 안 바뀐다 ──
+def ver_item(d, vid):
+    """버전 id → 목록 항목. 'current' 는 지금 덱을 나타내는 항목(기록의 마지막과 같으면 그 항목, 아니면 기록 없는 현재 상태)"""
+    if vid == 'current': return next((x for x in vers.listing(d) if x.get('current')), None)
+    return vers.get(d, vid)
+
+def pin_on(owner, did, vid, who):
+    d = STORE.deck_dir(owner, did); it = ver_item(d, vid)
+    if not it: raise ValueError('그 버전을 찾을 수 없습니다(보관 기간이 지났을 수 있습니다)')
+    vid = it['id']
+    if vid == 'current':   # 기록 없는 지금 상태 — 먼저 한 버전으로 남겨 그 id 에 고정한다
+        cur = open(os.path.join(d, 'index.html'), encoding='utf-8').read(); vid = vers.snapshot(d, cur, None, who, 'share', '공유 링크용 저장', diff=ver_chg)
+    tok = STORE.pin_add(owner, did, vid, who); vers.set_pin(d, vid, True); return tok
+
+def pin_off(owner, did, token):
+    ver, still = STORE.pin_remove(owner, did, token)
+    if not still: vers.set_pin(STORE.deck_dir(owner, did), ver, False)   # 같은 버전을 가리키는 링크가 더 없으면 보관 정리 대상으로 돌린다
+
+def pins_info(owner, did):
+    d = STORE.deck_dir(owner, did); names = {x['id']: x.get('name') or x['id'] for x in STORE.users}; by_id = {x['id']: x for x in vers.listing(d)}; out = []
+    for x in STORE.pins_of(owner, did):
+        v = by_id.get(x.get('ver')) or {}
+        out.append({'token': x['token'], 'path': f"/s/{x['token']}/", 'ver': x.get('ver'), 'at': x.get('at'), 'versionAt': v.get('t'), 'label': v.get('l') or '', 'by': names.get(x.get('by') or '', x.get('by') or '')})
+    return sorted(out, key=lambda x: -(x['at'] or 0))
 THUMB_SEM = _th.Semaphore(2); THUMB_BUSY = {}; THUMB_LOCK = _th.Lock()
 def thumb_path(owner, did): return os.path.join(STORE.deck_dir(owner, did), '.thumb.jpg')
 def thumb_fresh(owner, did):
@@ -684,6 +813,24 @@ class H(http.server.BaseHTTPRequestHandler):
                 if os.path.exists(t): _th.Thread(target=make_thumb, args=(owner, did), daemon=True).start()   # 옛 것을 주고 뒤에서 새로
                 elif not make_thumb(owner, did): return self.send_error(404)
             return self.send_file(t, head_only)
+        # 내보내기(사용자 지정 2026-10-07) — /export/<계정>/<덱>/<버전|current>/<pdf|pptx|pptx-edit>: 현재든 옛 버전이든. 덱 주인 · 관리자만
+        m = re.fullmatch(r'/export/([a-z0-9][a-z0-9_.-]{1,31})/(\d{8}-[0-9a-f]{6})/(current|\d{9,11}-[0-9a-f]{4})/(pdf|pptx|pptx-edit)', path)
+        if m:
+            owner, did, vid, kind = m.groups(); u = self.me()
+            if not self.can(u, owner) or not os.path.isfile(os.path.join(STORE.deck_dir(owner, did), 'index.html')): return self.send_error(404)
+            try: f, info = make_export(owner, did, vid, kind)
+            except Exception as e: return self.reply(500, {'error': str(e)})
+            d = STORE.deck_dir(owner, did); title = (STORE._load(os.path.join(d, 'meta.json'), {}) or {}).get('title') or did; tag = ''
+            if vid != 'current':
+                it = vers.get(d, vid)
+                if it: lt = time.localtime(it['t']); tag = f" ({lt.tm_mon}월 {lt.tm_mday}일 {'오전' if lt.tm_hour < 12 else '오후'} {lt.tm_hour % 12 or 12}.{lt.tm_min:02d} 버전)"
+            name = re.sub(r'[\\/:*?"<>|]+', ' ', title).strip()[:70] + tag + ('' if kind != 'pptx-edit' else ' (편집용)') + '.' + EXPORTS[kind][0]
+            data = open(f, 'rb').read()
+            self.send_response(200); self.send_header('Content-Type', EXPORTS[kind][1]); self.send_header('Content-Length', str(len(data)))
+            self.send_header('Content-Disposition', "attachment; filename=\"deck." + EXPORTS[kind][0] + "\"; filename*=UTF-8''" + urllib.parse.quote(name)); self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Export-Info', urllib.parse.quote(json.dumps({k: info.get(k) for k in ('cached', 'pages', 'sec')}))); self.end_headers()
+            if not head_only: self.wfile.write(data)
+            return
         # PDF 로 받기(사용자 지정 2026-10-01) — 덱 주인 · 관리자만. 화면 그대로 찍은 PDF(engine/tools/deck_pdf.cjs)
         m = re.fullmatch(r'/pdf/([a-z0-9][a-z0-9_.-]{1,31})/(\d{8}-[0-9a-f]{6})\.pdf', path)
         if m:
@@ -712,7 +859,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 if not head_only: self.wfile.write(msg)
                 return
             if m.group(2) is None: self.send_response(301); self.send_header('Location', path + '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
-            return self.serve_view(t[0], t[1], rest, head_only)
+            pv = STORE.share_ver(tok); html = None
+            if pv:   # 그 버전에 고정된 링크 — 덱을 그 뒤에 고쳐도 이 링크는 그때 모습
+                html = vers.read(STORE.deck_dir(t[0], t[1]), pv)
+                if html is None: return self.send_error(404)
+            return self.serve_view(t[0], t[1], rest, head_only, html)
         # 버전 미리보기(사용자 지정 2026-10-06) — 로그인한 주인 · 관리자만. 그 버전의 덱을 읽기 전용으로(공유 주소와 같은 모양)
         m = VIEW_RE.match(path)
         if m:
@@ -805,7 +956,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 # 문서 첨부(25MB → base64 약 34MB)는 /api/asset 만 크게 받는다. 나머지(고치기 · 캡처 · 글꼴)는 12MB 그대로
                 req = self.body(36_000_000 if path == '/api/asset' else 12_000_000); self.deck_access(u, req.get('file'))
                 fn = {'/api/shot': lambda: shot(req, PORT), '/api/asset': lambda: save_asset(req), '/api/font': lambda: cache_font(req),
-                      '/api/edit': lambda: apply_edits(req, u['id']), '/api/edit/undo': lambda: undo_edit(req, u['id']), '/api/docset': lambda: docset(deck_of(req.get('file')), req),
+                      '/api/edit': lambda: apply_edits(req, u['id']), '/api/edit/undo': lambda: undo_edit(req, u['id']), '/api/docset': lambda: docset(deck_of(req.get('file')), req, u['id']),
                       '/api/versions': lambda: ver_post(deck_of(req.get('file')), req, u['id'])}[path]
                 return self.reply(200, fn())
             if path.startswith('/api/agent/'): return self.agent(u, path, self.body(200_000))
