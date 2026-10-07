@@ -476,7 +476,7 @@ def make_export(owner, did, vid, kind):
                 except OSError: pass
 
 # 내보내기 예상 시간 = 고정 + 페이지당(맥 실측으로 정한 기본값 — 만든 뒤에는 그 덱에서 잰 실제 속도로 맞춘다)
-EXP_BASE = {'pdf': (5.0, 1.0), 'pptx': (6.0, 1.5), 'pptx-edit': (9.0, 1.2)}
+EXP_BASE = {'pdf': (5.0, 1.0), 'pptx': (5.0, 1.0), 'pptx-edit': (6.0, 0.85)}   # GPU 서버 실측(24쪽): PDF 25.7초 · PPT 그림 29.6초 · PPT 편집 26.3초 — 만든 뒤에는 실제 속도로 보정
 def exp_cached(d, kind):
     """지금 덱의 kind 내보내기를 이미 만들어 뒀나(내용 · 엔진이 같으면 바로 받는다)"""
     try:
