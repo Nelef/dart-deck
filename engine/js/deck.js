@@ -54,6 +54,8 @@
     if (!document.querySelector('#ppt-home')) { const a = document.createElement(VIEW ? 'div' : 'a'); a.id = 'ppt-home'; if (!VIEW) { a.href = '/'; a.title = '발표 자료 목록'; } a.innerHTML = '<img src="/web/ai-ppt.svg" alt="AI PPT">'; document.body.appendChild(a); }
     // 확대 · 축소(휠 · 핀치 · + − 0 · 끌어 이동)는 엔진 기본 — 덱 HTML 에 없어도 붙인다(사용자 지정 2026-09-30). 덱이 뒤에서 직접 불러오면 js/deckzoom.js 가 알아서 한 번만 붙는다
     if (!window.DeckZoom) setTimeout(() => { if (!window.DeckZoom && !document.querySelector('script[src$="deckzoom.js"]')) { const z = document.createElement('script'); z.src = 'js/deckzoom.js'; document.body.appendChild(z); } }, 0);
+    // 강조 도구(사용자 지정 2026-10-12 "강조 할 수 있게 도구 · 모두 지움 버튼") — 펜 · 형광펜 · 레이저 · 지우개(js/deckpen.js). 발표하는 사람의 도구라 읽기 모드(공유 주소)에도 붙인다. 서버의 캡처 크롬은 제외
+    if (!navigator.webdriver && !window.DeckPen) setTimeout(() => { if (!window.DeckPen && !document.querySelector('script[src$="deckpen.js"]')) { const z = document.createElement('script'); z.src = 'js/deckpen.js'; document.body.appendChild(z); } }, 0);
     // 문서 설정(사용자 지정 2026-10-01) — 오른쪽 위 ⚙: 읽기 공유 링크 + PDF 로 받기(js/deckset.js). 주인 · 관리자가 여는 /d/ 주소에서만(읽기 모드 · 서버의 캡처 크롬(webdriver)에선 안 붙음 — 찍은 그림에 단추가 끼지 않게)
     if (!VIEW && !navigator.webdriver && /^\/d\//.test(location.pathname) && !window.DeckSet) setTimeout(() => { if (!window.DeckSet && !document.querySelector('script[src$="deckset.js"]')) { const z = document.createElement('script'); z.src = 'js/deckset.js'; document.body.appendChild(z); } }, 0);
     if (!document.querySelector('link[rel~="icon"]')) { const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = '/web/favicon.svg'; document.head.appendChild(l); }
@@ -141,6 +143,7 @@
       const tb = $('#toc button.on'); if (tb) tb.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
       closeDrawer(); render();
       if (window.DeckKit && DeckKit.cfg) { DeckKit.hidePop(); DeckKit.refresh(); }
+      dispatchEvent(new CustomEvent('deckshow', { detail: { cur } }));   // 강조 도구(js/deckpen.js)가 그 페이지의 표시를 다시 그린다
     };
     // 다음 = 이 장의 다음 단계, 단계를 다 보면 다음 장(자동 재생이 부른 것이면 재생을 잇는다)
     const next = (auto = false) => {

@@ -191,7 +191,8 @@ body.dfs #view { inset: 0; }
 body.dfs #stage { border-radius: 0; box-shadow: none; }
 body.dfs #bar { background: rgba(15,17,21,.88); transform: translateY(100%); transition: transform .22s ease; z-index: 60; }
 body.dfs.dbar #bar { transform: none; }
-body.dfs:not(.dbar) { cursor: none; }
+/* 전체화면에서도 마우스 커서는 숨기지 않는다(사용자 지정 2026-10-12 "전체화면 하면 마우스가 자꾸 사라져" — 예전엔 조작줄이 숨은 동안 cursor: none) */
+body.dfs { cursor: auto; }
 /* [편집] 은 ← 위(왼쪽 아래), [AI] 는 ⛶ 위(오른쪽 아래)에 띄운다(사용자 지정 2026-09-30). 조작줄 안에서 위로 띄우는 것이라 조작줄과 같이 움직인다
    (전체화면에서 숨고 · AI 패널이 열리면 오른쪽 끝이 따라온다). 무대 위에 겹쳐도 된다(사용자 지정 — 버튼 자리를 따로 비우니 빈 띠가 생겨 무대만 작아졌다).
    좁은 화면은 조작줄 안 그대로 */
