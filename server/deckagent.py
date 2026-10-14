@@ -230,6 +230,23 @@ def _step(name, inp):
         return f'웹 읽기 {host}'
     return name
 
+def thread_session(path, tid, owner, engine):
+    """같은 대화방(thread)의 마지막 Claude Code 세션 id — 이어 묻기의 대화 기억(2026-10-14 사용자 지적 "이전 대화를 기억 못 한다").
+    브라우저가 세션 id 를 안 보내도(수정안 [적용] 뒤 화면을 새로고침하면 메모리의 A.sess 가 사라진다) 서버가 부탁 기록(.agent-log/<rid>.json 의 thread · sess)에서 찾아 --resume 으로 잇는다.
+    같은 계정 · 같은 엔진 것만, 그 세션 파일이 설정 폴더에 실제로 있을 때만(없는 세션으로 --resume 하면 실패한다)"""
+    if not THREAD_RE.fullmatch(tid or ''): return ''
+    best = (0.0, '')
+    for f in glob.glob(os.path.join(logdir_of(path), '*.json')):
+        try: m = json.load(open(f, encoding='utf-8'))
+        except (OSError, ValueError): continue
+        if m.get('thread') != tid or m.get('owner') != owner or not re.fullmatch(r'[0-9a-f-]{36}', str(m.get('sess') or '')): continue
+        if ((m.get('o') or {}).get('engine') or 'sub') != engine or (m.get('o') or {}).get('quick'): continue
+        if (m.get('t') or 0) > best[0]: best = (m['t'], m['sess'])
+    sess = best[1]
+    if not sess: return ''
+    cfg = os.path.join(ADIR, f'cfg-{owner}' if engine == 'sub' else 'cfg-gemma')
+    return sess if glob.glob(os.path.join(cfg, 'projects', '*', f'{sess}.jsonl')) else ''
+
 def start(req, port, edit_target, slide_parts, shot, url_of, backup_name, owner):
     """부탁 하나를 서버 스레드로 시작하고 rid 를 돌려준다 — 따라 보기는 follow(rid, send).
     url_of(파일 경로) → 그 파일의 웹 주소(/d/<계정>/<덱>/…) — 캡처 도구가 덱 사본을 여는 주소"""
@@ -249,6 +266,7 @@ def start(req, port, edit_target, slide_parts, shot, url_of, backup_name, owner)
             # 부탁마다 새 사본(지금 파일에서) — 대화 기억만 앞 세션으로 잇는다(req.session). 사본을 이어 고치던 방식은 '수정안이 떠 있는데
             # 또 부탁하면?'이 헷갈려 없앴다(사용자 지정 2026-09-30 "심플하게"). 세션 ID 는 Claude Code 가 준 uuid 꼴만 받는다
             sess = str(req.get('session') or '')
+            if not re.fullmatch(r'[0-9a-f-]{36}', sess): sess = thread_session(path, str(req.get('thread') or ''), owner, engine)   # 브라우저가 못 준 세션은 대화방 기록에서
             r = RUNS[rid] = {'file': path, 'work': work, 'sha0': _sha(text), 'session': sess if re.fullmatch(r'[0-9a-f-]{36}', sess) else '', 't': time.time(), 'engine': engine}
         r['busy'] = True; r['t'] = time.time()
     path = r['file']; ld = logdir_of(path); os.makedirs(ld, exist_ok=True)

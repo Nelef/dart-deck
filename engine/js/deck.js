@@ -175,6 +175,11 @@
       }
     });
 
+    // 아래 페이지 목록(#toc)은 가로로 넘치면 마우스 휠을 굴리는 것만으로도 가로로 움직인다(사용자 지정 2026-10-14 "가로 스크롤을 그냥 스크롤해도 움직이게") — 세로 휠 · 트랙패드 모두. 안 넘치면 그대로 둔다
+    { const tc = $('#toc'); if (tc) tc.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || tc.scrollWidth <= tc.clientWidth + 1) return;
+      const px = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? tc.clientWidth : 1; const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * px; if (!d) return;
+      e.preventDefault(); e.stopPropagation(); tc.scrollLeft += d; }, { passive: false }); }
     // ── 조작 ──
     if ($('#nx')) $('#nx').onclick = () => next();
     if ($('#pv')) $('#pv').onclick = prev;
