@@ -672,7 +672,7 @@ def import_run(job, uid, did, d, tpl, title, name, raw):
 
 def new_deck(user, req):
     """제목 + 받은 정보(설문 또는 통째 붙여넣기) + 그림 → 표지 한 페이지짜리 덱과 brief.json. 만들기는 덱을 연 뒤 Claude Code 가(?new=1)"""
-    if not STORE.claude_token(user['id']): raise ValueError('새 발표 자료는 Claude Code 가 만듭니다 — 먼저 계정 설정에서 Claude 구독을 연결해 주세요')
+    if not (STORE.claude_token(user['id']) or SHARED_TOKEN): raise ValueError('새 발표 자료는 Claude Code 가 만듭니다 — 먼저 계정 설정에서 Claude 구독을 연결해 주세요')
     title = re.sub(r'\s+', ' ', str(req.get('title') or '')).strip()[:80]
     if not title: raise ValueError('제목을 적어 주세요')
     b = req.get('brief') or {}
@@ -707,11 +707,12 @@ def build_prompt(deck_dir):
     imgs = [f for f in (b.get('files') or []) if f.startswith('img/')]; docs = b.get('docs') or []
     if imgs: L.append(f'- 첨부 그림: {", ".join(imgs)} — Read 로 열어 보고, 내용이면 재료로 · 덱에 넣을 만하면 <img src="그 경로"> 로')
     for dc in docs: L.append('- ' + doc_line(dc))
+    if deckagent.DART_RAG_URL: L.append('- 공시 도구(dart_search · dart_finance · dart_section) 사용 가능: 회사 · 실적 · 사업 · 리스크는 이 도구로 2025 사업보고서에서 찾아 쓰고, 그 숫자 · 사실이 들어간 페이지에는 각주로 출처(회사 · 장 · 접수번호)를 단다. 도구 결과도 「받은 정보」로 본다')
     if b.get('web'): L.append('- 웹 검색 켜짐: 받은 정보만으로 부족한 배경 · 최신 사실 · 공개 통계는 웹에서 찾아 보강하고 출처를 단다(받은 정보와 어긋나면 받은 정보를 따른다)')
     L += ['', '[만드는 순서]',
           '1. 듣는 사람과 목적에 맞춰 흐름을 정한다: 표지 → 목차 → (부분마다 간지 → 본문 페이지) → 정리. 한 페이지에 메시지 하나. 분량을 말하지 않았으면 본문 6~10페이지.',
           '2. 페이지마다 명사형 제목 · 개조식 설명(2~4줄) · 그림(표 · 막대 · 순서도 · 비교 카드 등 인포그래픽)을 먼저 생각한다. 글만 있는 페이지는 피한다.',
-          '3. 숫자 · 이름 · 사실은 받은 정보에 있는 것만 쓴다. 없는 숫자를 지어내지 않는다 — 꼭 필요하면 「(자료 필요)」 로 자리만 둔다.',
+          '3. 숫자 · 이름 · 사실은 받은 정보(공시 도구 결과 포함)에 있는 것만 쓴다. 없는 숫자를 지어내지 않는다 — 꼭 필요하면 「(자료 필요)」 로 자리만 둔다.',
           '4. 표지의 제목 · 부제는 알맞게 다듬어도 된다. data-name 은 페이지 이름(짧게)으로.',
           '5. 다 만들면 모든 페이지를 한 번에 찍어(장 번호 쉼표 목록) errors · problems 와 그림을 보고 넘침 · 겹침 · 빈 곳을 고친다.',
           '마지막 답: 만든 페이지 목록(번호. 제목)과, 자료가 부족해 자리표시로 둔 곳.']
