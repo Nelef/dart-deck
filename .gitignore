@@ -9,3 +9,7 @@ __pycache__/
 
 # PDF 전용 고정 글꼴 — engine/tools/fontprint.py 가 만든다(Docker 빌드가 돌린다, 약 11MB)
 engine/fonts/print/
+
+# DART 원본 · 임베딩(용량 큼 · 다시 받을 수 있음)
+rag/data/
+rag/models/
