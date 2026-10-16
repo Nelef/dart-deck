@@ -37,13 +37,19 @@ DEMO_PER_IP_HOUR = int(os.environ.get('DECK_DEMO_PER_IP_HOUR', '6'))   # IP 하�
 DEMO_OK = ('/api/logout', '/api/edit', '/api/edit/undo', '/api/shot', '/api/versions', '/api/classify', '/api/ask')   # 데모가 쓸 수 있는 POST(+ /api/agent/*)
 _demo_hits = {}; _demo_day = {'d': '', 'n': 0}
 def _ip_limited(ip, max_n, window=3600):
-    now = time.time(); a = [t for t in _demo_hits.get(ip, []) if now - t < window]; a.append(now); _demo_hits[ip] = a
-    return len(a) > max_n
+    """최근 window 초 안에 허용된 횟수로 막는다(막힌 시도는 세지 않는다 — 계속 눌러도 막히는 시간이 늘지 않게)"""
+    now = time.time(); a = [t for t in _demo_hits.get(ip, []) if now - t < window]
+    if len(a) >= max_n: _demo_hits[ip] = a; return True
+    a.append(now); _demo_hits[ip] = a; return False
+def _ip_recent(ip, window=3600):
+    now = time.time(); return [t for t in _demo_hits.get(ip, []) if now - t < window]
+def _kst_day(): return time.strftime('%Y-%m-%d', time.gmtime(time.time() + 9 * 3600))   # 하루 = 한국 시간 0시 기준
 def _demo_day_take():
-    d = time.strftime('%Y-%m-%d')
+    d = _kst_day()
     if _demo_day['d'] != d: _demo_day.update(d=d, n=0)
     if _demo_day['n'] >= DEMO_DAILY: return False
     _demo_day['n'] += 1; return True
+def _demo_day_used(): return _demo_day['n'] if _demo_day['d'] == _kst_day() else 0
 def demo_cleanup_loop():
     while True:
         try: STORE.drop_demos((deckagent.ADIR,))
@@ -820,6 +826,11 @@ class H(http.server.BaseHTTPRequestHandler):
             if pu:
                 pu['local'] = bool(deckagent.LLM_BASE)   # 로컬 LLM 이 없으면 화면에서 그 엔진 단추를 숨긴다
                 if not pu['claude'] and SHARED_TOKEN: pu.update(claude=True, shared=True)   # 주인 구독을 같이 쓰는 계정 · 데모
+                if u['role'] == 'demo':   # 데모 한도 — 화면 오른쪽 아래 위젯용(조회만)
+                    dm = STORE.demos.get(u['id']) or {}; opens = _ip_recent(self.client_ip())
+                    pu['demo'] = {'runs': dm.get('runs', 0), 'runsMax': DEMO_RUNS, 'expIn': max(0, int(dm.get('exp', 0) - time.time())),
+                                  'day': _demo_day_used(), 'dayMax': DEMO_DAILY, 'opens': len(opens), 'opensMax': DEMO_PER_IP_HOUR,
+                                  'opensNextIn': max(0, int(opens[0] + 3600 - time.time())) if opens else 0}
             return self.reply(200, {'user': pu})
         if path == '/api/decks':
             u = self.me()

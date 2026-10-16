@@ -26,6 +26,24 @@
   const docThumb = (name) => { const x = (name.match(DOC_RE)?.[1] || '').toUpperCase().replace('PPTX', 'PPT').replace('DOCX', 'DOC'); const c = { PDF: '#DC2626', PPT: '#d97706', DOC: '#0F766E' }[x] || '#6b7280';
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="14" fill="#f2f3f6"/><path d="M36 20h36l20 20v60H36z" fill="#fff" stroke="${c}" stroke-width="4"/><text x="64" y="84" font-family="sans-serif" font-size="22" font-weight="900" fill="${c}" text-anchor="middle">${x}</text></svg>`); };
   const CSS = `
+  /* 데모 한도 — 오른쪽 아래 떠 있는 알약(AI 창이 열리면 그 왼쪽으로) · 누르면 계산 방식 */
+  #kq { position: fixed; z-index: 60; right: 16px; bottom: 64px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; font: 600 12.5px/1.45 'Noto Sans KR', sans-serif; color: #16181d; }
+  body.kside #kq { right: calc(var(--kw, 420px) + 16px); }
+  #kq .qb { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px 7px 8px; border: 1px solid rgba(22,24,29,.12); border-radius: 99px; background: rgba(255,255,255,.94); box-shadow: 0 10px 26px -12px rgba(0,0,0,.45); cursor: pointer; font: inherit; color: inherit; }
+  #kq .qb:hover { border-color: #0F766E; }
+  #kq .ring { --p: 0; --qc: #0F766E; width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(var(--qc) calc(var(--p) * 1turn), #e3e6ea 0); display: grid; place-items: center; }
+  #kq .ring::after { content: ''; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+  #kq .qp { width: min(330px, calc(100vw - 32px)); background: #fff; border: 1px solid rgba(22,24,29,.12); border-radius: 16px; padding: 14px 16px; box-shadow: 0 24px 50px -22px rgba(0,0,0,.5); font-weight: 500; }
+  #kq .qp h3 { margin: 0 0 10px; font-size: 14px; }
+  #kq .qr { margin-bottom: 11px; }
+  #kq .qr .top { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
+  #kq .qr .top span:last-child { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+  #kq .qbar { height: 6px; border-radius: 6px; background: #eef0f3; margin: 5px 0 4px; overflow: hidden; }
+  #kq .qbar i { display: block; height: 100%; width: calc(var(--v) * 100%); background: var(--qc, #0F766E); border-radius: inherit; }
+  #kq .qr p { margin: 0; color: #5b6270; font-size: 12px; }
+  #kq .qf { border-top: 1px solid #eef0f3; padding-top: 9px; color: #5b6270; font-size: 12px; }
+  @media (max-width: 640px) { body.kside #kq { display: none; } #kq { right: 10px; bottom: 60px; } }
+
   /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
      탭이 AI 하나뿐인 덱(noCode)은 「AI 에게 묻기」 알약과 따로 한 줄 먹던 페이지 이름 줄(kstage)을 없애고 윗줄에 합친다 */
   #kpanel.ka-solo .khead { padding: 10px 10px 10px 16px; gap: 4px; }
@@ -174,6 +192,7 @@
       // 부탁 — Claude Code 엔진이 켜져 있으면 가로챈다(예전 방식의 자가검증 · 되묻기 차례는 그대로 예전 길로)
       const ask0 = K.ask.bind(K); A.ask0 = ask0;
       K.ask = (q, opts = {}) => {
+        setTimeout(() => A.quota(true), 2500);
         if (opts.retry || opts.verify || opts.src || opts.noEdit) return ask0(q, opts);   // 예전 길의 자가검증 · 되묻기 · 설명 답
         if (A.pendingIdx() >= 0) { A.lock(true); return; }   // 수정안이 떠 있으면 새 부탁은 받지 않는다 — 적용 · 버리기 먼저
         if (A.engine === 'claude' && !A.token) return A.needLogin();
@@ -204,7 +223,31 @@
       if (document.body.classList.contains('kchatmode')) K.render();
       // 캡처용 사본(.deckpreview-* · .deckagent-*)에서는 계정 · 지난 대화를 부르지 않는다 — 서버 안 크롬이 여는 숨김 파일이다
       if (/\/\.[^/]*$/.test(location.pathname)) return;
-      fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then(async (j) => { A.me = j.user; K.render(); if (/[?&]new=1\b/.test(location.search)) A.build(); else await A.resume(); }).catch(() => {});
+      fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then(async (j) => { A.me = j.user; K.render(); A.quota(); if (/[?&]new=1\b/.test(location.search)) A.build(); else await A.resume(); }).catch(() => {});
+    },
+    // ── 데모 한도 — 오른쪽 아래 위젯. /api/me 의 demo 값(조회만)으로 그린다 ──
+    quota(refresh) {
+      if (A.me?.role !== 'demo') return;
+      if (refresh) return fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then((j) => { if (j.user) { A.me = j.user; A.quota(); } }).catch(() => {});
+      const d = A.me.demo; if (!d) return;
+      let w = document.getElementById('kq');
+      if (!w) {
+        w = document.createElement('div'); w.id = 'kq'; w.innerHTML = '<div class="qp" hidden></div><button class="qb" aria-expanded="false"><span class="ring"></span><span class="qt"></span></button>'; document.body.appendChild(w);
+        const p = w.querySelector('.qp'), b = w.querySelector('.qb');
+        b.onclick = (e) => { e.stopPropagation(); p.hidden = !p.hidden; b.setAttribute('aria-expanded', !p.hidden); if (!p.hidden) A.quota(true); };
+        document.addEventListener('click', (e) => { if (!w.contains(e.target)) { p.hidden = true; b.setAttribute('aria-expanded', false); } });
+        setInterval(() => { if (!document.hidden) A.quota(true); }, 20000);
+      }
+      const mins = (s) => { const m = Math.ceil(s / 60); return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`; };
+      const row = (t, u, m, note) => `<div class="qr" style="${u >= m ? '--qc:#b45309' : ''}"><div class="top"><span>${t}</span><span>${u} / ${m}</span></div><div class="qbar"><i style="--v:${Math.min(1, u / m)}"></i></div><p>${note}</p></div>`;
+      const left = Math.max(0, d.runsMax - d.runs), out = left === 0 || d.day >= d.dayMax;
+      w.querySelector('.qt').textContent = out ? 'AI 부탁 한도 — 첫 화면에서 새 데모' : `AI 부탁 ${left}/${d.runsMax} 남음`;
+      const ring = w.querySelector('.ring'); ring.style.setProperty('--p', left / d.runsMax); ring.style.setProperty('--qc', out ? '#b45309' : '#0F766E');
+      w.querySelector('.qp').innerHTML = '<h3>데모 사용 한도</h3>'
+        + row('AI 부탁 · 이 데모', d.runs, d.runsMax, `데모 하나(사본 자료 묶음)마다 ${d.runsMax}번입니다. 질문 · 수정 모두 1번씩 셉니다. 다 쓰면 첫 화면에서 데모를 다시 시작하면 원본 사본과 함께 새로 ${d.runsMax}번입니다.`)
+        + row('AI 부탁 · 사이트 전체 오늘', d.day, d.dayMax, '모든 데모 방문자를 합친 하루 횟수입니다. 한국 시간 0시에 다시 0이 됩니다.')
+        + row('데모 열기 · 이 기기(IP)', d.opens, d.opensMax, `최근 60분 안에 새 데모를 연 횟수입니다(법숲 데모 입장 포함). 가장 오래된 1회가 60분이 지나면 하나씩 풀립니다${d.opens ? ` — 다음 1회는 <b>${mins(d.opensNextIn)}</b> 뒤` : ''}.`)
+        + `<div class="qf">이 데모와 고친 사본은 <b>${mins(d.expIn)}</b> 뒤 지워집니다. 데모의 AI 는 개인 Claude 구독으로 돌아가서 한도를 둡니다.</div>`;
     },
     // ── 새 덱 처음 만들기 — 목록에서 받은 정보(brief.json)를 서버가 부탁으로 만든다(Opus · 노력 high). 끝나면 곧바로 적용(빈 표지뿐이라 잃을 것이 없고, 백업은 남는다)
     async build() {
