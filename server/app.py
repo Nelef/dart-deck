@@ -931,9 +931,14 @@ class H(http.server.BaseHTTPRequestHandler):
             owner, did, rest = d
             if not self.is_shot():
                 u = self.me()
-                if not u:
-                    self.send_response(302); self.send_header('Location', '/?next=' + urllib.parse.quote(self.path)); self.send_header('Content-Length', '0'); self.end_headers(); return
-                if not self.can(u, owner): return self.send_error(403, 'no access')
+                if not self.can(u, owner):
+                    if owner.startswith(storemod.DEMO_PREFIX) and self.command in ('GET', 'HEAD') and rest in ('', 'index.html'):
+                        return self.demo_reenter(u, did)   # 끝난 데모 주소 — 새 데모로(사용자 버그 신고 2026-10-16)
+                    if not u:
+                        self.send_response(302); self.send_header('Location', '/?next=' + urllib.parse.quote(self.path)); self.send_header('Content-Length', '0'); self.end_headers(); return
+                    if rest in ('', 'index.html'):   # 권한 없는 덱 페이지 — 원문 403 대신 첫 화면으로
+                        self.send_response(302); self.send_header('Location', '/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+                    return self.send_error(403, 'no access')
                 # 숨김 파일(고치는 중인 사본 · 미리보기 · 백업)은 캡처 도구만
                 if any(seg.startswith('.') for seg in rest.split('/')): return self.send_error(404)
             if not path.endswith('/') and rest == '':
@@ -1027,22 +1032,39 @@ class H(http.server.BaseHTTPRequestHandler):
     def client_ip(self):
         return (self.headers.get('X-Forwarded-For') or self.client_address[0]).split(',')[0].strip()
 
-    def demo_start(self):
-        """데모 체험 — 임시 계정 + 예시 덱 사본(늘 원본에서 새로) → 첫 덱 주소(AI 창 연 채)"""
-        if not DEMO_SAMPLES: return self.reply(503, {'error': '아직 데모용 예시 발표 자료가 없습니다'})
-        if _ip_limited(self.client_ip(), DEMO_PER_IP_HOUR): return self.reply(429, {'error': '데모를 너무 자주 열었습니다 — 잠시 뒤 다시 해 주세요'})
+    def _demo_session(self):
+        """임시 계정 + 예시 덱 사본(늘 원본에서 새로) → (sid, {did: 주소}) 또는 (None, (코드, 오류))"""
+        if not DEMO_SAMPLES: return None, (503, '아직 데모용 예시 발표 자료가 없습니다')
+        if _ip_limited(self.client_ip(), DEMO_PER_IP_HOUR): return None, (429, '데모를 너무 자주 열었습니다 — 잠시 뒤 다시 해 주세요')
         STORE.drop_demos((deckagent.ADIR,))
-        uid, sid = STORE.new_demo(); first = None
+        uid, sid = STORE.new_demo(); urls = {}
         for item in DEMO_SAMPLES:
             owner, _, did = item.partition('/')
             src = STORE.deck_dir(owner, did)
             if not re.fullmatch(r'\d{8}-[0-9a-f]{6}', did) or not os.path.isfile(os.path.join(src, 'index.html')): continue
             dst = STORE.deck_dir(uid, did)
             shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns('.*'))   # 숨김(고치는 사본 · 대화 기록 · 버전)은 빼고
-            link_engine(dst); first = first or f'/d/{uid}/{did}/?ai=1'
-        if not first: return self.reply(503, {'error': '예시 발표 자료를 찾지 못했습니다'})
-        return self.reply(200, {'ok': True, 'url': first, 'runs': DEMO_RUNS},
-                          [('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.DEMO_SEC}')])
+            link_engine(dst); urls[did] = f'/d/{uid}/{did}/?ai=1'
+        if not urls: return None, (503, '예시 발표 자료를 찾지 못했습니다')
+        return sid, urls
+    def _demo_cookie(self, sid): return ('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.DEMO_SEC}')
+    def demo_start(self):
+        """데모 체험 — 임시 계정 + 예시 덱 사본 → 첫 덱 주소(AI 창 연 채)"""
+        sid, urls = self._demo_session()
+        if not sid: return self.reply(urls[0], {'error': urls[1]})
+        return self.reply(200, {'ok': True, 'url': next(iter(urls.values())), 'runs': DEMO_RUNS}, [self._demo_cookie(sid)])
+    def demo_reenter(self, u, did):
+        """끝난 데모 주소(세션 만료 · 서버 재시작 · 다른 세션)로 온 방문자 — 403 대신, 살아 있는 내 데모의 같은 자료로, 없으면 새 데모로 보낸다"""
+        def go(loc, cookie=None):
+            self.send_response(302); self.send_header('Location', loc); self.send_header('Cache-Control', 'no-store')
+            if cookie: self.send_header(*cookie)
+            self.send_header('Content-Length', '0'); self.end_headers()
+        if u and u['role'] == 'demo' and os.path.isfile(os.path.join(STORE.deck_dir(u['id'], did), 'index.html')):
+            return go(f"/d/{u['id']}/{did}/?ai=1")
+        if u and u['role'] != 'demo': return go('/')   # 로그인한 일반 사용자는 남의 데모 사본 대신 첫 화면으로
+        sid, urls = self._demo_session()
+        if not sid: return go('/')
+        return go(urls.get(did) or next(iter(urls.values())), self._demo_cookie(sid))
 
     def law_proxy(self, method, head_only=False):
         """/law/… → 법숲(LAW_URL). 로그인은 이 서버가 확인하고, 법숲에는 역할(user · demo)과 비밀 값만 넘긴다"""
