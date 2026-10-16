@@ -344,7 +344,7 @@
       const mn = bar.querySelector('.ka-menu'); const mb = bar.querySelector('.ka-more');
       if (mb && mn) { mb.onclick = (e) => { e.stopPropagation(); mn.classList.toggle('on'); }; document.addEventListener('click', () => mn.classList.remove('on'), { once: true });
         mn.querySelector('[data-m="use"]').onclick = () => { mn.classList.remove('on'); A.usage(); };
-        mn.querySelector('[data-m="acct"]').onclick = () => { mn.classList.remove('on'); if (confirm('Claude 구독 연결을 끊을까요? (내 계정에 저장된 연결을 지웁니다)')) { A.token = ''; K.render(); } }; }
+        const ab = mn.querySelector('[data-m="acct"]'); if (ab) ab.onclick = () => { mn.classList.remove('on'); if (confirm('Claude 구독 연결을 끊을까요? (내 계정에 저장된 연결을 지웁니다)')) { A.token = ''; K.render(); } }; }   // 주인 구독을 같이 쓰는 계정엔 '연결 끊기'가 없다
       const ac = bar.querySelector('.ka-connect'); if (ac) ac.onclick = () => A.login();
       // 연결 안 된 Claude Code — 보내기를 막는다(입력은 그대로 두고 연결을 권한다)
       const sendB = body.querySelector('.kc-send'); const ta = body.querySelector('.kc-box textarea');
