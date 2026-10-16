@@ -1030,7 +1030,11 @@ class H(http.server.BaseHTTPRequestHandler):
         sub_path = self.path[4:] or '/'; u = self.me()
         if not u:
             if method == 'GET' and not sub_path.startswith('/api/'):
-                self.send_response(302); self.send_header('Location', '/?next=/law/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+                # 법숲 옛 주소 · 나눠 준 링크로 온 방문자 — 첫 화면을 거치지 않고 바로 데모로 들인다(발표 자료 사본은 만들지 않는다)
+                if _ip_limited(self.client_ip(), DEMO_PER_IP_HOUR): return self.reply(429, {'error': '데모를 너무 자주 열었습니다 — 잠시 뒤 다시 해 주세요'})
+                _, sid = STORE.new_demo()
+                self.send_response(302); self.send_header('Location', self.path); self.send_header('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.DEMO_SEC}')
+                self.send_header('Content-Length', '0'); self.end_headers(); return
             return self.reply(401, {'error': '로그인이 필요합니다'})
         hd = {'x-uyai-role': 'demo' if u['role'] == 'demo' else 'user', 'x-uyai-key': GATEWAY_KEY, 'x-forwarded-for': self.client_ip(),
               'x-forwarded-proto': self.headers.get('X-Forwarded-Proto') or 'http'}
