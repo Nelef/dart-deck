@@ -27,8 +27,8 @@
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="14" fill="#f2f3f6"/><path d="M36 20h36l20 20v60H36z" fill="#fff" stroke="${c}" stroke-width="4"/><text x="64" y="84" font-family="sans-serif" font-size="22" font-weight="900" fill="${c}" text-anchor="middle">${x}</text></svg>`); };
   const CSS = `
   /* 데모 한도 — 오른쪽 아래 떠 있는 알약(AI 창이 열리면 그 왼쪽으로) · 누르면 계산 방식 */
-  #kq { position: fixed; z-index: 60; right: 16px; bottom: 64px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; font: 600 12.5px/1.45 'Noto Sans KR', sans-serif; color: #16181d; }
-  body.kside #kq { right: calc(var(--kw, 420px) + 16px); }
+  #kq { position: fixed; z-index: 60; right: 16px; bottom: 118px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; font: 600 12.5px/1.45 'Noto Sans KR', sans-serif; color: #16181d; }
+  body.kside #kq { right: calc(var(--kw, 420px) + 16px); bottom: 64px; }
   #kq .qb { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px 7px 8px; border: 1px solid rgba(22,24,29,.12); border-radius: 99px; background: rgba(255,255,255,.94); box-shadow: 0 10px 26px -12px rgba(0,0,0,.45); cursor: pointer; font: inherit; color: inherit; }
   #kq .qb:hover { border-color: #0F766E; }
   #kq .ring { --p: 0; --qc: #0F766E; width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(var(--qc) calc(var(--p) * 1turn), #e3e6ea 0); display: grid; place-items: center; }
@@ -42,7 +42,7 @@
   #kq .qbar i { display: block; height: 100%; width: calc(var(--v) * 100%); background: var(--qc, #0F766E); border-radius: inherit; }
   #kq .qr p { margin: 0; color: #5b6270; font-size: 12px; }
   #kq .qf { border-top: 1px solid #eef0f3; padding-top: 9px; color: #5b6270; font-size: 12px; }
-  @media (max-width: 640px) { body.kside #kq { display: none; } #kq { right: 10px; bottom: 60px; } }
+  @media (max-width: 640px) { body.kside #kq { display: none; } #kq { right: 10px; bottom: 112px; } }
 
   /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
      탭이 AI 하나뿐인 덱(noCode)은 「AI 에게 묻기」 알약과 따로 한 줄 먹던 페이지 이름 줄(kstage)을 없애고 윗줄에 합친다 */
