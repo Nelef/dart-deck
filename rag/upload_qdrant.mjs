@@ -5,13 +5,13 @@
 import { readFileSync, readdirSync } from 'node:fs';
 
 const URL0 = process.argv[2] || 'http://127.0.0.1:16333', COL = 'dart', DIM = 1024, BATCH = 256;
-const DATA = new URL('./data/', import.meta.url).pathname;
+const DATA = process.env.DART_DATA || new URL('./data/', import.meta.url).pathname;
 const api = async (method, path, body) => {
   const r = await fetch(URL0 + path, { method, headers: { 'content-type': 'application/json' }, body: body && JSON.stringify(body) });
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`${method} ${path} ${r.status} ${JSON.stringify(j).slice(0, 300)}`); return j;
 };
 const chunks = readFileSync(DATA + 'chunks.jsonl', 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
-const parts = readdirSync(DATA + 'vec/').filter((f) => f.endsWith('.f32')).sort();
+const parts = readdirSync(DATA + 'vec/').filter((f) => /^part-\d+\.f32$/.test(f)).sort();   // q_torch.f32(검증용 질문 벡터)는 빼고
 const vecs = new Float32Array(chunks.length * DIM); let off = 0;
 for (const p of parts) { const b = readFileSync(DATA + 'vec/' + p); const v = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4); vecs.set(v, off); off += v.length; }
 const n = off / DIM; if (n !== chunks.length) console.warn(`벡터 ${n}/${chunks.length} — 있는 만큼만 올린다`);
