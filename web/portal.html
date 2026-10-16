@@ -101,6 +101,8 @@ a { color: inherit; }
 /* 스크롤 안내 — 키워드 줄까지 한 화면에 안 들어올 때만, 화면 아래에 크게 페이드 인 */
 .scrollcue { position: fixed; z-index: 15; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 26px 16px max(14px, env(safe-area-inset-bottom)); text-decoration: none; background: linear-gradient(oklch(97.6% 0.007 95 / 0), var(--paper) 55%); color: var(--ink); font: 750 16px/1 var(--sans); letter-spacing: -0.01em; opacity: 0; transform: translateY(10px); pointer-events: none; transition: opacity .8s var(--ease), transform .8s var(--ease); }
 .scrollcue.show { opacity: 1; transform: none; pointer-events: auto; }
+/* 내용이 첫 화면에 다 들어오면 카드 아래 빈 자리(첫 화면 맨 아래)에 놓는다 — 겹치지 않게 */
+.scrollcue.inline { position: static; margin: auto auto 0; padding: 18px 16px 4px; background: none; }
 .scrollcue svg { width: 18px; height: 18px; fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; animation: nudge 1.8s var(--ease-io) infinite; }
 @keyframes nudge { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(4px); } }
 .fade { opacity: 0; animation: fade .9s var(--ease) forwards; animation-delay: var(--fd, .5s); }
@@ -509,7 +511,7 @@ $$('.tech').forEach((tech, ti) => {
 // 스크롤 안내 — 조금이라도 내려가면 감춘다
 const cue = $('#scrollcue');
 const cueNeeded = () => $$('.duo-row').some((r) => r.getBoundingClientRect().bottom > innerHeight - 8);   // 두 카드의 단추까지 한 화면에 들어오면 안내 없음
-const paintCue = () => { const on = scrollY < 40 && cueNeeded(); cue.hidden = false; cue.classList.toggle('show', on); };
+const paintCue = () => { cue.hidden = false; if (scrollY < 40) cue.classList.toggle('inline', !cueNeeded()); cue.classList.toggle('show', scrollY < 40); };   // 늘 보이되, 다 들어오면 카드 아래 자리에
 setTimeout(paintCue, 1200);   // 첫 화면 글자 · 카드가 다 들어온 뒤에 페이드 인
 addEventListener('scroll', paintCue, { passive: true }); addEventListener('resize', paintCue);
 
