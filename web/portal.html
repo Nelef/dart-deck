@@ -84,7 +84,7 @@ a { color: inherit; }
 .hero .lead { margin: 0; max-width: 32em; font-size: clamp(15.5px, 1.25vw, 18px); color: var(--ink-2); line-height: 1.65; }
 /* 두 서비스 카드 — 첫 화면에 둘 다. 각자 소개 영상 + 데모 단추 */
 .duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 22px); margin-top: clamp(16px, 2.6vh, 32px); }
-@media (min-width: 701px) { .duo { max-width: max(640px, calc((100svh - 575px) * 3.56 + 22px)); } }
+@media (min-width: 701px) { .duo { max-width: max(640px, calc((100svh - 520px) * 3.56 + 22px)); } }
 .duo-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .duo-media.frame { border-radius: 16px; }
 .duo-media.frame video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--night); }
@@ -98,12 +98,6 @@ a { color: inherit; }
 .duo-name span { font-size: 13.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .duo-name:hover b { color: var(--accent-ink); }
 .duo-row .btn { flex: none; }
-/* 첫 화면 키워드 줄 — 두 카드 아래 한 줄 크기 */
-.hero .rail { margin-top: clamp(12px, 1.6vh, 20px); padding-top: 12px; }
-.hero .kws { margin-top: 8px; }
-.hero .kw { font-size: clamp(1.05rem, 1.75vw, 1.6rem); }
-.hero .kwcap { margin-top: 10px; min-height: 0; }
-.hero .kwcap p { font-size: 15px; }
 /* 스크롤 안내 — 키워드 줄까지 한 화면에 안 들어올 때만, 화면 아래에 크게 페이드 인 */
 .scrollcue { position: fixed; z-index: 15; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 26px 16px max(14px, env(safe-area-inset-bottom)); text-decoration: none; background: linear-gradient(oklch(97.6% 0.007 95 / 0), var(--paper) 55%); color: var(--ink); font: 750 16px/1 var(--sans); letter-spacing: -0.01em; opacity: 0; transform: translateY(10px); pointer-events: none; transition: opacity .8s var(--ease), transform .8s var(--ease); }
 .scrollcue.show { opacity: 1; transform: none; pointer-events: auto; }
@@ -115,42 +109,22 @@ a { color: inherit; }
 
 
 /* 키워드 레일 — 고르면 아래 한 줄이 그 키워드가 어디서 어떻게 쓰였는지로 바뀐다 */
-.rail { margin-top: clamp(48px, 7vh, 88px); border-top: 1px solid var(--line-2); padding-top: 22px; }
-.rail .head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
-.kws { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 0; margin: 14px 0 0; padding: 0; list-style: none; }
-.kws li { display: inline-flex; align-items: center; }
-.kws li:not(:last-child)::after { content: '/'; color: var(--line-2); margin: 0 .16em; font: 500 clamp(1.05rem, 1.75vw, 1.6rem)/1 var(--mono); }
-/* 키워드 — 지금 것은 쓰인 곳 색으로 꽉 찬 알약(AI PPT 청록 · 법숲 초록 · 두 서비스 두 색), 아래 막대는 다음으로 넘어갈 때까지 */
-.kw { --kc: var(--accent); position: relative; overflow: hidden; font: 700 clamp(1.4rem, 3vw, 2.7rem)/1.18 var(--mono); letter-spacing: -0.03em; color: var(--ink-4); background: transparent; border: 0; padding: 2px 7px 4px; margin: 0 -1px; border-radius: 9px; cursor: pointer; white-space: nowrap; transition: color .4s var(--ease), background .5s var(--ease), box-shadow .5s var(--ease), transform .5s var(--ease); }
-.kw[data-svc="law"] { --kc: var(--law); }
-.kw[data-svc="both"] { --kc: var(--accent); }
-.kw:hover { color: var(--ink); }
-.kw.on { color: var(--paper); background: var(--kc); box-shadow: 0 10px 26px -12px var(--kc); transform: translateY(-1px); }
-.kw.on[data-svc="both"] { background: linear-gradient(100deg, var(--accent), var(--law)); }
-.kw::before { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: oklch(100% 0 0 / .55); transform-origin: left; transform: scaleX(0); }
-.kw.on.auto::before { animation: kwbar var(--kwdur, 2.8s) linear forwards; }
-@keyframes kwbar { to { transform: scaleX(1); } }
-/* 카드 아우라 — 키워드에 올리거나 누르면, 그 키워드가 쓰인 서비스 영상 뒤에서 빛이 뿜어져 나온다 */
-.duo-card { position: relative; isolation: isolate; }
-.duo-card::before, .duo-card::after { content: ''; position: absolute; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease), transform .8s var(--ease); }
-.duo-card::before { inset: -26px -26px 24px; border-radius: 40px; background: radial-gradient(58% 64% at 50% 44%, var(--aura, var(--accent)) 0%, color-mix(in oklch, var(--aura, var(--accent)) 55%, transparent) 45%, transparent 75%); filter: blur(30px); transform: scale(.94); }
-.duo-card::after { inset: -110px -110px -40px; background: repeating-conic-gradient(from 0deg at 50% 42%, color-mix(in oklch, var(--aura, var(--accent)) 80%, white) 0deg 4deg, transparent 4deg 15deg); -webkit-mask: radial-gradient(closest-side at 50% 42%, #000 30%, transparent 92%); mask: radial-gradient(closest-side at 50% 42%, #000 30%, transparent 92%); filter: blur(1.5px); }
-.duo-card.aura::before { opacity: .5; transform: scale(1); animation: aura 3.2s ease-in-out infinite; }
-.duo-card.aura::after { opacity: .16; animation: rays 18s linear infinite; }
-.duo-card.aura .duo-media { box-shadow: 0 0 0 2px var(--aura, var(--accent)), 0 0 28px -4px color-mix(in oklch, var(--aura, var(--accent)) 60%, transparent); }
-.duo-card.shake .duo-media { animation: shake .45s cubic-bezier(.36,.07,.19,.97) both; }
-@keyframes aura { 50% { opacity: .36; transform: scale(1.03); } }
-@keyframes rays { to { transform: rotate(360deg); } }
-@keyframes shake { 20% { transform: translate(-1.5px, 0) rotate(-.2deg); } 45% { transform: translate(1.5px, 0) rotate(.2deg); } 70% { transform: translate(-.75px, 0); } 100% { transform: none; } }
 /* 로고 */
 .blogo { width: 26px; height: 26px; border-radius: 7px; flex: none; }
 .svc-logo { width: clamp(52px, 6vw, 84px); height: auto; border-radius: 22%; vertical-align: -.08em; margin-right: .18em; box-shadow: 0 12px 30px -16px oklch(0% 0 0 / .5); }
-.kwcap { margin-top: 18px; min-height: 3.2em; display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: baseline; }
-.kwcap .svc { font: 700 12.5px/1 var(--sans); letter-spacing: 0; color: var(--accent-ink); background: var(--accent-wash); padding: 6px 9px; border-radius: 6px; white-space: nowrap; }
-.kwcap p { margin: 0; font-size: 16.5px; color: var(--ink-2); }
-.kwcap p b { color: var(--ink); font-weight: 700; }
-.kwcap.swap p, .kwcap.swap .svc { animation: fade .5s var(--ease); }
-
+/* 카드 안 사용 기술 — 지금 것은 서비스 색 알약으로, 하나씩 자동으로 넘어가며 아래 한 줄이 바뀐다 */
+.tech { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.kws { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.kw { --kc: var(--accent); position: relative; overflow: hidden; font: 700 13px/1 var(--mono); letter-spacing: 0; color: var(--ink-3); background: transparent; border: 1px solid var(--line-2); padding: 7px 11px 8px; border-radius: 99px; cursor: pointer; white-space: nowrap; transition: color .35s var(--ease), background .4s var(--ease), border-color .4s var(--ease); }
+.tech[data-svc="law"] .kw { --kc: var(--law); }
+.kw:hover { color: var(--ink); border-color: var(--kc); }
+.kw.on { color: var(--paper); background: var(--kc); border-color: var(--kc); }
+.kw::before { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: oklch(100% 0 0 / .55); transform-origin: left; transform: scaleX(0); }
+.kw.on.auto::before { animation: kwbar var(--kwdur, 2.8s) linear forwards; }
+@keyframes kwbar { to { transform: scaleX(1); } }
+.tech .kwcap { margin: 0; min-height: 1.5em; text-align: center; font-size: 13.5px; color: var(--ink-3); line-height: 1.5; }
+.tech .kwcap b { color: var(--ink); font-weight: 700; }
+.tech 
 /* ── 증명 칸(벤토) ── */
 section.proof { padding: clamp(72px, 11vh, 140px) 0; }
 .sec-h { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(20px, 4vw, 64px); align-items: end; margin-bottom: clamp(32px, 5vh, 56px); }
@@ -303,10 +277,9 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   .top nav { display: none; }
   .svc-b.flip .frame { order: -1; }
 }
-@media (max-width: 700px) { .duo { grid-template-columns: 1fr; gap: 12px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
+@media (max-width: 700px) { .duo { grid-template-columns: 1fr; gap: 12px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
 @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } .night .stat + .stat { border-color: var(--night-line); } .bar { grid-template-columns: 6em 1fr 3em; } .who { display: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .duo-card.aura::after { animation: none; } .duo-card.shake .duo-media { animation: none; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .hero h1 .ln > span, .fade, .rv { transform: none; opacity: 1; }
@@ -341,28 +314,16 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <p class="lead fade" style="--fd:.55s">공시와 법령을 근거로 답하는 <b>RAG</b>, 말로 부탁하면 자료를 고치고 스스로 확인하는 <b>AI 에이전트</b>.<span class="m-hide"> 두 서비스를 로그인 없이 바로 써 볼 수 있습니다.</span></p>
     </div>
     <div class="duo">
-      <article class="duo-card fade" data-svc="ppt" style="--fd:.6s;--aura:var(--accent)">
+      <article class="duo-card fade" data-svc="ppt" style="--fd:.6s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-aippt-poster.webp?v=1016c" data-src="/web/media/promo-aippt.mp4?v=1016c" width="1280" height="720" aria-label="AI PPT 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 17초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
+        <div class="tech" data-svc="ppt"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="DART 사업보고서 95곳에서 먼저 찾아 그 안에서만 씁니다 — 각주에 <b>공시 접수번호</b>.">RAG</button></li><li><button class="kw" data-tip="Claude Code 에이전트가 사본을 고치고 <b>화면을 찍어 스스로 확인</b>합니다. 적용은 사람이.">AI Agent</button></li><li><button class="kw" data-tip="공시 검색 · 재무 · 장 읽기 — <b>MCP 도구 3개</b>를 에이전트가 직접 부릅니다.">MCP</button></li><li><button class="kw" data-tip="BM25 + bge-m3 순위 융합 — 공시 검색 hit@5 <b>0.36 → 0.75</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="공시 <b>43,047개 청크</b>를 Qdrant(HNSW)에 넣고 회사 이름으로 거릅니다.">Vector DB</button></li><li><button class="kw" data-tip="공시 334문항을 dev · test 로 나눠 <b>설정은 dev, 숫자는 test</b>.">LLM Eval</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
         <div class="duo-row"><button class="btn go big deckDemo" data-demo="1" data-open="/deck/" data-label="AI PPT 데모 체험" data-logo="/web/media/logo-aippt.webp" disabled><img class="blogo" src="/web/media/logo-aippt.webp" alt="">AI PPT 준비 중</button><a class="duo-sub" href="#ppt">공시를 근거로, 말로 고치는 발표 자료</a></div>
       </article>
-      <article class="duo-card fade" data-svc="law" style="--fd:.72s;--aura:var(--law)">
+      <article class="duo-card fade" data-svc="law" style="--fd:.72s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-law-poster.webp?v=1016c" data-src="/web/media/promo-law.mp4?v=1016c" width="1280" height="720" aria-label="법숲 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
+        <div class="tech" data-svc="law"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="법령 16개 · <b>2,437개 조문</b>에서 먼저 찾아 그 안에서만 답합니다.">RAG</button></li><li><button class="kw" data-tip="BM25 + bge-m3 · 질의 재작성으로 정답 조문 hit@5 <b>0.71 → 0.90</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="근거가 모자랄 때만 다시 찾는 <b>적응형 흐름</b> — 쉬운 질문은 한 번에.">LangGraph</button></li><li><button class="kw" data-tip="법령 검색을 <b>MCP 서버</b>로도 내놓습니다.">MCP</button></li><li><button class="kw" data-tip="126문항 평가 · 답변 정확성 <b>30/31</b>.">LLM Eval</button></li><li><button class="kw" data-tip="조문 번호로만 인용하고, 근거가 없으면 <b>거절</b> — 범위 밖 10/10.">Grounding</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
         <div class="duo-row"><a class="btn go big" href="/law/"><img class="blogo" src="/web/media/logo-beopsoop.webp" alt="">법숲 데모 체험 <span class="ar" aria-hidden="true">→</span></a><a class="duo-sub" href="#law">법 조문으로 답하고, 근거 없으면 거절</a></div>
       </article>
-    </div>
-    <div class="rail fade" id="rail" style="--fd:.9s">
-      <div class="head"><span class="label ko">기술 키워드 — 눌러 보세요</span><span class="label ko" style="color:var(--ink-4)">모두 아래 두 서비스에서 실제로 돌아갑니다</span></div>
-      <ul class="kws" id="kws">
-        <li><button class="kw on" data-k="rag" data-svc="both">RAG</button></li>
-        <li><button class="kw" data-k="agent" data-svc="ppt">AI Agent</button></li>
-        <li><button class="kw" data-k="mcp" data-svc="both">MCP</button></li>
-        <li><button class="kw" data-k="hybrid" data-svc="both">Hybrid Search</button></li>
-        <li><button class="kw" data-k="vdb" data-svc="ppt">Vector DB</button></li>
-        <li><button class="kw" data-k="eval" data-svc="both">LLM Eval</button></li>
-        <li><button class="kw" data-k="graph" data-svc="law">LangGraph</button></li>
-        <li><button class="kw" data-k="guard" data-svc="both">Grounding</button></li>
-      </ul>
-      <div class="kwcap" id="kwcap" aria-live="polite"><span class="svc"></span><p></p></div>
     </div>
     <a class="scrollcue" id="scrollcue" href="#ppt" hidden><span>스크롤해 주세요</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg></a>
   </div></section>
@@ -528,51 +489,26 @@ let ME = null;
 // 머리줄 — 내려가면 아래 선
 addEventListener('scroll', () => $('#top').classList.toggle('scrolled', scrollY > 8), { passive: true });
 
-// 키워드 레일 — 고른 키워드가 어디서 무엇으로 쓰였는지
-const KW = {
-  rag:    ['두 서비스', '공시 · 법령을 먼저 찾아 그 안에서만 답합니다 — <b>DART 사업보고서 95곳 · 법령 2,437개 조문</b>.'],
-  agent:  ['AI PPT', 'Claude Code 에이전트가 발표 자료 사본을 고치고 <b>화면을 찍어 스스로 확인</b>합니다. 적용은 사람이.'],
-  mcp:    ['두 서비스', '공시 검색 · 재무 · 장 읽기를 <b>MCP 도구 3개</b>로 묶어 에이전트가 부르고, 법숲도 <b>MCP 서버</b>로 냅니다.'],
-  hybrid: ['두 서비스', 'BM25 + bge-m3 벡터를 순위 융합(RRF) — 공시 검색 hit@5 <b>0.36 → 0.75</b>.'],
-  vdb:    ['AI PPT', '공시 <b>43,047개 청크</b>를 Qdrant(HNSW · 코사인 · 회사 이름 색인)에 넣어 회사별로 거릅니다.'],
-  eval:   ['두 서비스', '평가 문항을 dev · test 로 나눠 <b>설정은 dev, 숫자는 test</b>. 법숲 126문항 · 공시 334문항.'],
-  graph:  ['법숲', '근거가 모자랄 때만 다시 찾는 <b>LangGraph 적응형 흐름</b> — 쉬운 질문은 한 번에 끝납니다.'],
-  guard:  ['두 서비스', '조문 번호 · 공시 접수번호로만 인용하고, 근거가 없으면 <b>지어내지 않고 거절</b>합니다(범위 밖 10/10).'],
-};
-const cap = $('#kwcap'), kws = $$('.kw'), KW_MS = 2800;
-const pickKw = (b, auto) => {
-  if (!b) return; kws.forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('auto', x === b && !!auto); });
-  b.style.setProperty('--kwdur', KW_MS + 'ms');
-  const [svc, txt] = KW[b.dataset.k]; cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
-  $('.svc', cap).textContent = svc; $('p', cap).innerHTML = txt;
-};
-// 자동으로 하나씩 — 화면에 보일 때만, 누르거나 올리면 잠시 멈춘다(움직임 줄이기면 자동 안 함)
-let kwIdx = 0, kwPause = 0, kwSeen = true, auraT;
-new IntersectionObserver((es) => { kwSeen = es[0].isIntersecting; }).observe($('#kws'));
-setInterval(() => {
-  if (still || document.hidden || !kwSeen || Date.now() < kwPause) return;
-  kwIdx = (kwIdx + 1) % kws.length; pickKw(kws[kwIdx], true);
-}, KW_MS);
-// 누르면 그 키워드가 쓰인 서비스 카드 뒤에 아우라
-const aura = (svc, scroll = true) => {
-  clearTimeout(auraT);
-  const cards = $$('.duo-card');
-  cards.forEach((c) => {
-    const on = svc === 'both' || c.dataset.svc === svc, was = c.classList.contains('aura');
-    c.classList.toggle('aura', on);
-    if (on && !was) { c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }   // 새로 켜질 때 한 번 흔들림
-  });
-  const first = cards.find((c) => c.classList.contains('aura'));
-  if (first && scroll) { const r = first.getBoundingClientRect(); if (r.bottom < 70 || r.top > innerHeight - 80) first.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' }); }
-  auraT = setTimeout(() => cards.forEach((c) => c.classList.remove('aura', 'shake')), 4200);
-};
-$('#kws').addEventListener('click', (e) => { const b = e.target.closest('.kw'); if (!b) return; kwIdx = kws.indexOf(b); kwPause = Date.now() + 9000; pickKw(b); aura(b.dataset.svc); });
-if (matchMedia('(hover: hover)').matches) $('#kws').addEventListener('mouseover', (e) => { const b = e.target.closest('.kw'); if (!b) return; kwIdx = kws.indexOf(b); kwPause = Date.now() + 6000; pickKw(b); aura(b.dataset.svc, false); });
-pickKw(kws[0], !still);
+// 카드 안 사용 기술 — 카드마다 하나씩 자동으로 강조하고 아래 한 줄 설명을 바꾼다(올리거나 누르면 그 기술로, 잠시 멈춤)
+const KW_MS = 2800;
+$$('.tech').forEach((tech, ti) => {
+  const kws = $$('.kw', tech), cap = $('.kwcap', tech); let idx = 0, pause = 0, seen = true;
+  const pick = (b, auto) => {
+    kws.forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('auto', x === b && !!auto); });
+    b.style.setProperty('--kwdur', KW_MS + 'ms');
+    cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap'); cap.innerHTML = b.dataset.tip;
+  };
+  new IntersectionObserver((es) => { seen = es[0].isIntersecting; }).observe(tech);
+  setTimeout(() => setInterval(() => { if (still || document.hidden || !seen || Date.now() < pause) return; idx = (idx + 1) % kws.length; pick(kws[idx], true); }, KW_MS), ti * KW_MS / 2);   // 두 카드가 엇갈려 넘어가게
+  const hold = (e, ms) => { const b = e.target.closest('.kw'); if (!b) return; idx = kws.indexOf(b); pause = Date.now() + ms; pick(b); };
+  tech.addEventListener('click', (e) => hold(e, 9000));
+  if (matchMedia('(hover: hover)').matches) tech.addEventListener('mouseover', (e) => hold(e, 6000));
+  pick(kws[0], !still);
+});
 
 // 스크롤 안내 — 조금이라도 내려가면 감춘다
 const cue = $('#scrollcue');
-const cueNeeded = () => $('#rail').getBoundingClientRect().bottom > innerHeight - 8;   // 키워드 줄까지 한 화면에 들어오면 안내 없음
+const cueNeeded = () => $$('.duo-row').some((r) => r.getBoundingClientRect().bottom > innerHeight - 8);   // 두 카드의 단추까지 한 화면에 들어오면 안내 없음
 const paintCue = () => { const on = scrollY < 40 && cueNeeded(); cue.hidden = false; cue.classList.toggle('show', on); };
 setTimeout(paintCue, 1200);   // 첫 화면 글자 · 카드가 다 들어온 뒤에 페이드 인
 addEventListener('scroll', paintCue, { passive: true }); addEventListener('resize', paintCue);
