@@ -580,6 +580,9 @@ $$('[data-demo]').forEach((b) => {
   };
 });
 
+// 뒤로가기로 돌아오면 브라우저가 누르던 순간의 화면(잠긴 단추)을 그대로 되살린다 — 다시 보일 때 풀어 준다
+addEventListener('pageshow', () => { $$('[data-demo]').forEach((b) => { b.disabled = !deckReady && b.classList.contains('deckDemo'); }); });
+
 // 관리자 로그인
 const openLogin = () => { $('#loginBox').hidden = false; $('#lid').focus(); };
 const closeLogin = () => { $('#loginBox').hidden = true; };
@@ -597,8 +600,9 @@ $('#lpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin();
 $('#bOut').onclick = async () => { await post('/api/logout').catch(() => {}); ME = null; paint(); };
 
 // 발표 자료 데모 — 예시 자료가 준비됐을 때만 연다
+let deckReady = false;
 fetch('/api/site', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
-  if (!j.demoDeck) return;
+  if (!j.demoDeck) return; deckReady = true;
   $$('.deckDemo').forEach((b) => { b.disabled = false; b.innerHTML = `${b.dataset.logo ? `<img class="blogo" src="${b.dataset.logo}" alt="">` : ''}${b.dataset.label || '데모 체험'} <span class="ar" aria-hidden="true">→</span>`; });
 }).catch(() => {});
 fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
