@@ -761,14 +761,30 @@ class H(http.server.BaseHTTPRequestHandler):
         tag = f'"{int(st.st_mtime)}-{st.st_size}"'
         if self.headers.get('If-None-Match') == tag:
             self.send_response(304); self.send_header('ETag', tag); self.send_header('Content-Length', '0'); self.end_headers(); return
-        t = 'font/woff2' if path.endswith('.woff2') else (mimetypes.guess_type(path)[0] or 'application/octet-stream')
+        t = 'font/woff2' if path.endswith('.woff2') else 'image/webp' if path.endswith('.webp') else (mimetypes.guess_type(path)[0] or 'application/octet-stream')
         if t.startswith('text/') or t in ('application/javascript', 'application/json'): t += '; charset=utf-8'
-        self.send_response(200)
-        # 덱은 js · css 를 자주 고친다 — 늘 새로 확인(no-cache 는 '바뀌었나 묻기'라 안 바뀐 파일은 304 로 가볍다)
-        self.send_header('Content-Type', t); self.send_header('Content-Length', str(st.st_size)); self.send_header('ETag', tag); self.send_header('Cache-Control', 'no-cache')
+        # 영상은 Range(부분 요청)로 받는다 — Safari 는 206 이 없으면 재생하지 않는다
+        size, start, end = st.st_size, 0, st.st_size - 1
+        m = re.fullmatch(r'bytes=(\d*)-(\d*)', self.headers.get('Range') or '')
+        if m and (m[1] or m[2]):
+            if m[1]: start = int(m[1]); end = min(int(m[2]), size - 1) if m[2] else size - 1
+            else: start = max(0, size - int(m[2]))
+            if start > end or start >= size:
+                self.send_response(416); self.send_header('Content-Range', f'bytes */{size}'); self.send_header('Content-Length', '0'); self.end_headers(); return
+            self.send_response(206); self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+        else:
+            self.send_response(200)
+        # 덱은 js · css 를 자주 고친다 — 늘 새로 확인(no-cache 는 '바뀌었나 묻기'라 안 바뀐 파일은 304 로 가볍다). 첫 화면 소개 미디어(web/media)는 하루 캐시
+        cc = 'public, max-age=86400' if os.sep + 'media' + os.sep in path else 'no-cache'
+        self.send_header('Content-Type', t); self.send_header('Content-Length', str(end - start + 1)); self.send_header('Accept-Ranges', 'bytes'); self.send_header('ETag', tag); self.send_header('Cache-Control', cc)
         self.end_headers()
         if not head_only:
-            with open(path, 'rb') as f: shutil.copyfileobj(f, self.wfile)
+            with open(path, 'rb') as f:
+                f.seek(start); left = end - start + 1
+                while left > 0:
+                    b = f.read(min(65536, left))
+                    if not b: break
+                    self.wfile.write(b); left -= len(b)
     def log_error(self, fmt, *args):
         if 'timed out' in (fmt % args): return   # 쉬던 연결이 30초 뒤 닫히는 것 — 오류가 아니다
         self.log_message(fmt, *args)
