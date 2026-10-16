@@ -12,7 +12,7 @@ export const MODELS = {
 
 const pipes = new Map();
 async function getPipe(name) {
-  if (!pipes.has(name)) pipes.set(name, pipeline('feature-extraction', MODELS[name].id, { dtype: 'q8' }));
+  if (!pipes.has(name)) pipes.set(name, pipeline('feature-extraction', MODELS[name].id, { dtype: 'q8', ...(process.env.ORT_THREADS ? { session_options: { intraOpNumThreads: +process.env.ORT_THREADS, interOpNumThreads: 1 } } : {}) }));
   return pipes.get(name);
 }
 

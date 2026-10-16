@@ -6,6 +6,7 @@ import os, re, json, sys, zipfile, html
 
 HERE = os.path.dirname(os.path.abspath(__file__)); DATA = os.path.join(HERE, 'data'); RAW = os.path.join(DATA, 'raw')
 WIN, OVER = 800, 100
+ALL = False
 
 TAG = re.compile(r'<[^>]+>')
 def clean(s):
@@ -50,6 +51,7 @@ def windows(text):
 
 def main():
     mx = int(sys.argv[sys.argv.index('--max') + 1]) if '--max' in sys.argv else 0
+    global ALL; ALL = '--all' in sys.argv
     reps = json.load(open(os.path.join(DATA, 'reports.json'), encoding='utf-8'))
     if mx: reps = reps[:mx]
     n = 0; per = []
@@ -62,6 +64,7 @@ def main():
             year = re.search(r'\((\d{4})\.\d{2}\)', r['report_nm']); year = year.group(1) if year else ''
             k = 0
             for s1, s2, text in sections(xml):
+                if not ALL and ('주석' in s2 or s1.startswith('XII')): continue   # 재무제표 주석 · 상세표는 뺀다 — 4.5만 · 7천 청크인데 브리핑엔 거의 안 쓰이고, 평가 정답 청크를 잃는 질문 0개(2026-10-16 측정)
                 head = f"{r['name']} · {year} 사업보고서 · {s1}" + (f" > {s2}" if s2 else '')
                 for w in windows(text):
                     fo.write(json.dumps({'id': f"{r['stock']}-{k}", 'stock': r['stock'], 'name': r['name'], 'year': year, 'rcept_no': r['rcept_no'],

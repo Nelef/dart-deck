@@ -51,15 +51,15 @@ const topK = (s, k, allow) => {
 };
 
 /** 색인 읽기 — chunks.jsonl + vec/part-*.f32 + BM25. names: 회사 이름 목록(긴 것부터 — '삼성전자'가 '삼성'보다 먼저) */
-export function loadIndex(dataDir, { log = () => {}, vectors = true } = {}) {
+export function loadIndex(dataDir, { log = () => {}, vectors = true, vecDir = 'vec/' } = {}) {
   const t0 = Date.now();
   const chunks = readFileSync(dataDir + 'chunks.jsonl', 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   log(`청크 ${chunks.length.toLocaleString()}개 읽음`);
   let vecs = null, dim = 1024;
-  if (vectors && existsSync(dataDir + 'vec/')) {
-    const parts = readdirSync(dataDir + 'vec/').filter((f) => f.endsWith('.f32')).sort();
+  if (vectors && existsSync(dataDir + vecDir)) {
+    const parts = readdirSync(dataDir + vecDir).filter((f) => /^part-\d+\.f32$/.test(f)).sort();
     vecs = new Float32Array(chunks.length * dim); let off = 0;
-    for (const p of parts) { const b = readFileSync(dataDir + 'vec/' + p); const v = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4); vecs.set(v, off); off += v.length; }
+    for (const p of parts) { const b = readFileSync(dataDir + vecDir + p); const v = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4); vecs.set(v, off); off += v.length; }
     if (off !== vecs.length) { log(`벡터 ${off / dim}/${chunks.length} — 덜 만들어짐(전수 검색은 만든 데까지)`); }
   }
   const bm25 = new BM25(chunks.map((c) => `${c.head}\n${c.text}`));
