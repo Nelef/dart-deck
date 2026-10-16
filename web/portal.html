@@ -8,43 +8,71 @@
 <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
 <link rel="stylesheet" href="/fonts/base.css">
 <style>
-/* uyai 첫 화면 — 두 서비스 소개 · 데모 체험 · 주인 로그인. 서버(server/app.py): /api/me · /api/login · /api/logout · /api/demo */
-:root { --brand: #0F766E; --brand-deep: #134E4A; --ink: #16181d; --sub: #4b5260; --mute: #6b7280; --line: #e3e6ea; --bg: #f6f7f9; --card: #fff; --tint: #e6f4f2; }
+/* uyai 첫 화면 — 두 서비스를 움직이는 흐름도로 소개 · 데모 체험 · 관리자 로그인. 서버(server/app.py): /api/me · /api/login · /api/logout · /api/demo */
+:root { --brand: #0F766E; --brand-deep: #134E4A; --ink: #16181d; --sub: #4b5260; --mute: #6b7280; --line: #e3e6ea; --bg: #f6f7f9; --card: #fff; --tint: #e6f4f2; --warm: #b45309; --warm-tint: #fff4e0;
+        --cycle: 7s; }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: 'Noto Sans KR', sans-serif; color: var(--ink); background: var(--bg); line-height: 1.6; }
-.wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
-header { padding: 22px 0 6px; }
+[hidden] { display: none !important; }   /* .btn 의 display 가 hidden 속성을 덮지 않게 */
+body { margin: 0; font-family: 'Noto Sans KR', sans-serif; color: var(--ink); background: var(--bg); line-height: 1.55; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+header { padding: 22px 0 4px; }
 header .wrap { display: flex; align-items: center; gap: 12px; }
 header img { height: 30px; display: block; }
 header .sp { flex: 1; }
 header .who { font-size: 14px; color: var(--sub); }
-.btn { font: inherit; font-size: 14px; font-weight: 700; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; cursor: pointer; }
+.btn { font: inherit; font-size: 14px; font-weight: 700; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
 .btn:hover { border-color: #c9cdd3; }
 .btn.go { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btn.go:hover { background: var(--brand-deep); }
 .btn:disabled { opacity: .55; cursor: default; }
-.hero { padding: 26px 0 10px; }
-.hero h1 { font-size: 30px; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.5px; }
-.hero p { margin: 0; color: var(--sub); font-size: 15.5px; max-width: 680px; }
-.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 22px 0 10px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px 22px 20px; display: flex; flex-direction: column; }
-.card .tag { font-size: 12.5px; font-weight: 800; color: var(--brand); letter-spacing: .2px; }
-.card h2 { font-size: 21px; margin: 4px 0 6px; }
-.card .lead { color: var(--sub); font-size: 15px; margin: 0 0 12px; }
-.card ul { margin: 0 0 16px; padding-left: 18px; font-size: 14px; color: var(--sub); }
-.card li { margin: 3px 0; }
-.card li b { color: var(--ink); }
-.card .soon { display: inline-block; font-size: 11.5px; font-weight: 800; color: #8a5a00; background: #fff4d6; border-radius: 6px; padding: 0 6px; margin-left: 4px; }
-.card .flow { font-size: 12.5px; color: var(--mute); background: var(--bg); border-radius: 10px; padding: 8px 10px; margin: 0 0 16px; }
-.card .acts { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
-.note { font-size: 13.5px; color: var(--mute); margin: 6px 0 0; }
-.err { color: #b42318; font-size: 13.5px; min-height: 20px; margin: 8px 0 0; }
-#loginBox { margin: 18px 0 40px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; max-width: 420px; }
+.hero { padding: 22px 0 6px; }
+.hero h1 { font-size: 30px; line-height: 1.3; margin: 0 0 6px; letter-spacing: -0.5px; }
+.hero p { margin: 0; color: var(--sub); font-size: 15.5px; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px 22px 20px; display: flex; flex-direction: column; }
+.card .tag { font-size: 12.5px; font-weight: 800; color: var(--brand); }
+.card h2 { font-size: 22px; margin: 2px 0 2px; }
+.card .lead { color: var(--sub); font-size: 14.5px; margin: 0 0 14px; }
+.card .acts { margin-top: auto; padding-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.card .hint { font-size: 12.5px; color: var(--mute); }
+
+/* ── 흐름도: 단계가 차례로 켜지고, 점이 연결선을 따라 내려간다 ── */
+.flow { position: relative; margin: 0; padding: 0; list-style: none; }
+.step { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center; padding: 7px 0; }
+.step .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--bg); border: 1.5px solid var(--line); display: grid; place-items: center; z-index: 1; position: relative;
+            animation: lit var(--cycle) infinite; animation-delay: calc(var(--i) * var(--cycle) / var(--n)); }
+.step .ic svg { width: 21px; height: 21px; stroke: var(--sub); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; animation: litsvg var(--cycle) infinite; animation-delay: calc(var(--i) * var(--cycle) / var(--n)); }
+.step .t { font-size: 14.5px; font-weight: 800; line-height: 1.3; }
+.step .s { font-size: 12.5px; color: var(--mute); line-height: 1.35; }
+.step.soon .ic { border-style: dashed; }
+.step .badge { display: inline-block; font-size: 11px; font-weight: 800; color: var(--warm); background: var(--warm-tint); border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 1px; }
+/* 연결선(아이콘 가운데 세로) + 지나가는 점 */
+.step:not(:last-child)::before { content: ''; position: absolute; left: 19px; top: 47px; height: calc(100% - 40px); width: 2px; background: var(--line); }
+.step:not(:last-child)::after { content: ''; position: absolute; left: 16px; top: 47px; width: 8px; height: 8px; border-radius: 99px; background: var(--brand); opacity: 0;
+            animation: travel var(--cycle) infinite; animation-delay: calc(var(--i) * var(--cycle) / var(--n)); }
+@keyframes lit { 0% { background: var(--tint); border-color: var(--brand); transform: scale(1.06); box-shadow: 0 0 0 6px rgba(15,118,110,.10); }
+                 12% { background: var(--tint); border-color: var(--brand); transform: scale(1); box-shadow: 0 0 0 0 rgba(15,118,110,0); }
+                 18%, 100% { background: var(--bg); border-color: var(--line); transform: scale(1); } }
+@keyframes litsvg { 0%, 12% { stroke: var(--brand); } 18%, 100% { stroke: var(--sub); } }
+@keyframes travel { 0% { opacity: 0; transform: translateY(0); } 3% { opacity: 1; } 13% { opacity: 1; transform: translateY(22px); } 16%, 100% { opacity: 0; transform: translateY(26px); } }
+/* 숫자 칩 */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.stat { background: var(--bg); border-radius: 12px; padding: 10px 10px 8px; text-align: center; }
+.stat b { display: block; font-size: 22px; font-weight: 900; color: var(--brand-deep); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat small { display: block; font-size: 11.5px; color: var(--mute); line-height: 1.3; margin-top: 2px; }
+.stat .from { font-size: 12px; color: var(--mute); font-weight: 700; margin-right: 3px; }
+/* 데모 안내 줄 */
+.demo-note { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--sub); background: var(--bg); border-radius: 12px; padding: 9px 11px; margin-top: 14px; }
+.demo-note svg { flex: none; width: 16px; height: 16px; stroke: var(--brand); fill: none; stroke-width: 2; margin-top: 1px; }
+
+.err { color: #b42318; font-size: 13.5px; min-height: 20px; margin: 6px 0 0; }
+#loginBox { margin: 14px 0 40px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; max-width: 420px; }
 #loginBox label { display: block; font-size: 13px; font-weight: 700; color: var(--sub); margin: 8px 0 4px; }
 #loginBox input { width: 100%; font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; }
 #loginBox .row { display: flex; gap: 8px; margin-top: 12px; }
-footer { padding: 26px 0 40px; font-size: 12.5px; color: var(--mute); }
-@media (max-width: 720px) { .cards { grid-template-columns: 1fr; } .hero h1 { font-size: 24px; } }
+footer { padding: 22px 0 40px; font-size: 12.5px; color: var(--mute); }
+@media (max-width: 760px) { .cards { grid-template-columns: 1fr; } .hero h1 { font-size: 24px; } }
+@media (prefers-reduced-motion: reduce) { .step .ic, .step .ic svg, .step::after { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -52,47 +80,67 @@ footer { padding: 26px 0 40px; font-size: 12.5px; color: var(--mute); }
   <img src="/web/uyai.svg" alt="uyai">
   <span class="sp"></span>
   <span class="who" id="who"></span>
-  <button class="btn" id="bLogin">주인 로그인</button>
+  <button class="btn" id="bLogin">관리자 로그인</button>
   <button class="btn" id="bOut" hidden>로그아웃</button>
 </div></header>
 
 <main class="wrap">
   <section class="hero">
-    <h1>근거를 찾아 답하고, 말로 고치는 AI 서비스</h1>
-    <p>직접 만들어 운영하는 두 서비스입니다. 로그인 없이 <b>데모 체험</b>으로 바로 써 볼 수 있습니다.</p>
+    <h1>근거를 찾아 답하고, 말로 고치는 AI</h1>
+    <p>직접 만들어 운영하는 두 서비스 — 로그인 없이 <b>데모 체험</b>으로 바로 써 볼 수 있습니다.</p>
   </section>
 
   <section class="cards">
+    <!-- DART Deck -->
     <article class="card">
       <span class="tag">발표 자료 AI</span>
       <h2>DART Deck</h2>
-      <p class="lead">발표 자료를 열어 두고 오른쪽 AI 창에 고칠 점을 말하면, 에이전트가 고친 뒤 화면을 찍어 스스로 확인합니다. 반영은 사람이 [적용]을 눌러야 됩니다.</p>
-      <ul>
-        <li><b>Claude Code 에이전트</b> — 원본이 아닌 사본을 고치고 캡처로 검증</li>
-        <li>한 페이지는 바로, 여러 페이지는 계획을 먼저 보여 주고 진행</li>
-        <li>공시(DART 사업보고서) 근거 검색 · 자료 생성 <span class="soon">준비 중</span></li>
-      </ul>
-      <div class="flow">데모: 예시 발표 자료가 AI 창이 열린 채로 뜹니다. 자유롭게 말해서 고쳐 보세요 — 방문할 때마다 원래 자료로 다시 시작합니다.</div>
+      <p class="lead">말로 부탁하면 에이전트가 발표 자료를 고치고, 스스로 확인합니다.</p>
+      <ol class="flow" style="--n: 5">
+        <li class="step soon" style="--i: 0"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg></span>
+          <span><span class="t">공시 근거 찾기<span class="badge">준비 중</span></span><br><span class="s">사업보고서 · bge-m3 · Qdrant</span></span></li>
+        <li class="step" style="--i: 1"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg></span>
+          <span><span class="t">말로 부탁</span><br><span class="s">"2장 그래프를 세로로 바꿔 줘"</span></span></li>
+        <li class="step" style="--i: 2"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="11" height="13" rx="2"/><path d="M9 20h10a1 1 0 0 0 1-1V8"/></svg></span>
+          <span><span class="t">에이전트가 사본을 수정</span><br><span class="s">Claude Code · 원본은 그대로</span></span></li>
+        <li class="step" style="--i: 3"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <span><span class="t">화면을 찍어 스스로 확인</span><br><span class="s">넘침 · 겹침을 보고 다시 고침</span></span></li>
+        <li class="step" style="--i: 4"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg></span>
+          <span><span class="t">사람이 [적용]</span><br><span class="s">바뀐 페이지 비교 · 되돌리기</span></span></li>
+      </ol>
+      <div class="demo-note"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span>데모: 예시 자료가 AI 창이 열린 채로 뜹니다. 들어올 때마다 원래 자료로 다시 시작합니다.</span></div>
       <div class="acts"><button class="btn go" data-open="/deck/" data-demo="1">데모 체험</button><a class="btn" id="aDeck" href="/deck/" hidden>발표 자료 목록</a></div>
     </article>
 
+    <!-- 법숲 -->
     <article class="card">
       <span class="tag">법령 RAG</span>
       <h2>법숲</h2>
-      <p class="lead">중고거래 · 환불 · 사기 · 개인정보 · 금융 거래처럼 일상에서 부딪히는 법적 질문에, 법령 조문을 근거로 답합니다. 근거가 없으면 답하지 않습니다.</p>
-      <ul>
-        <li>생활 · 금융 법령 <b>15개 · 2,437개 조문</b>, BM25 + bge-m3 하이브리드 검색</li>
-        <li>근거가 부족할 때만 다시 찾는 <b>LangGraph</b> 에이전트 · <b>MCP</b> 서버</li>
-        <li>평가(질문 126개 중 시험 31문항): 정답 조문 hit@5 <b>0.90</b> · 답변 정확성 <b>30/31</b> · 범위 밖 질문 <b>10/10</b> 거절</li>
-      </ul>
-      <div class="flow">데모: 예시 질문은 미리 만든 답변을 보여 주고, 직접 한 질문은 시간당 횟수 안에서 실시간으로 답합니다.</div>
+      <p class="lead">일상의 법적 질문에 법령 조문을 근거로 답합니다. 근거가 없으면 답하지 않습니다.</p>
+      <ol class="flow" style="--n: 5" id="lawFlow">
+        <li class="step" style="--i: 0"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/><path d="M9 10h6"/></svg></span>
+          <span><span class="t">일상어 질문</span><br><span class="s">"중고로 산 노트북이 고장 났어요"</span></span></li>
+        <li class="step" style="--i: 1"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 10l3 2-3 2"/></svg></span>
+          <span><span class="t">법령 용어로 다시 쓰기</span><br><span class="s">질의 재작성</span></span></li>
+        <li class="step" style="--i: 2"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/></svg></span>
+          <span><span class="t">하이브리드 검색</span><br><span class="s">BM25 + bge-m3 · 15개 법령 2,437개 조문</span></span></li>
+        <li class="step" style="--i: 3"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <span><span class="t">근거가 충분한가?</span><br><span class="s">LangGraph — 부족할 때만 다시 찾기</span></span></li>
+        <li class="step" style="--i: 4"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></svg></span>
+          <span><span class="t">조문 번호로 인용해 답변</span><br><span class="s">근거가 없으면 거절 · MCP 도구로도 제공</span></span></li>
+      </ol>
+      <div class="stats" id="lawStats">
+        <div class="stat"><b><span class="from">0.71→</span><span data-to="0.90" data-from="0.71" data-dec="2">0.90</span></b><small>정답 조문 hit@5<br>(질의 재작성)</small></div>
+        <div class="stat"><b><span data-to="30" data-dec="0">30</span>/31</b><small>답변 정확성<br>(시험 문항)</small></div>
+        <div class="stat"><b><span data-to="10" data-dec="0">10</span>/10</b><small>범위 밖 질문<br>거절</small></div>
+      </div>
       <div class="acts"><button class="btn go" data-open="/law/" data-demo="1">데모 체험</button><a class="btn" id="aLaw" href="/law/" hidden>열기</a></div>
     </article>
   </section>
   <p class="err" id="err"></p>
 
   <section id="loginBox" hidden>
-    <strong>주인 로그인</strong>
+    <strong>관리자 로그인</strong>
     <label for="lid">아이디</label><input id="lid" autocomplete="username">
     <label for="lpw">비밀번호</label><input id="lpw" type="password" autocomplete="current-password">
     <div class="row"><button class="btn go" id="lgo">로그인</button><button class="btn" id="lcancel">닫기</button></div>
@@ -109,6 +157,19 @@ const post = async (url, body) => { const r = await fetch(url, { method: 'POST',
 const nextOf = () => { const n = new URLSearchParams(location.search).get('next') || ''; return /^\/(d|deck|law)\//.test(n) ? n : ''; };
 let ME = null;
 
+// 법숲 숫자 — 카드가 보이면 시작 값(0 · 0.71)에서 목표까지 올라간다
+const countUp = () => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelectorAll('#lawStats [data-to]').forEach((el) => {
+    const to = Number(el.dataset.to), dec = Number(el.dataset.dec), from = Number(el.dataset.from || 0);   // 처음엔 최종 값이 보이고(JS 전 · 움직임 줄이기), 보일 때 시작 값부터 다시 올라간다
+    if (still) { el.textContent = to.toFixed(dec); return; }
+    const t0 = performance.now(), dur = 1400;
+    const tick = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = (from + (to - from) * e).toFixed(dec); if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+};
+new IntersectionObserver((es, ob) => { if (es.some((e) => e.isIntersecting)) { countUp(); ob.disconnect(); } }, { threshold: 0.4 }).observe($('#lawStats'));
+
 // 로그인 상태에 맞게 머리 · 단추를 바꾼다
 const paint = () => {
   const real = ME && ME.role !== 'demo';
@@ -117,22 +178,19 @@ const paint = () => {
   $('#aDeck').hidden = !ME; $('#aLaw').hidden = !ME;
 };
 
-// 데모 체험 — 이미 로그인(주인 · 데모)이면 그대로 열고, 아니면 데모 세션을 새로 만든다(발표 자료는 늘 원본 사본)
+// 데모 체험 — 발표 자료는 늘 원본 사본으로 새로 시작, 법숲은 로그인돼 있으면 바로
 document.querySelectorAll('[data-demo]').forEach((b) => {
   b.onclick = async () => {
     $('#err').textContent = ''; b.disabled = true;
     try {
       const dest = b.dataset.open;
-      if (dest === '/deck/' || !ME) {
-        const j = await post('/api/demo');   // 발표 자료 데모는 매번 새로(원본으로 다시 시작)
-        location.href = dest === '/deck/' ? j.url : dest; return;
-      }
+      if (dest === '/deck/' || !ME) { const j = await post('/api/demo'); location.href = dest === '/deck/' ? j.url : dest; return; }
       location.href = dest;
     } catch (e) { $('#err').textContent = e.message; b.disabled = false; }
   };
 });
 
-// 주인 로그인
+// 관리자 로그인
 const doLogin = async () => {
   $('#lerr').textContent = '';
   try { const j = await post('/api/login', { id: $('#lid').value, pw: $('#lpw').value }); ME = j.user; const n = nextOf(); if (n) { location.href = n; return; } $('#loginBox').hidden = true; paint(); }
