@@ -33,16 +33,9 @@ SHARED_TOKEN = os.environ.get('DECK_SHARED_TOKEN', '')       # 주인(개인) Cl
 DEMO_SAMPLES = [x.strip() for x in os.environ.get('DECK_DEMO_SAMPLES', '').split(',') if x.strip()]   # 데모에 줄 예시 덱 '계정/덱ID'(첫 것이 열린다)
 DEMO_RUNS = int(os.environ.get('DECK_DEMO_RUNS', '8'))       # 데모 세션 하나가 AI 에 부탁할 수 있는 횟수
 DEMO_DAILY = int(os.environ.get('DECK_DEMO_DAILY', '60'))    # 서버 전체 하루 데모 부탁 상한(구독 한도 보호)
-DEMO_PER_IP_HOUR = int(os.environ.get('DECK_DEMO_PER_IP_HOUR', '6'))   # IP 하나가 한 시간에 새 데모를 여는 횟수
+CONTACT = os.environ.get('DECK_CONTACT', '')   # 한도에 걸린 방문자에게 안내할 연락처(시연 요청)
 DEMO_OK = ('/api/logout', '/api/edit', '/api/edit/undo', '/api/shot', '/api/versions', '/api/classify', '/api/ask')   # 데모가 쓸 수 있는 POST(+ /api/agent/*)
-_demo_hits = {}; _demo_day = {'d': '', 'n': 0}
-def _ip_limited(ip, max_n, window=3600):
-    """최근 window 초 안에 허용된 횟수로 막는다(막힌 시도는 세지 않는다 — 계속 눌러도 막히는 시간이 늘지 않게)"""
-    now = time.time(); a = [t for t in _demo_hits.get(ip, []) if now - t < window]
-    if len(a) >= max_n: _demo_hits[ip] = a; return True
-    a.append(now); _demo_hits[ip] = a; return False
-def _ip_recent(ip, window=3600):
-    now = time.time(); return [t for t in _demo_hits.get(ip, []) if now - t < window]
+_demo_day = {'d': '', 'n': 0}
 def _kst_day(): return time.strftime('%Y-%m-%d', time.gmtime(time.time() + 9 * 3600))   # 하루 = 한국 시간 0시 기준
 def _demo_day_take():
     d = _kst_day()
@@ -827,10 +820,9 @@ class H(http.server.BaseHTTPRequestHandler):
                 pu['local'] = bool(deckagent.LLM_BASE)   # 로컬 LLM 이 없으면 화면에서 그 엔진 단추를 숨긴다
                 if not pu['claude'] and SHARED_TOKEN: pu.update(claude=True, shared=True)   # 주인 구독을 같이 쓰는 계정 · 데모
                 if u['role'] == 'demo':   # 데모 한도 — 화면 오른쪽 아래 위젯용(조회만)
-                    dm = STORE.demos.get(u['id']) or {}; opens = _ip_recent(self.client_ip())
+                    dm = STORE.demos.get(u['id']) or {}
                     pu['demo'] = {'runs': dm.get('runs', 0), 'runsMax': DEMO_RUNS, 'expIn': max(0, int(dm.get('exp', 0) - time.time())),
-                                  'day': _demo_day_used(), 'dayMax': DEMO_DAILY, 'opens': len(opens), 'opensMax': DEMO_PER_IP_HOUR,
-                                  'opensNextIn': max(0, int(opens[0] + 3600 - time.time())) if opens else 0}
+                                  'day': _demo_day_used(), 'dayMax': DEMO_DAILY, 'contact': CONTACT}
             return self.reply(200, {'user': pu})
         if path == '/api/decks':
             u = self.me()
@@ -1046,7 +1038,6 @@ class H(http.server.BaseHTTPRequestHandler):
     def _demo_session(self):
         """임시 계정 + 예시 덱 사본(늘 원본에서 새로) → (sid, {did: 주소}) 또는 (None, (코드, 오류))"""
         if not DEMO_SAMPLES: return None, (503, '아직 데모용 예시 발표 자료가 없습니다')
-        if _ip_limited(self.client_ip(), DEMO_PER_IP_HOUR): return None, (429, '데모를 너무 자주 열었습니다 — 잠시 뒤 다시 해 주세요')
         STORE.drop_demos((deckagent.ADIR,))
         uid, sid = STORE.new_demo(); urls = {}
         for item in DEMO_SAMPLES:
@@ -1084,7 +1075,6 @@ class H(http.server.BaseHTTPRequestHandler):
         if not u:
             if method == 'GET' and not sub_path.startswith('/api/'):
                 # 법숲 옛 주소 · 나눠 준 링크로 온 방문자 — 첫 화면을 거치지 않고 바로 데모로 들인다(발표 자료 사본은 만들지 않는다)
-                if _ip_limited(self.client_ip(), DEMO_PER_IP_HOUR): return self.reply(429, {'error': '데모를 너무 자주 열었습니다 — 잠시 뒤 다시 해 주세요'})
                 _, sid = STORE.new_demo()
                 self.send_response(302); self.send_header('Location', self.path); self.send_header('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.DEMO_SEC}')
                 self.send_header('Content-Length', '0'); self.end_headers(); return
@@ -1127,8 +1117,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 if u['role'] == 'demo':
                     if req.get('build'): raise PermissionError('데모에서는 새 발표 자료를 만들 수 없습니다')
                     dm = STORE.demos.get(u['id']) or {}
-                    if dm.get('runs', 0) >= DEMO_RUNS: raise ValueError(f'데모 부탁 {DEMO_RUNS}번을 다 썼습니다 — 첫 화면에서 데모를 다시 시작할 수 있습니다')
-                    if not _demo_day_take(): raise ValueError('오늘 데모 사용량이 다 찼습니다 — 내일 다시 와 주세요')
+                    if dm.get('runs', 0) >= DEMO_RUNS: raise ValueError(f'데모 부탁 {DEMO_RUNS}번을 다 썼습니다 — 첫 화면에서 데모를 다시 시작할 수 있습니다. 더 보고 싶으시면 {CONTACT} 으로 연락 주세요')
+                    if not _demo_day_take(): raise ValueError(f'오늘 데모 사용량이 다 찼습니다. 시연을 원하시면 {CONTACT} 으로 연락 주세요')
                     dm['runs'] = dm.get('runs', 0) + 1
                     req.update({'model': 'sonnet', 'effort': 'medium', 'web': False, 'engine': 'claude'})
                 tok = STORE.claude_token(u['id']) or SHARED_TOKEN

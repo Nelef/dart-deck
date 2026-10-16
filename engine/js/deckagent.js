@@ -42,6 +42,7 @@
   #kq .qbar i { display: block; height: 100%; width: calc(var(--v) * 100%); background: var(--qc, #0F766E); border-radius: inherit; }
   #kq .qr p { margin: 0; color: #5b6270; font-size: 12px; }
   #kq .qf { border-top: 1px solid #eef0f3; padding-top: 9px; color: #5b6270; font-size: 12px; }
+  #kq .qf a { color: #0F766E; font-weight: 700; }
   @media (max-width: 640px) { body.kside #kq { display: none; } #kq { right: 10px; bottom: 112px; } }
 
   /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
@@ -241,12 +242,12 @@
       const mins = (s) => { const m = Math.ceil(s / 60); return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`; };
       const row = (t, u, m, note) => `<div class="qr" style="${u >= m ? '--qc:#b45309' : ''}"><div class="top"><span>${t}</span><span>${u} / ${m}</span></div><div class="qbar"><i style="--v:${Math.min(1, u / m)}"></i></div><p>${note}</p></div>`;
       const left = Math.max(0, d.runsMax - d.runs), out = left === 0 || d.day >= d.dayMax;
-      w.querySelector('.qt').textContent = out ? 'AI 부탁 한도 — 첫 화면에서 새 데모' : `AI 부탁 ${left}/${d.runsMax} 남음`;
+      w.querySelector('.qt').textContent = out ? 'AI 부탁 한도 — 시연 요청은 메일로' : `AI 부탁 ${left}/${d.runsMax} 남음`;
       const ring = w.querySelector('.ring'); ring.style.setProperty('--p', left / d.runsMax); ring.style.setProperty('--qc', out ? '#b45309' : '#0F766E');
       w.querySelector('.qp').innerHTML = '<h3>데모 사용 한도</h3>'
         + row('AI 부탁 · 이 데모', d.runs, d.runsMax, `데모 하나(사본 자료 묶음)마다 ${d.runsMax}번입니다. 질문 · 수정 모두 1번씩 셉니다. 다 쓰면 첫 화면에서 데모를 다시 시작하면 원본 사본과 함께 새로 ${d.runsMax}번입니다.`)
         + row('AI 부탁 · 사이트 전체 오늘', d.day, d.dayMax, '모든 데모 방문자를 합친 하루 횟수입니다. 한국 시간 0시에 다시 0이 됩니다.')
-        + `<div class="qf">이 데모와 고친 사본은 <b>${mins(d.expIn)}</b> 뒤 지워집니다. 데모의 AI 는 개인 Claude 구독으로 돌아가서 한도를 둡니다.</div>`;
+        + `<div class="qf">${out ? `<b>한도에 걸렸나요?</b> 시연을 원하시면 <a href="mailto:${d.contact}">${d.contact}</a> 으로 연락 주세요.<br>` : `더 보고 싶으시면 <a href="mailto:${d.contact}">${d.contact}</a> 으로 연락 주세요.<br>`}이 데모와 고친 사본은 <b>${mins(d.expIn)}</b> 뒤 지워집니다. 데모의 AI 는 개인 Claude 구독으로 돌아가서 한도를 둡니다.</div>`;
     },
     // ── 새 덱 처음 만들기 — 목록에서 받은 정보(brief.json)를 서버가 부탁으로 만든다(Opus · 노력 high). 끝나면 곧바로 적용(빈 표지뿐이라 잃을 것이 없고, 백업은 남는다)
     async build() {
