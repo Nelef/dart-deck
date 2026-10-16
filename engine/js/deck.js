@@ -51,7 +51,7 @@
     // DART Deck — 왼쪽 위 로고 = 발표 자료 목록 · 탭 아이콘(사용자 지정 2026-09-30). 덱 HTML 을 고치지 않게 엔진이 붙인다(모양은 css/deck.css 끝)
     // 읽기 모드(공유 주소 /s/<토큰>/, 서버가 window.DECK_VIEW 를 심는다) — 로고는 링크가 아닌 그림, 편집 · AI 는 꺼진다(deckedit · deckkit)
     const VIEW = !!window.DECK_VIEW; if (VIEW) document.body.classList.add('dview');
-    if (!document.querySelector('#ppt-home')) { const a = document.createElement(VIEW ? 'div' : 'a'); a.id = 'ppt-home'; if (!VIEW) { a.href = '/'; a.title = '발표 자료 목록'; } a.innerHTML = '<img src="/web/logo.svg" alt="DART Deck">'; document.body.appendChild(a); }
+    if (!document.querySelector('#ppt-home')) { const a = document.createElement(VIEW ? 'div' : 'a'); a.id = 'ppt-home'; if (!VIEW) { a.href = '/deck/'; a.title = '발표 자료 목록'; } a.innerHTML = '<img src="/web/logo.svg" alt="DART Deck">'; document.body.appendChild(a); }
     // 확대 · 축소(휠 · 핀치 · + − 0 · 끌어 이동)는 엔진 기본 — 덱 HTML 에 없어도 붙인다(사용자 지정 2026-09-30). 덱이 뒤에서 직접 불러오면 js/deckzoom.js 가 알아서 한 번만 붙는다
     if (!window.DeckZoom) setTimeout(() => { if (!window.DeckZoom && !document.querySelector('script[src$="deckzoom.js"]')) { const z = document.createElement('script'); z.src = 'js/deckzoom.js'; document.body.appendChild(z); } }, 0);
     // 강조 도구(사용자 지정 2026-10-12 "강조 할 수 있게 도구 · 모두 지움 버튼") — 펜 · 형광펜 · 레이저 · 지우개(js/deckpen.js). 발표하는 사람의 도구라 읽기 모드(공유 주소)에도 붙인다. 서버의 캡처 크롬은 제외

@@ -154,7 +154,7 @@
   `;
   const A = {
     // 엔진 — 고른 적 없으면 구독이 연결돼 있으면 Claude Code, 아니면 gemma
-    get engine() { const e = ls.get('deckagent.engine'); return e === 'claude' || e === 'gemma' ? e : 'claude'; }, set engine(v) { ls.set('deckagent.engine', v); },
+    get engine() { const e = ls.get('deckagent.engine'); return A.me && !A.me.local ? 'claude' : (e === 'claude' || e === 'gemma' ? e : 'claude'); },   // 로컬 LLM 이 없으면 늘 Claude set engine(v) { ls.set('deckagent.engine', v); },
     get model() { return ls.get('deckagent.model') ?? 'sonnet'; }, set model(v) { ls.set('deckagent.model', v); },
     // 노력(effort) — Claude Code --effort. 기본 medium(고른 값 없을 때). 「노력 자동」 = 작은 수정 medium · 큰 수정 / 여러 장 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
     get effort() { return ls.get('deckagent.effort') ?? 'medium'; }, set effort(v) { ls.set('deckagent.effort', v); },
@@ -255,7 +255,7 @@
       bt.onclick = () => inp.click(); box.insertBefore(bt, box.firstChild);
       // 웹 검색 켜기 — Claude 구독 엔진에서만 된다(gemma 는 LiteLLM 경유라 검색 도구가 없다)
       const send = box.querySelector('.kc-send');
-      if (A.engine === 'claude' && A.token && send) {
+      if (A.engine === 'claude' && A.token && send && A.me?.role !== 'demo') {   // 데모는 웹 검색을 쓰지 않는다(서버도 끈다)
         const wb = document.createElement('button'); wb.type = 'button'; wb.className = `ka-webin${A.web ? ' on' : ''}`; wb.innerHTML = `${IC.web}웹`;
         wb.title = '켜면 AI 가 웹에서 찾아 넣는다 — 가져온 사실엔 출처를 달고, 검색 결과에 나온 주소만 연다';
         wb.onclick = () => { A.web = !A.web; wb.classList.toggle('on', A.web); A.toast(A.web ? '웹 검색 켬 — 필요하면 웹에서 찾아 출처와 함께 넣어요' : '웹 검색 끔'); };
@@ -301,9 +301,9 @@
       const EFFORTS = [['auto', '자동', '자동', '작은 수정은 medium · 큰 수정 · 여러 페이지는 high · 설명은 지정하지 않음'], ['low', 'low', 'low', '가장 빠름 — 간단한 글 고치기'], ['medium', 'medium', 'med', '보통 — 대부분의 수정 (기본)'],
         ['high', 'high', 'high', '오래 생각함 — 큰 수정 · 레이아웃, 사용량이 늘어남'], ['xhigh', 'xhigh', 'xhigh', '더 깊게 — 매우 오래 걸리고 사용량이 많음'], ['max', 'max', 'max', '최대 — 가장 오래 걸리고 사용량이 가장 많음']];
       const bar = document.createElement('div'); bar.className = 'ka-bar';
-      bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 LLM — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
-        + (cc && sub ? `<button class="ka-mdl" title="모델 · 노력(effort) 고르기"><span></span><i>▼</i></button><div class="ka-mpop" role="dialog" aria-label="모델 · 노력"></div>`
-          + `<button class="ka-more" title="사용량 · 구독 연결">⋯</button><div class="ka-menu"><button data-m="use">남은 사용량 보기</button><button data-m="acct">구독 연결 끊기</button><div class="sub">Claude 구독 연결됨</div></div>` : '')
+      bar.innerHTML = `<span class="ka-seg">${A.me?.local ? `<button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 LLM — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">로컬</button>` : ''}<button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
+        + (cc && sub && A.me?.role !== 'demo' ? `<button class="ka-mdl" title="모델 · 노력(effort) 고르기"><span></span><i>▼</i></button><div class="ka-mpop" role="dialog" aria-label="모델 · 노력"></div>`
+          + `<button class="ka-more" title="사용량 · 구독 연결">⋯</button><div class="ka-menu"><button data-m="use">남은 사용량 보기</button>${A.me?.shared ? '' : '<button data-m="acct">구독 연결 끊기</button>'}<div class="sub">${A.me?.shared ? '주인 구독을 같이 씀' : 'Claude 구독 연결됨'}</div></div>` : '')
         + (cc && !sub ? '<button class="ka-connect ka-acct">Claude 구독 연결</button>' : '');
       top.after(bar);
       // 윗줄(khead) — 덱 · 페이지 이름과 아이콘 버튼. render 때마다 다시 붙이니 전 것을 먼저 뗀다

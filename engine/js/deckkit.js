@@ -423,6 +423,7 @@
         const g = e.target.closest('.kc-go'); if (g) { e.preventDefault(); K.cfg.goto(Number(g.dataset.goto)); }
       });
       if (cfg.editable && K.restoreChat()) setTimeout(() => { K.checkAfterEdit(); K.open('ai'); }, 600);
+      else if (cfg.editable && new URLSearchParams(location.search).get('ai') === '1') setTimeout(() => K.open('ai'), 600);   // uyai 데모 — 오른쪽 AI 창을 연 채로
       // Claude Code 엔진(js/deckagent.js · 서버 research/deckagent.py) — 고칠 수 있는 덱에서만(2026-09-30 사용자 지정 "클로드 코드 도구 연결 · 구독 계정으로")
       if (cfg.editable && !window.DeckAgent) { const sc = document.createElement('script'); sc.src = 'js/deckagent.js'; document.head.appendChild(sc); } // 고치고 새로고침한 뒤 — 점검하고 대화를 이어서 연다
     },

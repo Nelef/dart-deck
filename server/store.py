@@ -8,12 +8,18 @@ import os, json, hashlib, hmac, secrets, time, threading, re, shutil
 
 LOCK = threading.RLock()
 SESSION_SEC = 14 * 86400
+# 데모 방문자(uyai 첫 화면의 「데모 체험하기」) — 계정 파일에 넣지 않는 임시 계정. 예시 덱 사본만 갖고, 시간이 지나거나 서버가 다시 켜지면 사본째 지운다
+DEMO_SEC = int(os.environ.get('DECK_DEMO_SEC', str(3 * 3600)))
+DEMO_PREFIX = 'demo-'
 
 class Store:
     def __init__(self, data_dir):
         self.dir = data_dir; os.makedirs(os.path.join(data_dir, 'decks'), exist_ok=True)
         self.users_f = os.path.join(data_dir, 'users.json'); self.sess_f = os.path.join(data_dir, 'sessions.json')
         self.users = self._load(self.users_f, {'users': []})['users']; self.sess = self._load(self.sess_f, {})
+        self.demos = {}   # 데모 계정 → {t, exp, runs} — 메모리에만. 켤 때 남은 데모 사본은 지운다
+        for o in os.listdir(os.path.join(data_dir, 'decks')):
+            if o.startswith(DEMO_PREFIX): shutil.rmtree(os.path.join(data_dir, 'decks', o), ignore_errors=True)
         if not self.users:   # 처음 켤 때 관리자 하나 — 이전 프로토타입 와 같게 admin/admin(첫 로그인 뒤 바꾸라고 화면에서 알린다)
             self.add_user('admin', 'admin', 'admin', '관리자', must_change=True)
         self.shares = {}; self.pins = {}   # shares: 토큰 → (계정, 덱) 「최신」 링크 · pins: 토큰 → (계정, 덱, 버전 id) 「그 버전에 고정」 링크(2026-10-07)
@@ -41,10 +47,31 @@ class Store:
         try: _, salt, h = u['pw'].split('$')
         except (KeyError, ValueError): return False
         return hmac.compare_digest(self.hash_pw(pw, salt), u['pw'])
-    def user(self, uid): return next((u for u in self.users if u['id'] == uid), None)
+    def user(self, uid):
+        u = next((u for u in self.users if u['id'] == uid), None)
+        if u: return u
+        d = self.demos.get(uid)
+        if d and d['exp'] > time.time(): return {'id': uid, 'name': '데모 방문자', 'role': 'demo', 'created': int(d['t'])}
+        return None
+    def new_demo(self):
+        """데모 계정과 세션을 만든다 → (계정, 세션 id)"""
+        uid = DEMO_PREFIX + secrets.token_hex(4); now = time.time(); sid = secrets.token_urlsafe(32)
+        with LOCK:
+            self.demos[uid] = {'t': now, 'exp': now + DEMO_SEC, 'runs': 0}
+            self.sess[sid] = {'user': uid, 'exp': now + DEMO_SEC}; self._save(self.sess_f, self.sess)
+        return uid, sid
+    def drop_demos(self, extra_dirs=()):
+        """시간이 지난 데모 계정 · 사본 덱(· Claude Code 설정 폴더)을 지운다 → 지운 수"""
+        now = time.time()
+        with LOCK: gone = [k for k, v in self.demos.items() if v['exp'] < now]
+        for k in gone:
+            self.demos.pop(k, None); shutil.rmtree(os.path.join(self.dir, 'decks', k), ignore_errors=True)
+            for base in extra_dirs: shutil.rmtree(os.path.join(base, f'cfg-{k}'), ignore_errors=True)
+        return len(gone)
     def add_user(self, uid, pw, role='user', name='', must_change=False):
         uid = str(uid or '').strip().lower()
         if not re.fullmatch(r'[a-z0-9][a-z0-9_.-]{1,31}', uid): raise ValueError('아이디는 영문 소문자 · 숫자 · _ . - 로 2~32자')
+        if uid.startswith(DEMO_PREFIX): raise ValueError(f'{DEMO_PREFIX} 로 시작하는 아이디는 쓸 수 없습니다')
         if len(str(pw or '')) < 4: raise ValueError('비밀번호는 4자 이상')
         with LOCK:
             if self.user(uid): raise ValueError('이미 있는 아이디입니다')
@@ -112,6 +139,7 @@ class Store:
         out = []; base = os.path.join(self.dir, 'decks')
         for o in sorted(os.listdir(base)) if os.path.isdir(base) else []:
             if owner and o != owner: continue
+            if not owner and o.startswith(DEMO_PREFIX): continue   # 관리자 목록에 데모 사본은 넣지 않는다
             for d in sorted(os.listdir(os.path.join(base, o))) if os.path.isdir(os.path.join(base, o)) else []:
                 m = self._load(os.path.join(base, o, d, 'meta.json'), None)
                 if not m or m.get('importing'): continue   # 가져오는 중인 덱은 끝나야 목록에 나온다

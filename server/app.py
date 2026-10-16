@@ -6,7 +6,7 @@
 #   권한: 덱 주인 또는 관리자만. 캡처 도구(서버 안에서 도는 크롬)는 이 컴퓨터에서 온 요청 + 서버가 켤 때 만든 캡처 키(x-shot-key)로 들어온다 —
 #         localhost 라는 것만으로 열어 주면 같은 컴퓨터의 역방향 프록시를 거친 모든 요청이 로그인 없이 통과한다
 #   Claude 구독 토큰은 계정에 묶어 서버에만 둔다(store.py) — 화면 · 응답 · 로그로 내보내지 않는다(로그에는 길이만)
-import os, re, sys, json, glob, uuid, time, base64, hashlib, secrets, datetime, subprocess, shutil, tempfile, socketserver, http.server, urllib.request, urllib.parse, mimetypes, html as htmlmod
+import os, re, sys, json, glob, uuid, time, base64, hashlib, secrets, datetime, subprocess, shutil, tempfile, socketserver, http.server, urllib.request, urllib.error, urllib.parse, mimetypes, html as htmlmod
 import importlib.util as _ilu
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
@@ -25,6 +25,30 @@ STORE = storemod.Store(DATA_DIR)
 _dropped = STORE.drop_importing()   # 가져오다 서버가 꺼진 반쪽 덱 정리
 if _dropped: sys.stderr.write(f'가져오던 중이던 덱 {_dropped}개를 지웠습니다\n')
 COOKIE = 'ppt_sid'
+
+# ── uyai 사이트(2026-10-16) — 첫 화면(/) · 발표 자료(/deck/) · 법숲(/law/ → LAW_URL 로 중계) · 데모 체험 ──
+LAW_URL = os.environ.get('LAW_URL', '').rstrip('/')          # 법숲 컨테이너(같은 도커 네트워크) — 비우면 /law/ 는 404
+GATEWAY_KEY = os.environ.get('GATEWAY_KEY', '')              # 법숲이 이 서버가 보낸 요청인지 확인하는 비밀 값
+SHARED_TOKEN = os.environ.get('DECK_SHARED_TOKEN', '')       # 주인(개인) Claude 구독 토큰 — 데모 · 구독을 따로 연결하지 않은 계정이 쓴다
+DEMO_SAMPLES = [x.strip() for x in os.environ.get('DECK_DEMO_SAMPLES', '').split(',') if x.strip()]   # 데모에 줄 예시 덱 '계정/덱ID'(첫 것이 열린다)
+DEMO_RUNS = int(os.environ.get('DECK_DEMO_RUNS', '8'))       # 데모 세션 하나가 AI 에 부탁할 수 있는 횟수
+DEMO_DAILY = int(os.environ.get('DECK_DEMO_DAILY', '60'))    # 서버 전체 하루 데모 부탁 상한(구독 한도 보호)
+DEMO_PER_IP_HOUR = int(os.environ.get('DECK_DEMO_PER_IP_HOUR', '6'))   # IP 하나가 한 시간에 새 데모를 여는 횟수
+DEMO_OK = ('/api/logout', '/api/edit', '/api/edit/undo', '/api/shot', '/api/versions', '/api/classify', '/api/ask')   # 데모가 쓸 수 있는 POST(+ /api/agent/*)
+_demo_hits = {}; _demo_day = {'d': '', 'n': 0}
+def _ip_limited(ip, max_n, window=3600):
+    now = time.time(); a = [t for t in _demo_hits.get(ip, []) if now - t < window]; a.append(now); _demo_hits[ip] = a
+    return len(a) > max_n
+def _demo_day_take():
+    d = time.strftime('%Y-%m-%d')
+    if _demo_day['d'] != d: _demo_day.update(d=d, n=0)
+    if _demo_day['n'] >= DEMO_DAILY: return False
+    _demo_day['n'] += 1; return True
+def demo_cleanup_loop():
+    while True:
+        try: STORE.drop_demos((deckagent.ADIR,))
+        except Exception as e: sys.stderr.write(f'데모 정리 실패: {e}\n')
+        time.sleep(600)
 
 _fc_spec = _ilu.spec_from_file_location('fontcache', os.path.join(ENGINE, 'tools', 'fontcache.py')); FONTCACHE = _ilu.module_from_spec(_fc_spec); _fc_spec.loader.exec_module(FONTCACHE)
 FONTCACHE.FONTS = FONT_DIR   # 편집에서 새로 받은 글꼴은 data/ 에(엔진 폴더는 배포 이미지 안이라 다시 배포하면 사라진다)
@@ -769,8 +793,14 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self): self.do_GET(head_only=True)
     def do_GET(self, head_only=False):
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/law': self.send_response(301); self.send_header('Location', '/law/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+        if path.startswith('/law/'): return self.law_proxy('GET', head_only)
         if path == '/api/me':
-            u = self.me(); return self.reply(200, {'user': STORE.public(u) if u else None})
+            u = self.me(); pu = STORE.public(u) if u else None
+            if pu:
+                pu['local'] = bool(deckagent.LLM_BASE)   # 로컬 LLM 이 없으면 화면에서 그 엔진 단추를 숨긴다
+                if not pu['claude'] and SHARED_TOKEN: pu.update(claude=True, shared=True)   # 주인 구독을 같이 쓰는 계정 · 데모
+            return self.reply(200, {'user': pu})
         if path == '/api/decks':
             u = self.me()
             if not u: return self.reply(401, {'error': '로그인이 필요합니다'})
@@ -799,7 +829,9 @@ class H(http.server.BaseHTTPRequestHandler):
             counts = {}
             for x in STORE.decks(): counts[x['owner']] = counts.get(x['owner'], 0) + 1
             return self.reply(200, {'users': [{**STORE.public(x), 'decks': counts.get(x['id'], 0)} for x in STORE.users]})
-        if path in ('/', '/index.html'): return self.send_file(os.path.join(WEB, 'index.html'), head_only)
+        if path in ('/', '/index.html'): return self.send_file(os.path.join(WEB, 'portal.html'), head_only)
+        if path == '/deck': self.send_response(301); self.send_header('Location', '/deck/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+        if path == '/deck/': return self.send_file(os.path.join(WEB, 'index.html'), head_only)
         if path.startswith('/web/'):
             p = os.path.realpath(os.path.join(WEB, path[5:]))
             if not p.startswith(WEB + os.sep): return self.send_error(404)
@@ -909,7 +941,9 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self.reply(401, {'error': '로그인이 필요합니다 — 새로고침해 다시 로그인해 주세요'})
             self.close_connection = True; return self.reply(413 if logged else 401, {'error': '본문이 너무 큽니다' if logged else '로그인이 필요합니다 — 새로고침해 다시 로그인해 주세요'})
         self._raw = self.rfile.read(n) if n > 0 else b''
+        if path.startswith('/law/'): return self.law_proxy('POST')
         try:
+            if path == '/api/demo': return self.demo_start()
             if path == '/api/login':
                 req = self.body(10_000); sid = STORE.login(req.get('id'), req.get('pw'))
                 return self.reply(200, {'ok': True, 'user': STORE.public(STORE.who(sid))}, [('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.SESSION_SEC}')])
@@ -921,6 +955,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self.reply(200, {'ok': True})
             u = self.me()
             if not u: return self.reply(401, {'error': '로그인이 필요합니다 — 새로고침해 다시 로그인해 주세요'})
+            if u['role'] == 'demo' and ((path not in DEMO_OK and not path.startswith('/api/agent/')) or path.startswith('/api/agent/login')):
+                return self.reply(403, {'error': '데모에서는 할 수 없는 기능입니다'})
             if path == '/api/logout':
                 STORE.logout(self.sid()); return self.reply(200, {'ok': True}, [('Set-Cookie', f'{COOKIE}=; Path=/; Max-Age=0')])
             if path == '/api/me/password':
@@ -968,6 +1004,48 @@ class H(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             return self.reply(409, {'error': str(e)})
 
+    def client_ip(self):
+        return (self.headers.get('X-Forwarded-For') or self.client_address[0]).split(',')[0].strip()
+
+    def demo_start(self):
+        """데모 체험 — 임시 계정 + 예시 덱 사본(늘 원본에서 새로) → 첫 덱 주소(AI 창 연 채)"""
+        if not DEMO_SAMPLES: return self.reply(503, {'error': '아직 데모용 예시 발표 자료가 없습니다'})
+        if _ip_limited(self.client_ip(), DEMO_PER_IP_HOUR): return self.reply(429, {'error': '데모를 너무 자주 열었습니다 — 잠시 뒤 다시 해 주세요'})
+        STORE.drop_demos((deckagent.ADIR,))
+        uid, sid = STORE.new_demo(); first = None
+        for item in DEMO_SAMPLES:
+            owner, _, did = item.partition('/')
+            src = STORE.deck_dir(owner, did)
+            if not re.fullmatch(r'\d{8}-[0-9a-f]{6}', did) or not os.path.isfile(os.path.join(src, 'index.html')): continue
+            dst = STORE.deck_dir(uid, did)
+            shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns('.*'))   # 숨김(고치는 사본 · 대화 기록 · 버전)은 빼고
+            link_engine(dst); first = first or f'/d/{uid}/{did}/?ai=1'
+        if not first: return self.reply(503, {'error': '예시 발표 자료를 찾지 못했습니다'})
+        return self.reply(200, {'ok': True, 'url': first, 'runs': DEMO_RUNS},
+                          [('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.DEMO_SEC}')])
+
+    def law_proxy(self, method, head_only=False):
+        """/law/… → 법숲(LAW_URL). 로그인은 이 서버가 확인하고, 법숲에는 역할(user · demo)과 비밀 값만 넘긴다"""
+        if not LAW_URL: return self.send_error(404)
+        sub_path = self.path[4:] or '/'; u = self.me()
+        if not u:
+            if method == 'GET' and not sub_path.startswith('/api/'):
+                self.send_response(302); self.send_header('Location', '/?next=/law/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+            return self.reply(401, {'error': '로그인이 필요합니다'})
+        hd = {'x-uyai-role': 'demo' if u['role'] == 'demo' else 'user', 'x-uyai-key': GATEWAY_KEY, 'x-forwarded-for': self.client_ip(),
+              'x-forwarded-proto': self.headers.get('X-Forwarded-Proto') or 'http'}
+        if self.headers.get('Content-Type'): hd['content-type'] = self.headers.get('Content-Type')
+        rq = urllib.request.Request(LAW_URL + sub_path, data=(getattr(self, '_raw', b'') or b'') if method == 'POST' else None, headers=hd, method=method)
+        try: r = urllib.request.urlopen(rq, timeout=180)
+        except urllib.error.HTTPError as e: r = e
+        except Exception as e: return self.reply(502, {'error': f'법숲에 연결하지 못했습니다: {str(e)[:120]}'})
+        body = r.read(); self.send_response(getattr(r, 'status', None) or r.code)
+        for k in ('Content-Type', 'Cache-Control'):
+            v = r.headers.get(k)
+            if v: self.send_header(k, v)
+        self.send_header('Content-Length', str(len(body))); self.end_headers()
+        if not head_only: self.wfile.write(body)
+
     # ── Claude Code — 토큰은 이 계정의 것을 서버가 꺼내 붙인다(브라우저가 보낸 token 은 무시) ──
     def agent(self, u, path, req):
         req.pop('token', None)
@@ -978,7 +1056,14 @@ class H(http.server.BaseHTTPRequestHandler):
             if req.get('engine') == 'gemma' and not req.get('build'):
                 req['model'] = req['effort'] = None
             else:
-                tok = STORE.claude_token(u['id'])
+                if u['role'] == 'demo':
+                    if req.get('build'): raise PermissionError('데모에서는 새 발표 자료를 만들 수 없습니다')
+                    dm = STORE.demos.get(u['id']) or {}
+                    if dm.get('runs', 0) >= DEMO_RUNS: raise ValueError(f'데모 부탁 {DEMO_RUNS}번을 다 썼습니다 — 첫 화면에서 데모를 다시 시작할 수 있습니다')
+                    if not _demo_day_take(): raise ValueError('오늘 데모 사용량이 다 찼습니다 — 내일 다시 와 주세요')
+                    dm['runs'] = dm.get('runs', 0) + 1
+                    req.update({'model': 'sonnet', 'effort': 'medium', 'web': False, 'engine': 'claude'})
+                tok = STORE.claude_token(u['id']) or SHARED_TOKEN
                 if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
                 req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
             if req.get('build'):
@@ -1125,6 +1210,7 @@ if __name__ == '__main__':
     os.makedirs(DECKS, exist_ok=True)
     for dd in glob.glob(os.path.join(DECKS, '*', '*')):
         if os.path.isdir(dd): link_engine(dd)
+    import threading as _thr; _thr.Thread(target=demo_cleanup_loop, daemon=True).start()
     with S((os.environ.get('PPT_HOST', '0.0.0.0'), PORT), H) as s:   # PPT_HOST=127.0.0.1 이면 이 컴퓨터에서만(이 맥은 Tailscale 이 tailnet 주소의 8900 을 GPU 서버으로 넘겨 0.0.0.0 으로는 못 연다)
         sys.stderr.write(f'DART Deck http://0.0.0.0:{PORT} · 데이터 {DATA_DIR}\n'); sys.stderr.flush()
         s.serve_forever()

@@ -219,14 +219,16 @@ const doLogin = async () => {
 };
 $('#lgo').onclick = doLogin;
 $('#lpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
-$('#bOut').onclick = async () => { await post('/api/logout').catch(() => {}); ME = null; show(); };
-$('#logo').onclick = () => { history.pushState(null, '', '/'); route(); };
+$('#bOut').onclick = async () => { await post('/api/logout').catch(() => {}); location.href = '/'; };   // uyai — 로그아웃하면 첫 화면으로
+$('#logo').onclick = () => { history.pushState(null, '', '/deck/'); route(); };
 
 // 로그인 여부에 따라 화면을 고른다
 const show = () => {
+  if (!ME) { location.href = '/?next=' + encodeURIComponent(location.pathname + location.hash); return; }   // uyai — 로그인 · 데모는 첫 화면에서
   $('#login').hidden = !!ME; $('#app').hidden = !ME;
   if (!ME) { setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) $('#lid').focus(); }, 50); return; }   // 이미 입력 중이면 커서를 뺏지 않는다
   $('#who').textContent = `${ME.name}${ME.role === 'admin' ? ' · 관리자' : ''}`; $('#bUsers').hidden = ME.role !== 'admin';
+  if (ME.role === 'demo') { $('#bNew').hidden = true; $('#bAcct').hidden = true; if (location.hash === '#new') history.replaceState(null, '', '/deck/'); }   // 데모 — 예시 사본만, 새로 만들기 · 계정 없음
   route();
 };
 // 주소(#new)에 따라 목록 · 새 발표 자료를 고른다
