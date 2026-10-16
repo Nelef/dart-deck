@@ -19,6 +19,9 @@ RUN python3 -m venv /opt/fonttools && /opt/fonttools/bin/pip install --no-cache-
 # PPT 로 받기(화면 그대로) — 페이지 그림을 .pptx 로 묶는다(server/pptx_build.py · python-pptx). 글자 편집 가능 PPT 는 위의 LibreOffice 가 PDF 를 바꾼다
 RUN python3 -m venv /opt/pptx && /opt/pptx/bin/pip install --no-cache-dir python-pptx==1.0.2
 COPY web ./web
+# 공시 검색(rag/server.mjs · mcp.mjs · lib) — 데이터 · 모델은 이미지가 아니라 /data/rag(볼륨)에
+COPY rag/server.mjs rag/mcp.mjs ./rag/
+COPY rag/lib ./rag/lib
 
 ENV PPT_PORT=8900 PPT_DATA_DIR=/data DISABLE_AUTOUPDATER=1 PYTHONUNBUFFERED=1
 EXPOSE 8900

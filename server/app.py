@@ -1215,6 +1215,11 @@ if __name__ == '__main__':
     for dd in glob.glob(os.path.join(DECKS, '*', '*')):
         if os.path.isdir(dd): link_engine(dd)
     import threading as _thr; _thr.Thread(target=demo_cleanup_loop, daemon=True).start()
+    _rag = os.path.join(DATA_DIR, 'rag')
+    if os.path.isfile(os.path.join(_rag, 'chunks.jsonl')):   # 공시 검색 서버(rag/server.mjs) — 데이터가 있을 때만, 이 컨테이너 안(127.0.0.1)에서
+        subprocess.Popen(['node', os.path.join(ROOT, 'rag', 'server.mjs')], env={**os.environ, 'DART_DATA': _rag + os.sep, 'DART_MODELS': os.path.join(_rag, 'models') + os.sep, 'DART_OFFLINE': '1'},
+                         stdout=open(os.path.join(_rag, 'server.log'), 'a'), stderr=subprocess.STDOUT, start_new_session=True)
+        os.environ.setdefault('DART_RAG_URL', 'http://127.0.0.1:8787'); deckagent.DART_RAG_URL = os.environ['DART_RAG_URL']
     with S((os.environ.get('PPT_HOST', '0.0.0.0'), PORT), H) as s:   # PPT_HOST=127.0.0.1 이면 이 컴퓨터에서만(이 맥은 Tailscale 이 tailnet 주소의 8900 을 GPU 서버으로 넘겨 0.0.0.0 으로는 못 연다)
         sys.stderr.write(f'DART Deck http://0.0.0.0:{PORT} · 데이터 {DATA_DIR}\n'); sys.stderr.flush()
         s.serve_forever()

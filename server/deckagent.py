@@ -34,6 +34,12 @@ WEB = ('\n# 웹 검색(이번 부탁에 켜짐)\n'
        '- 웹에서 가져온 숫자 · 사실을 덱에 쓰면 그 페이지 아래에 출처를 단다: 「출처: 사이트 이름(연도 또는 날짜)」, 글자 크기 var(--fs-foot), 색 var(--c-text-mute).\n'
        '  여러 곳에서 가져왔으면 한 줄에 · 로 잇는다. 확인하지 못한 숫자는 쓰지 않는다.\n'
        '- 마지막 답에 무엇을 어디서 찾아 넣었는지 한 줄씩 적는다.\n')                 # 덱 사본 폴더의 tools/deck_shot.cjs 가 playwright 를 찾게
+DART_RAG_URL = os.environ.get('DART_RAG_URL', '')            # 공시 검색 서버(rag/server.mjs) — 있으면 에이전트에 dart MCP 도구를 붙인다
+DART_MCP = os.path.join(ROOT, 'rag', 'mcp.mjs')
+DART_RULES = ('\n# 공시(DART) 근거\n- 회사 · 실적 · 사업 · 리스크 같은 사실과 숫자는 dart_search · dart_finance · dart_section 도구로 찾은 것만 쓴다. 기억이나 추측으로 채우지 않는다.\n'
+              '- 숫자는 dart_finance(원 단위) 값을 우선 쓰고, 조 · 억 원으로 바꿀 때 자릿수를 다시 확인한다.\n'
+              '- 공시에서 넣은 사실 · 숫자가 있는 장에는 각주(작은 글씨)로 「출처: 회사 2025 사업보고서 · 장 > 절 · 접수번호」를 단다.\n'
+              '- 도구가 결과를 못 찾으면 지어내지 말고 「공시에서 찾지 못함」이라고 적는다. 투자 권유 · 전망 단정은 하지 않는다.\n')
 RUN_SEC = 15 * 60                                             # 한 번 부탁의 상한(생각 켠 gemma 는 몇 분 걸린다 — 벤치 중앙 70초, 긴 것 10분)
 BUILD_SEC = 40 * 60                                            # 새 덱 처음 만들기(10페이지 안팎을 Opus 가 쓰고 찍어 보며 고친다)
 BUILD_PROMPT_MAX = 60_000                                      # 새 덱 부탁 — 사용자가 붙여 넣은 자료 전체가 들어간다
@@ -416,10 +422,11 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
         # 계획만 세우는 차례라는 것과 지금 덱을 읽을 파일을 메시지 앞에 박는다
         if req.get('plan'):
             ask = f"[이번 차례는 계획만 — 파일을 고치지 않는다. 지금 덱은 ./{r['work']} 를 Read 해서 보고, 고칠 곳을 적은 뒤 「이대로 진행할까요?」로 끝낸다. 사용자가 [진행]을 누르면 다음 차례에 고친다]\n{ask}"
+        dart = engine == 'sub' and bool(DART_RAG_URL)   # 공시 검색(MCP) — 근거 · 숫자는 도구 결과에서만, 각주에 접수번호
         args = [CLAUDE, '-p', ask, '--output-format', 'stream-json', '--verbose',
-                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, '')), docs) + (WEB if web else '') + hint, '--permission-mode', 'default',
+                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, '')), docs) + (WEB if web else '') + (DART_RULES if dart else '') + hint, '--permission-mode', 'default',
                 # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
-                '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if web else []),
+                '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if web else []), *(['mcp__dart__dart_search', 'mcp__dart__dart_finance', 'mcp__dart__dart_section'] if dart else []),
                 # 웹은 기본으로 막는다 — [웹 검색] 켠 부탁(Claude 구독)에만 열고, WebFetch 는 관문 훅이 검색 결과 주소로 좁힌다
                 '--disallowedTools', *([] if web else ['WebFetch', 'WebSearch']), 'Task', 'NotebookEdit',
                 # 덱 폴더의 js · css · tools · DECK.md 는 engine/ 을 가리키는 링크다 — 링크 너머 읽기가 '작업 폴더 밖'으로 막히지 않게 엔진 폴더를 읽기로 연다
@@ -440,6 +447,7 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
                         'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-gemma')})
             args += ['--bare', '--model', 'gemma-think']
         if web: args += ['--settings', json.dumps({'hooks': {'PreToolUse': [{'matcher': 'WebFetch', 'hooks': [{'type': 'command', 'command': f'{shutil.which("python3") or "python3"} {GUARD}'}]}]}})]
+        if dart: args += ['--mcp-config', json.dumps({'mcpServers': {'dart': {'command': 'node', 'args': [DART_MCP], 'env': {'DART_RAG_URL': DART_RAG_URL}}}})]
         if r['session']: args += ['--resume', r['session']]
         os.makedirs(env['CLAUDE_CONFIG_DIR'], exist_ok=True)
         p = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)

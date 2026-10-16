@@ -1,7 +1,7 @@
 // 로컬 임베딩(@huggingface/transformers, ONNX). Claude 에는 임베딩 API 가 없어 로컬 모델을 쓴다 — 외부 API 키 없이 로컬 CPU 에서 돈다.
 import { pipeline, env } from '@huggingface/transformers';
 
-env.cacheDir = new URL('../models/', import.meta.url).pathname;   // rag/models/Xenova/bge-m3 (법숲과 같은 파일)
+env.cacheDir = process.env.DART_MODELS || new URL('../models/', import.meta.url).pathname;   // rag/models/Xenova/bge-m3 (법숲과 같은 파일)
 if (process.env.DART_OFFLINE) env.allowRemoteModels = false; // 배포 이미지: 포함된 모델만 쓴다
 
 export const MODELS = {
