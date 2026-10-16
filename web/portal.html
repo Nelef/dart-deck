@@ -19,7 +19,7 @@
   --paper: oklch(97.6% 0.007 95); --paper-2: oklch(94.6% 0.01 95); --card: oklch(99.2% 0.003 95);
   --ink: oklch(19% 0.012 250); --ink-2: oklch(35% 0.012 250); --ink-3: oklch(50% 0.01 250); --ink-4: oklch(64% 0.008 250);
   --line: oklch(19% 0.012 250 / .09); --line-2: oklch(19% 0.012 250 / .16);
-  --accent: oklch(51% 0.088 176); --accent-ink: oklch(39% 0.07 176); --accent-wash: oklch(93.5% 0.03 176); --accent-glow: oklch(51% 0.088 176 / .14);
+  --accent: oklch(51% 0.088 176); --law: oklch(58% 0.14 138); --accent-ink: oklch(39% 0.07 176); --accent-wash: oklch(93.5% 0.03 176); --accent-glow: oklch(51% 0.088 176 / .14);
   --night: oklch(17.5% 0.012 205); --night-2: oklch(22% 0.014 205); --night-line: oklch(100% 0 0 / .08);
   --on-night: oklch(95.5% 0.006 95); --on-night-2: oklch(77% 0.012 205); --on-night-3: oklch(60% 0.012 205); --mint: oklch(80% 0.1 172);
   --warm: oklch(60% 0.13 62); --warm-wash: oklch(95% 0.035 75);
@@ -29,6 +29,14 @@
   --gut: clamp(20px, 4vw, 56px); --max: 1280px;
 }
 * { box-sizing: border-box; }
+/* 스크롤바 — 얇고 둥글게, 바탕색에 맞춰(어두운 구역 위에서도 보이게 반투명) */
+html { scrollbar-width: thin; scrollbar-color: oklch(50% 0.02 220 / .45) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(50% 0.02 220 / .38); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: oklch(51% 0.088 176 / .75); border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+::selection { background: oklch(51% 0.088 176 / .22); }
 [hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--sans); letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; word-break: keep-all; overflow-wrap: break-word; }
@@ -107,12 +115,25 @@ a { color: inherit; }
 /* 키워드 레일 — 고르면 아래 한 줄이 그 키워드가 어디서 어떻게 쓰였는지로 바뀐다 */
 .rail { margin-top: clamp(48px, 7vh, 88px); border-top: 1px solid var(--line-2); padding-top: 22px; }
 .rail .head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
-.kws { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 14px 0 0; padding: 0; list-style: none; }
-.kws li { display: contents; }
-.kw { font: 700 clamp(1.4rem, 3vw, 2.7rem)/1.18 var(--mono); letter-spacing: -0.03em; color: var(--ink-4); background: none; border: 0; padding: 2px 0; cursor: pointer; transition: color .35s var(--ease); white-space: nowrap; }
-.kws li:not(:last-child) .kw::after { content: '/'; color: var(--line-2); margin: 0 .38em; font-weight: 500; }
-.kw:hover, .kw.on { color: var(--ink); }
-.kw.on { color: var(--accent); }
+.kws { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 0; margin: 14px 0 0; padding: 0; list-style: none; }
+.kws li { display: inline-flex; align-items: center; }
+.kws li:not(:last-child)::after { content: '/'; color: var(--line-2); margin: 0 .16em; font: 500 clamp(1.05rem, 1.75vw, 1.6rem)/1 var(--mono); }
+/* 키워드 — 지금 것은 쓰인 곳 색으로 꽉 찬 알약(AI PPT 청록 · 법숲 초록 · 두 서비스 두 색), 아래 막대는 다음으로 넘어갈 때까지 */
+.kw { --kc: var(--accent); position: relative; overflow: hidden; font: 700 clamp(1.4rem, 3vw, 2.7rem)/1.18 var(--mono); letter-spacing: -0.03em; color: var(--ink-4); background: transparent; border: 0; padding: 2px 7px 4px; margin: 0 -1px; border-radius: 9px; cursor: pointer; white-space: nowrap; transition: color .4s var(--ease), background .5s var(--ease), box-shadow .5s var(--ease), transform .5s var(--ease); }
+.kw[data-svc="law"] { --kc: var(--law); }
+.kw[data-svc="both"] { --kc: var(--accent); }
+.kw:hover { color: var(--ink); }
+.kw.on { color: var(--paper); background: var(--kc); box-shadow: 0 10px 26px -12px var(--kc); transform: translateY(-1px); }
+.kw.on[data-svc="both"] { background: linear-gradient(100deg, var(--accent), var(--law)); }
+.kw::before { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: oklch(100% 0 0 / .55); transform-origin: left; transform: scaleX(0); }
+.kw.on.auto::before { animation: kwbar var(--kwdur, 2.8s) linear forwards; }
+@keyframes kwbar { to { transform: scaleX(1); } }
+/* 카드 아우라 — 누른 키워드가 쓰인 서비스 영상 뒤가 빛난다 */
+.duo-card { position: relative; isolation: isolate; }
+.duo-card::before { content: ''; position: absolute; z-index: -1; inset: -26px -26px 34px; border-radius: 36px; background: radial-gradient(62% 72% at 50% 46%, var(--aura, var(--accent)), transparent 74%); filter: blur(30px); opacity: 0; transform: scale(.94); transition: opacity .7s var(--ease), transform .9s var(--ease); pointer-events: none; }
+.duo-card.aura::before { opacity: 1; transform: scale(1.03); animation: aura 2.4s ease-in-out infinite; }
+.duo-card.aura .duo-media { box-shadow: 0 0 0 2.5px var(--aura, var(--accent)), 0 0 46px -6px var(--aura, var(--accent)); }
+@keyframes aura { 50% { opacity: .7; transform: scale(1.07); } }
 .kwcap { margin-top: 18px; min-height: 3.2em; display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: baseline; }
 .kwcap .svc { font: 700 12.5px/1 var(--sans); letter-spacing: 0; color: var(--accent-ink); background: var(--accent-wash); padding: 6px 9px; border-radius: 6px; white-space: nowrap; }
 .kwcap p { margin: 0; font-size: 16.5px; color: var(--ink-2); }
@@ -308,11 +329,11 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <p class="lead fade" style="--fd:.55s">공시와 법령을 근거로 답하는 <b>RAG</b>, 말로 부탁하면 자료를 고치고 스스로 확인하는 <b>AI 에이전트</b>.<span class="m-hide"> 두 서비스를 로그인 없이 바로 써 볼 수 있습니다.</span></p>
     </div>
     <div class="duo">
-      <article class="duo-card fade" style="--fd:.6s">
+      <article class="duo-card fade" data-svc="ppt" style="--fd:.6s;--aura:var(--accent)">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-aippt-poster.webp" data-src="/web/media/promo-aippt.mp4" width="1280" height="720" aria-label="AI PPT 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 17초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <div class="duo-row"><button class="btn go big deckDemo" data-demo="1" data-open="/deck/" data-label="AI PPT 데모 체험" disabled>AI PPT 준비 중</button><a class="duo-sub" href="#ppt">공시를 근거로, 말로 고치는 발표 자료</a></div>
       </article>
-      <article class="duo-card fade" style="--fd:.72s">
+      <article class="duo-card fade" data-svc="law" style="--fd:.72s;--aura:var(--law)">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-law-poster.webp" data-src="/web/media/promo-law.mp4" width="1280" height="720" aria-label="법숲 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <div class="duo-row"><a class="btn go big" href="/law/">법숲 데모 체험 <span class="ar" aria-hidden="true">→</span></a><a class="duo-sub" href="#law">법 조문으로 답하고, 근거 없으면 거절</a></div>
       </article>
@@ -320,14 +341,14 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
     <div class="rail fade" id="rail" style="--fd:.9s">
       <div class="head"><span class="label ko">기술 키워드 — 눌러 보세요</span><span class="label ko" style="color:var(--ink-4)">모두 아래 두 서비스에서 실제로 돌아갑니다</span></div>
       <ul class="kws" id="kws">
-        <li><button class="kw on" data-k="rag">RAG</button></li>
-        <li><button class="kw" data-k="agent">AI Agent</button></li>
-        <li><button class="kw" data-k="mcp">MCP</button></li>
-        <li><button class="kw" data-k="hybrid">Hybrid Search</button></li>
-        <li><button class="kw" data-k="vdb">Vector DB</button></li>
-        <li><button class="kw" data-k="eval">LLM Eval</button></li>
-        <li><button class="kw" data-k="graph">LangGraph</button></li>
-        <li><button class="kw" data-k="guard">Grounding</button></li>
+        <li><button class="kw on" data-k="rag" data-svc="both">RAG</button></li>
+        <li><button class="kw" data-k="agent" data-svc="ppt">AI Agent</button></li>
+        <li><button class="kw" data-k="mcp" data-svc="both">MCP</button></li>
+        <li><button class="kw" data-k="hybrid" data-svc="both">Hybrid Search</button></li>
+        <li><button class="kw" data-k="vdb" data-svc="ppt">Vector DB</button></li>
+        <li><button class="kw" data-k="eval" data-svc="both">LLM Eval</button></li>
+        <li><button class="kw" data-k="graph" data-svc="law">LangGraph</button></li>
+        <li><button class="kw" data-k="guard" data-svc="both">Grounding</button></li>
       </ul>
       <div class="kwcap" id="kwcap" aria-live="polite"><span class="svc"></span><p></p></div>
     </div>
@@ -506,15 +527,31 @@ const KW = {
   graph:  ['법숲', '근거가 모자랄 때만 다시 찾는 <b>LangGraph 적응형 흐름</b> — 쉬운 질문은 한 번에 끝납니다.'],
   guard:  ['두 서비스', '조문 번호 · 공시 접수번호로만 인용하고, 근거가 없으면 <b>지어내지 않고 거절</b>합니다(범위 밖 10/10).'],
 };
-const cap = $('#kwcap');
-const pickKw = (b) => {
-  if (!b) return; $$('.kw').forEach((x) => x.classList.toggle('on', x === b));
+const cap = $('#kwcap'), kws = $$('.kw'), KW_MS = 2800;
+const pickKw = (b, auto) => {
+  if (!b) return; kws.forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('auto', x === b && !!auto); });
+  b.style.setProperty('--kwdur', KW_MS + 'ms');
   const [svc, txt] = KW[b.dataset.k]; cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
   $('.svc', cap).textContent = svc; $('p', cap).innerHTML = txt;
 };
-$('#kws').addEventListener('click', (e) => pickKw(e.target.closest('.kw')));
-if (matchMedia('(hover: hover)').matches) $('#kws').addEventListener('mouseover', (e) => pickKw(e.target.closest('.kw')));
-pickKw($('.kw.on'));
+// 자동으로 하나씩 — 화면에 보일 때만, 누르거나 올리면 잠시 멈춘다(움직임 줄이기면 자동 안 함)
+let kwIdx = 0, kwPause = 0, kwSeen = true, auraT;
+new IntersectionObserver((es) => { kwSeen = es[0].isIntersecting; }).observe($('#kws'));
+setInterval(() => {
+  if (still || document.hidden || !kwSeen || Date.now() < kwPause) return;
+  kwIdx = (kwIdx + 1) % kws.length; pickKw(kws[kwIdx], true);
+}, KW_MS);
+// 누르면 그 키워드가 쓰인 서비스 카드 뒤에 아우라
+const aura = (svc) => {
+  clearTimeout(auraT);
+  const cards = $$('.duo-card'); cards.forEach((c) => c.classList.toggle('aura', svc === 'both' || c.dataset.svc === svc));
+  const first = cards.find((c) => c.classList.contains('aura'));
+  if (first) { const r = first.getBoundingClientRect(); if (r.bottom < 70 || r.top > innerHeight - 80) first.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' }); }
+  auraT = setTimeout(() => cards.forEach((c) => c.classList.remove('aura')), 4200);
+};
+$('#kws').addEventListener('click', (e) => { const b = e.target.closest('.kw'); if (!b) return; kwIdx = kws.indexOf(b); kwPause = Date.now() + 9000; pickKw(b); aura(b.dataset.svc); });
+if (matchMedia('(hover: hover)').matches) $('#kws').addEventListener('mouseover', (e) => { const b = e.target.closest('.kw'); if (!b) return; kwIdx = kws.indexOf(b); kwPause = Date.now() + 6000; pickKw(b); });
+pickKw(kws[0], !still);
 
 // 스크롤 안내 — 조금이라도 내려가면 감춘다
 const cue = $('#scrollcue');

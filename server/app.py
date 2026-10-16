@@ -1085,6 +1085,17 @@ class H(http.server.BaseHTTPRequestHandler):
         try: r = urllib.request.urlopen(rq, timeout=180)
         except urllib.error.HTTPError as e: r = e
         except Exception as e: return self.reply(502, {'error': f'법숲에 연결하지 못했습니다: {str(e)[:120]}'})
+        if 'ndjson' in (r.headers.get('Content-Type') or ''):   # 법숲 단계 스트리밍 — 받는 대로 바로 넘긴다
+            self.send_response(getattr(r, 'status', None) or r.code)
+            self.send_header('Content-Type', r.headers.get('Content-Type')); self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Accel-Buffering', 'no'); self.send_header('Connection', 'close'); self.end_headers()
+            try:
+                while True:
+                    chunk = r.readline()
+                    if not chunk: break
+                    self.wfile.write(chunk); self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError): pass
+            self.close_connection = True; return
         body = r.read(); self.send_response(getattr(r, 'status', None) or r.code)
         for k in ('Content-Type', 'Cache-Control'):
             v = r.headers.get(k)
