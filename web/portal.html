@@ -91,27 +91,6 @@ footer { padding: 22px 0 40px; font-size: 12.5px; color: var(--mute); }
   </section>
 
   <section class="cards">
-    <!-- DART Deck -->
-    <article class="card">
-      <span class="tag">발표 자료 AI</span>
-      <h2>DART Deck</h2>
-      <p class="lead">말로 부탁하면 에이전트가 발표 자료를 고치고, 스스로 확인합니다.</p>
-      <ol class="flow" style="--n: 5">
-        <li class="step soon" style="--i: 0"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg></span>
-          <span><span class="t">공시 근거 찾기<span class="badge">준비 중</span></span><br><span class="s">사업보고서 · bge-m3 · Qdrant</span></span></li>
-        <li class="step" style="--i: 1"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg></span>
-          <span><span class="t">말로 부탁</span><br><span class="s">"2장 그래프를 세로로 바꿔 줘"</span></span></li>
-        <li class="step" style="--i: 2"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="11" height="13" rx="2"/><path d="M9 20h10a1 1 0 0 0 1-1V8"/></svg></span>
-          <span><span class="t">에이전트가 사본을 수정</span><br><span class="s">Claude Code · 원본은 그대로</span></span></li>
-        <li class="step" style="--i: 3"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></span>
-          <span><span class="t">화면을 찍어 스스로 확인</span><br><span class="s">넘침 · 겹침을 보고 다시 고침</span></span></li>
-        <li class="step" style="--i: 4"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg></span>
-          <span><span class="t">사람이 [적용]</span><br><span class="s">바뀐 페이지 비교 · 되돌리기</span></span></li>
-      </ol>
-      <div class="demo-note"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span>데모: 예시 자료가 AI 창이 열린 채로 뜹니다. 들어올 때마다 원래 자료로 다시 시작합니다.</span></div>
-      <div class="acts"><button class="btn go" data-open="/deck/" data-demo="1">데모 체험</button><a class="btn" id="aDeck" href="/deck/" hidden>발표 자료 목록</a></div>
-    </article>
-
     <!-- 법숲 -->
     <article class="card">
       <span class="tag">법령 RAG</span>
@@ -134,8 +113,29 @@ footer { padding: 22px 0 40px; font-size: 12.5px; color: var(--mute); }
         <div class="stat"><b><span data-to="30" data-dec="0">30</span>/31</b><small>답변 정확성<br>(시험 문항)</small></div>
         <div class="stat"><b><span data-to="10" data-dec="0">10</span>/10</b><small>범위 밖 질문<br>거절</small></div>
       </div>
-      <div class="acts"><button class="btn go" data-open="/law/" data-demo="1">데모 체험</button><a class="btn" id="aLaw" href="/law/" hidden>열기</a></div>
+      <div class="acts"><a class="btn go" href="/law/">데모 체험</a><a class="btn" id="aLaw" href="/law/" hidden>열기</a></div>
     </article>
+    <!-- AI PPT -->
+    <article class="card">
+      <span class="tag">발표 자료 AI</span>
+      <h2>AI PPT</h2>
+      <p class="lead">말로 부탁하면 에이전트가 발표 자료를 고치고, 스스로 확인합니다.</p>
+      <ol class="flow" style="--n: 5">
+        <li class="step soon" style="--i: 0"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg></span>
+          <span><span class="t">공시 근거 찾기<span class="badge">준비 중</span></span><br><span class="s">사업보고서 · bge-m3 · Qdrant</span></span></li>
+        <li class="step" style="--i: 1"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg></span>
+          <span><span class="t">말로 부탁</span><br><span class="s">"2장 그래프를 세로로 바꿔 줘"</span></span></li>
+        <li class="step" style="--i: 2"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="11" height="13" rx="2"/><path d="M9 20h10a1 1 0 0 0 1-1V8"/></svg></span>
+          <span><span class="t">에이전트가 사본을 수정</span><br><span class="s">Claude Code · 원본은 그대로</span></span></li>
+        <li class="step" style="--i: 3"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <span><span class="t">화면을 찍어 스스로 확인</span><br><span class="s">넘침 · 겹침을 보고 다시 고침</span></span></li>
+        <li class="step" style="--i: 4"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg></span>
+          <span><span class="t">사람이 [적용]</span><br><span class="s">바뀐 페이지 비교 · 되돌리기</span></span></li>
+      </ol>
+      <div class="demo-note"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span>데모: 예시 자료가 AI 창이 열린 채로 뜹니다. 들어올 때마다 원래 자료로 다시 시작합니다.</span></div>
+      <div class="acts"><button class="btn go" id="bDeckDemo" data-open="/deck/" data-demo="1" disabled>준비 중</button><a class="btn" id="aDeck" href="/deck/" hidden>발표 자료 목록</a></div>
+    </article>
+
   </section>
   <p class="err" id="err"></p>
 
@@ -202,6 +202,8 @@ $('#lgo').onclick = doLogin;
 $('#lpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
 $('#bOut').onclick = async () => { await post('/api/logout').catch(() => {}); ME = null; paint(); };
 
+// 발표 자료 데모 — 예시 자료가 준비됐을 때만 연다
+fetch('/api/site', { cache: 'no-store' }).then((r) => r.json()).then((j) => { if (j.demoDeck) { const b = $('#bDeckDemo'); b.disabled = false; b.textContent = '데모 체험'; } }).catch(() => {});
 fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
   ME = j.user; paint();
   if (!ME && nextOf()) $('#loginBox').hidden = false;   // 로그인이 필요한 주소에서 왔으면 로그인 칸을 연다
