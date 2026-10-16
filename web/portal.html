@@ -40,6 +40,7 @@ html { scrollbar-width: thin; scrollbar-color: oklch(50% 0.02 220 / .45) transpa
 ::selection { background: oklch(51% 0.088 176 / .22); }
 [hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+html, body { overflow-x: clip; }   /* 아우라 빛줄기가 화면 밖으로 넘쳐도 가로 스크롤이 생기지 않게 */
 body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--sans); letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; word-break: keep-all; overflow-wrap: break-word; }
 a { color: inherit; }
 .wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gut); }
@@ -132,15 +133,15 @@ a { color: inherit; }
 /* 카드 아우라 — 키워드에 올리거나 누르면, 그 키워드가 쓰인 서비스 영상 뒤에서 빛이 뿜어져 나온다 */
 .duo-card { position: relative; isolation: isolate; }
 .duo-card::before, .duo-card::after { content: ''; position: absolute; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease), transform .8s var(--ease); }
-.duo-card::before { inset: -46px -46px 20px; border-radius: 48px; background: radial-gradient(58% 64% at 50% 44%, var(--aura, var(--accent)) 0%, color-mix(in oklch, var(--aura, var(--accent)) 55%, transparent) 45%, transparent 75%); filter: blur(34px); transform: scale(.9); }
+.duo-card::before { inset: -26px -26px 24px; border-radius: 40px; background: radial-gradient(58% 64% at 50% 44%, var(--aura, var(--accent)) 0%, color-mix(in oklch, var(--aura, var(--accent)) 55%, transparent) 45%, transparent 75%); filter: blur(30px); transform: scale(.94); }
 .duo-card::after { inset: -110px -110px -40px; background: repeating-conic-gradient(from 0deg at 50% 42%, color-mix(in oklch, var(--aura, var(--accent)) 80%, white) 0deg 4deg, transparent 4deg 15deg); -webkit-mask: radial-gradient(closest-side at 50% 42%, #000 30%, transparent 92%); mask: radial-gradient(closest-side at 50% 42%, #000 30%, transparent 92%); filter: blur(1.5px); }
-.duo-card.aura::before { opacity: 1; transform: scale(1.04); animation: aura 2.2s ease-in-out infinite; }
-.duo-card.aura::after { opacity: .8; animation: rays 9s linear infinite; }
-.duo-card.aura .duo-media { box-shadow: 0 0 0 3px var(--aura, var(--accent)), 0 0 34px 4px color-mix(in oklch, var(--aura, var(--accent)) 70%, transparent), 0 0 90px 10px color-mix(in oklch, var(--aura, var(--accent)) 40%, transparent); }
-.duo-card.shake .duo-media { animation: shake .6s cubic-bezier(.36,.07,.19,.97) both; }
-@keyframes aura { 50% { opacity: .72; transform: scale(1.09); } }
+.duo-card.aura::before { opacity: .5; transform: scale(1); animation: aura 3.2s ease-in-out infinite; }
+.duo-card.aura::after { opacity: .16; animation: rays 18s linear infinite; }
+.duo-card.aura .duo-media { box-shadow: 0 0 0 2px var(--aura, var(--accent)), 0 0 28px -4px color-mix(in oklch, var(--aura, var(--accent)) 60%, transparent); }
+.duo-card.shake .duo-media { animation: shake .45s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes aura { 50% { opacity: .36; transform: scale(1.03); } }
 @keyframes rays { to { transform: rotate(360deg); } }
-@keyframes shake { 15% { transform: translate(-3px, 1px) rotate(-.6deg); } 30% { transform: translate(3px, -1px) rotate(.6deg); } 45% { transform: translate(-2px, 1px) rotate(-.35deg); } 60% { transform: translate(2px, 0) rotate(.3deg); } 75% { transform: translate(-1px, 0) rotate(-.15deg); } 100% { transform: none; } }
+@keyframes shake { 20% { transform: translate(-1.5px, 0) rotate(-.2deg); } 45% { transform: translate(1.5px, 0) rotate(.2deg); } 70% { transform: translate(-.75px, 0); } 100% { transform: none; } }
 /* 로고 */
 .blogo { width: 26px; height: 26px; border-radius: 7px; flex: none; }
 .svc-logo { width: clamp(52px, 6vw, 84px); height: auto; border-radius: 22%; vertical-align: -.08em; margin-right: .18em; box-shadow: 0 12px 30px -16px oklch(0% 0 0 / .5); }
