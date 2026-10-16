@@ -33,7 +33,7 @@
   #de-rb .grp { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-right: 1px solid #eef0f3; flex: none; flex-wrap: wrap; }
   #de-rb .tabs { display: inline-flex; gap: 2px; padding: 0 6px; }
   #de-rb .tabs button { font-weight: 800; color: #545b66; border-radius: 8px 8px 0 0; }
-  #de-rb .tabs button.on { background: #fafbfc; color: #1E3A8A; box-shadow: inset 0 -3px 0 #416AF0; }
+  #de-rb .tabs button.on { background: #fafbfc; color: #134E4A; box-shadow: inset 0 -3px 0 #0F766E; }
   #de-rb .pane { display: none; align-items: center; flex-wrap: wrap; gap: 2px; } #de-rb .pane.on { display: flex; }
   #de-rb .st { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (max-width: 900px) { #de-rb button { min-width: 28px; padding: 0 6px; } #de-rb select.font { width: 130px; } #de-rb .lab { display: none; } }
@@ -52,9 +52,9 @@
   @media (pointer: coarse) { #de-rb button { height: 38px; min-width: 36px; } #de-rb select, #de-rb input { height: 36px; font-size: 16px; } }   /* 16px 미만 입력칸은 아이폰이 누를 때 화면을 확대한다 */
   #de-rb .lab { font-size: 11px; color: #7a828e; margin-right: 2px; }
   #de-rb button { border: 0; background: transparent; border-radius: 8px; min-width: 32px; height: 34px; padding: 0 8px; white-space: nowrap; font: 700 13px 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif; color: #2b3038; cursor: pointer; }
-  #de-rb button:hover { background: #f2f3f6; } #de-rb button.on { background: #E8EEFD; color: #1E3A8A; }
+  #de-rb button:hover { background: #f2f3f6; } #de-rb button.on { background: #E8EEFD; color: #134E4A; }
   #de-rb button:disabled { opacity: .35; cursor: default; }
-  #de-rb button.pri { background: #1E3A8A; color: #fff; padding: 0 14px; } #de-rb button.warn { color: #b45309; }
+  #de-rb button.pri { background: #134E4A; color: #fff; padding: 0 14px; } #de-rb button.warn { color: #b45309; }
   #de-rb select, #de-rb input { height: 32px; border: 1px solid #d5d9df; border-radius: 8px; font: 500 13px 'Noto Sans KR', sans-serif; padding: 0 6px; background: #fff; color: #16181d; }
   #de-rb input[type=number] { width: 64px; } #de-rb input.sm { width: 54px; } #de-rb select.font { width: 170px; }
   #de-rb input[type=range] { width: 80px; padding: 0; border: 0; }
@@ -184,7 +184,7 @@
     palette(which, btn) {
       const p = $('#de-pal'); const r = btn.getBoundingClientRect();
       p.innerHTML = `<div class="grid">${PAL.map(([v, nm]) => `<button data-c="${esc(v)}" title="${esc(nm)}" class="${v === 'transparent' ? 'none' : ''}" style="background:${v === 'transparent' ? '' : v}"></button>`).join('')}</div>
-        <div class="more"><input type="color" value="#416af0"><span>다른 색(덱 색 변수 밖 — 되도록 위 색을)</span></div>`;
+        <div class="more"><input type="color" value="#0F766E"><span>다른 색(덱 색 변수 밖 — 되도록 위 색을)</span></div>`;
       Object.assign(p.style, { left: `${Math.min(innerWidth - 250, r.left)}px`, top: `${r.bottom + 6}px` }); p.classList.add('on');
       const pick = (v) => { p.classList.remove('on'); R.color(which, v); };
       p.querySelectorAll('[data-c]').forEach((b) => { b.onmousedown = (e) => e.preventDefault(); b.onclick = () => pick(b.dataset.c); });
@@ -259,7 +259,7 @@
     },
     savedBanner(o) {
       const b = document.createElement('div'); b.id = 'de-banner';
-      b.innerHTML = `<span>✓ 「${esc(o.slide)}」 편집 ${o.n}곳 저장됨${o.froze ? ' (장 고정 포함)' : ''} · 커밋은 직접</span><button class="undo" style="background:#fff;color:#1E3A8A">되돌리기</button><button class="ghost">닫기</button>`;
+      b.innerHTML = `<span>✓ 「${esc(o.slide)}」 편집 ${o.n}곳 저장됨${o.froze ? ' (장 고정 포함)' : ''} · 커밋은 직접</span><button class="undo" style="background:#fff;color:#134E4A">되돌리기</button><button class="ghost">닫기</button>`;
       document.body.appendChild(b); b.querySelector('.ghost').onclick = () => b.remove();
       b.querySelector('.undo').onclick = async () => {
         const r = await fetch('/api/edit/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: location.pathname }) });

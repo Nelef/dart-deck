@@ -1,5 +1,5 @@
 # 옛 덱을 지금 엔진 스크립트와 맞춘다 — ✎ 편집 · AI 고치기 · 페이지 목록(사용자 지정 2026-09-30 "모든 덱이 현재 스크립트와 호환되게").
-# 이전 프로토타입 deck 에서 옮긴 덱은 AI 패널 · 편집이 생기기 전에 만든 것이라 deckedit 를 안 불러오거나(파이프라인 덱),
+# 이전 프로토타입에서 옮긴 덱은 AI 패널 · 편집이 생기기 전에 만든 것이라 deckedit 를 안 불러오거나(파이프라인 덱),
 # deckkit 조차 없다(v2 한눈에 — 자막 · 자동 재생 덱). 여러 번 돌려도 같은 결과(이미 된 것은 건너뛴다).
 # 쓰는 법: python3 scripts/upgrade_deck.py <덱 index.html>...   → 바뀐 것 목록을 찍고 제자리에 쓴다(원본은 .edits/ 에 백업)
 import os, re, sys, time
@@ -44,7 +44,7 @@ def upgrade(html):
     bar = re.search(r'<div id="bar">.*', html)   # 조작줄은 한 줄 — 안에 #toc 의 </div> 가 있어 '</div> 까지'로 자르면 링크를 놓친다
     if bar and re.search(r'<a (?![^>]*class="nb")', bar.group(0)) and 'upgrade:barlink' not in html:
         html = html.replace('</style>', '/* upgrade:barlink */ #bar a:not(.nb) { white-space: nowrap; } @media (max-width: 640px) { #bar a:not(.nb) { display: none; } }\n</style>', 1); done.append('조작줄 링크 폰 정리')
-    # (☰ 목록 단추는 이제 넣지 않는다 — 엔진(deck.js)이 왼쪽 위에 AI PPT 로고를 붙이고 조작줄 ☰ 는 숨긴다, 2026-09-30)
+    # (☰ 목록 단추는 이제 넣지 않는다 — 엔진(deck.js)이 왼쪽 위에 DART Deck 로고를 붙이고 조작줄 ☰ 는 숨긴다, 2026-09-30)
     return html, done
 
 if __name__ == '__main__':

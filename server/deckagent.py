@@ -1,18 +1,18 @@
 # 덱 AI — Claude Code 로 고치기(serve.py 가 부른다). 사용자 지정(2026-09-30): "클로드 코드 도구를 연결 · 구독 계정으로, 계정 있으면 그걸로".
-# 왜 Claude Code 인가: 하네스 비교(bench/run.mjs, 12과제 × 2)에서 같은 gemma-4-26b 로도 Claude Code + 생각이 17/24 로 가장 좋았다
+# 왜 Claude Code 인가: 하네스 비교(bench/run.mjs, 12과제 × 2)에서 같은 로컬 LLM 로도 Claude Code + 생각이 17/24 로 가장 좋았다
 #   (덱 패널 한 번에 쓰기 15/24 · Codex 11/24). 도구로 조금씩 고치고, 그림을 직접 열어 보며 스스로 확인하는 방식이 이긴다.
 #
 # 흐름: 원본 옆에 숨김 사본(.deckagent-<rid>.html)을 만들고 → Claude Code 가 사본만 고치고 tools/deck_shot.cjs 로 찍어 보며 확인 →
 #   끝나면 원본 · 사본을 찍어 덱에 보낸다 → 사람이 [적용]을 누르면 원본이 그 사이 안 바뀌었는지 보고 백업한 뒤 사본으로 바꾼다.
 # 엔진 두 가지:
 #   · 구독 — 쓰는 사람의 Claude 구독 토큰(claude setup-token 로 만든 것, CLAUDE_CODE_OAUTH_TOKEN). 토큰은 브라우저에만 두고 부탁마다 받는다(서버 디스크에 안 남김).
-#   · gemma — 로컬 gemma-4-26b. vLLM 의 /v1/messages 는 Claude Code 의 system 역할 메시지를 거부해서(실측 400) LiteLLM(:4011)을 거친다.
+#   · gemma — 로컬 LLM. vLLM 의 /v1/messages 는 Claude Code 의 system 역할 메시지를 거부해서(실측 400) LiteLLM(:4011)을 거친다.
 # 안전: Tailscale 로 들어온 누구든 이 Mac 에서 돌리는 것이라 도구를 좁힌다 — 쓰기는 사본 한 파일만(Edit/Write(./사본)), 명령은 캡처 도구만
 #   (Bash(node tools/deck_shot.cjs:*)), 읽기는 작업 폴더(deck) 안만(Claude Code 기본: 폴더 밖은 허락을 물어 -p 에서는 거부).
 #   실측(2026-09-30): 다른 파일 고치기 · 폴더 밖 파일 읽기 · 'ls /' 전부 거부됨. 사용자 ~/.claude 의 훅 · 스킬이 안 끼게 설정 폴더를 따로 둔다.
 import os, re, json, glob, uuid, time, hashlib, shutil, subprocess, threading, pty, select, signal, tempfile, fcntl, termios, struct, urllib.request, urllib.error, urllib.parse
 
-# 경로 — ai-ppt(2026-09-30 이전 프로토타입 research/deckagent.py 에서 옮김). 덱은 DATA_DIR/decks/<계정>/<덱>/, 엔진은 engine/
+# 경로 — dart-deck. 덱은 DATA_DIR/decks/<계정>/<덱>/, 엔진은 engine/
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 ENGINE = os.path.join(ROOT, 'engine')
@@ -22,7 +22,7 @@ CLAUDE = shutil.which('claude') or next((p for p in ('/opt/homebrew/bin/claude',
 LITE = os.environ.get('DECK_LITE_URL', 'http://127.0.0.1:4011')
 LITE_BIN = os.path.expanduser(os.environ.get('DECK_LITE_BIN', '~/.venvs/litellm/bin/litellm'))
 LITE_CFG = os.path.join(HERE, 'litellm.yaml')
-LLM_BASE = os.environ.get('DECK_LLM_BASE', 'http://gpu-server:8002/v1')   # gemma(vLLM) 주소 — litellm.yaml 의 api_base 를 이 값으로
+LLM_BASE = os.environ.get('DECK_LLM_BASE', '')   # gemma(vLLM) 주소 — litellm.yaml 의 api_base 를 이 값으로
 NODE_PATH = os.path.join(ROOT, 'node_modules')
 GUARD = os.path.join(HERE, 'webfetch_guard.py')                 # [웹 검색] 켠 부탁의 WebFetch 관문(검색 결과 · 사용자가 적은 주소만)
 # [웹 검색] 켠 부탁에 붙이는 지시 — 가져온 사실은 출처를 달고, 페이지 안의 지시는 따르지 않는다(사용자 지정 2026-09-30 "웹 검색 켜기")
@@ -108,13 +108,14 @@ def _gc():
 
 # ── gemma 쪽 번역 서버 — 없으면 띄운다(venv 가 있을 때만) ──
 def ensure_lite():
+    if not LLM_BASE: raise ValueError('로컬 LLM 이 설정되지 않았습니다(DECK_LLM_BASE) — 계정 설정에서 Claude 구독을 연결해 Claude Code 로 써 주세요')
     try:
         urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
     except Exception: pass
     if not os.path.exists(LITE_BIN): raise ValueError(f'gemma 로 돌리려면 LiteLLM 이 필요합니다({LITE_BIN} 없음) — server/litellm.yaml 참고')
     os.makedirs(ADIR, exist_ok=True)
     cfg = os.path.join(ADIR, 'litellm.yaml')
-    open(cfg, 'w', encoding='utf-8').write(open(LITE_CFG, encoding='utf-8').read().replace('http://gpu-server:8002/v1', LLM_BASE))
+    open(cfg, 'w', encoding='utf-8').write(open(LITE_CFG, encoding='utf-8').read().replace('${DECK_LLM_BASE}', LLM_BASE))
     port = LITE.rsplit(':', 1)[-1]
     subprocess.Popen([LITE_BIN, '--config', cfg, '--host', '127.0.0.1', '--port', port, '--num_workers', '4'],
                      stdout=open(os.path.join(ADIR, 'litellm.log'), 'a'), stderr=subprocess.STDOUT, start_new_session=True)

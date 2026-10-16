@@ -8,7 +8,7 @@ from pptx.util import Inches, Emu
 folder, out, title = sys.argv[1], sys.argv[2], (sys.argv[3] if len(sys.argv) > 3 else '')
 pages = json.load(open(os.path.join(folder, 'pages.json'), encoding='utf-8'))
 prs = Presentation(); prs.slide_width = Inches(13.333); prs.slide_height = Inches(7.5)
-prs.core_properties.title = title[:200]; prs.core_properties.author = 'AI PPT'; prs.core_properties.comments = '화면 그대로 한 장씩 그림으로 넣은 발표 자료'
+prs.core_properties.title = title[:200]; prs.core_properties.author = 'DART Deck'; prs.core_properties.comments = '화면 그대로 한 장씩 그림으로 넣은 발표 자료'
 blank = prs.slide_layouts[6]
 for i, pg in enumerate(pages, 1):
     s = prs.slides.add_slide(blank)

@@ -27,7 +27,7 @@
   body.dedit #kpanel { top: calc(var(--fit-top, 104px) - 4px); }
   #de-dock button { flex: 1 1 auto; height: 36px; padding: 0 8px; border-radius: 10px; border: 1px solid #e3e6ea; background: #fff; color: #2b3038; font: 800 12.5px 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif; cursor: pointer; white-space: nowrap; }
   #de-dock button:hover { background: #eef1f7; } #de-dock button:active { transform: scale(.98); }
-  #de-dock .ed { color: #1E3A8A; flex: none; } #de-dock .sv { background: #1E3A8A; border-color: #1E3A8A; color: #fff; } #de-dock .sv:hover { background: #274aa8; }
+  #de-dock .ed { color: #134E4A; flex: none; } #de-dock .sv { background: #134E4A; border-color: #134E4A; color: #fff; } #de-dock .sv:hover { background: #274aa8; }
   #de-dock .sv:disabled { background: #c9d3ee; border-color: #c9d3ee; cursor: default; }
   @media (max-width: 640px), (max-height: 500px) {
     #de-dock { width: auto; background: none; border: 0; left: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); padding: 0; }
@@ -36,16 +36,16 @@
   /* 편집 중엔 아래 조작줄을 내린다(사용자 지정 2026-09-30) — 장 옮기기는 왼쪽 장 목록, 끝내기는 리본 */
   body.dedit #bar { transform: translateY(calc(100% + 60px)); pointer-events: none; transition: transform .2s ease; } body.dedit #view { bottom: 0; }   /* 위에 띄운 [편집] · [AI] 까지 함께 내린다 */
   body.dedit #stage { touch-action: none; }
-  body.dedit [contenteditable="true"] { outline: 2px solid #1E3A8A !important; cursor: text !important; background: rgba(232,238,253,.55); }
+  body.dedit [contenteditable="true"] { outline: 2px solid #134E4A !important; cursor: text !important; background: rgba(232,238,253,.55); }
   #de-ov { position: absolute; inset: 0; pointer-events: none; z-index: 55; }
-  #de-ov .box { position: absolute; border: 1.5px solid #416AF0; }
+  #de-ov .box { position: absolute; border: 1.5px solid #0F766E; }
   #de-ov .box.gen { border-style: dashed; border-color: #b45309; }
   #de-ov .hov { position: absolute; border: 1px dashed rgba(65,106,240,.7); }
-  #de-ov .h { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; background: #fff; border: 2px solid #416AF0; border-radius: 3px; pointer-events: auto; }
-  #de-ov .h.rot { border-radius: 99px; background: #416AF0; }
+  #de-ov .h { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; background: #fff; border: 2px solid #0F766E; border-radius: 3px; pointer-events: auto; }
+  #de-ov .h.rot { border-radius: 99px; background: #0F766E; }
   #de-ov .g { position: absolute; background: #DC2626; }
   #de-ov .kid { position: absolute; border: 1px dashed rgba(65,106,240,.6); background: rgba(65,106,240,.04); }
-  #de-ov .tag { position: absolute; transform: translateY(-100%); margin-top: -4px; background: #1E3A8A; color: #fff; font: 700 13px 'Noto Sans KR', sans-serif; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+  #de-ov .tag { position: absolute; transform: translateY(-100%); margin-top: -4px; background: #134E4A; color: #fff; font: 700 13px 'Noto Sans KR', sans-serif; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
   #de-cm { position: fixed; z-index: 96; background: #fff; border-radius: 10px; box-shadow: 0 8px 30px rgba(20,24,40,.22); padding: 6px; min-width: 200px; display: none; font: 600 13.5px 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif; }
   #de-cm.on { display: block; } #de-cm button { display: flex; justify-content: space-between; gap: 16px; width: 100%; border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 7px; font: inherit; color: #16181d; cursor: pointer; }
   @media (hover: hover) { #de-cm button:hover { background: #E8EEFD; } } #de-cm button:active { background: #E8EEFD; } #de-cm button:disabled { opacity: .35; cursor: default; background: none; } #de-cm hr { border: 0; border-top: 1px solid #eef0f3; margin: 4px 0; } #de-cm small { color: #7a828e; font-weight: 500; }
@@ -344,7 +344,7 @@
       } else if (kind === 'line' || kind === 'arrow') {
         // 선 · 화살표 — 가로로 긴 틀 안의 svg(틀 폭에 맞춰 늘어난다), 방향은 돌리기로
         st.width = '320px'; st.height = '24px';
-        d.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" style="display:block;overflow:visible"><line x1="0" y1="12" x2="${kind === 'arrow' ? 90 : 100}" y2="12" stroke="#416AF0" stroke-width="3" vector-effect="non-scaling-stroke"/>${kind === 'arrow' ? '<polygon points="100,12 88,4 88,20" fill="#416AF0"/>' : ''}</svg>`;
+        d.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" style="display:block;overflow:visible"><line x1="0" y1="12" x2="${kind === 'arrow' ? 90 : 100}" y2="12" stroke="#0F766E" stroke-width="3" vector-effect="non-scaling-stroke"/>${kind === 'arrow' ? '<polygon points="100,12 88,4 88,20" fill="#0F766E"/>' : ''}</svg>`;
       } else if (kind === 'image') { d.src = extra.src; d.alt = extra.alt || ''; st.width = '480px'; st.left = '560px'; st.top = '260px'; }
       E.cur().appendChild(d); E.select([d]); E.changed();
       if (kind === 'text') setTimeout(() => E.dbl({ target: d }), 30);

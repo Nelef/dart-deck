@@ -178,7 +178,7 @@ def build(tpl, title, deck_dir, name, raw, progress=None):
               f'const PPT = {pj};\n'
               "Object.entries(PPT).forEach(([n, p]) => { CTX[n] = () => `원본 ${p.no}쪽(그림 ${p.img})의 글:\\n${p.text}` + (p.media ? `\\n이 쪽에 들어 있던 사진 원본: ${p.media.join(', ')}` : ''); SUGGEST[n] = ['이 페이지를 편집 가능하게 바꿔줘']; });\n")
         html = html.replace('const deck = Deck.create(', js + 'const deck = Deck.create(', 1)
-        html = html.replace("intro: 'AI PPT 로 만든 발표 자료.", f"intro: '「{htmlmod.escape(name)}」 에서 가져온 발표 자료(쪽마다 원본 그림). ", 1)
+        html = html.replace("intro: 'DART Deck 로 만든 발표 자료.", f"intro: '「{htmlmod.escape(name)}」 에서 가져온 발표 자료(쪽마다 원본 그림). ", 1)
         return html, len(imgs), f'files/{keep}'
     finally:
         shutil.rmtree(work, ignore_errors=True)

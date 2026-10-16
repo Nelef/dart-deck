@@ -1,6 +1,6 @@
 // 덱 공용 부품 — 옆 패널(코드 경로 · AI 에게 묻기)과 누르면 뜨는 세부 카드.
 // v2·v1 파이프라인 덱이 함께 쓴다. 코드 발췌는 data/codemap.json(파일:줄·함수·주석 원문, 생성 시점 커밋 고정)에서,
-// AI 답은 serve.py 의 POST /api/ask(로컬 gemma-4-26b 중계)에서 온다. 문맥은 지금 장의 글 + 실행 기록 + 그 단계 코드 발췌다.
+// AI 답은 serve.py 의 POST /api/ask(로컬 LLM 중계)에서 온다. 문맥은 지금 장의 글 + 실행 기록 + 그 단계 코드 발췌다.
 (() => {
   // 고치기를 적용하고 막 새로고침한 참이면 오류를 모아 둔다 — 장 그리기(INIT)는 이 파일 다음에 도는 deck.js 가 부르고 실패를 console.error 로만 남긴다.
   // 모은 오류는 대화를 되살릴 때 그 수정안 밑에 띄워 [되돌리기]를 권한다(큰 레이아웃 수정 허용과 함께, 2026-09-29).
@@ -142,16 +142,16 @@
   #kpop .acts button { padding: 9px 16px; border-radius: 99px; border: 0; font-weight: 800; font-size: 14px; cursor: pointer; background: #f2f3f6; }
   #kpop .acts .go { background: #16181d; color: #fff; }
   #kpop .acts .ai { background: #fbe9fd; color: #a21caf; }
-  .kc-go { display: inline-block; font-size: 12.5px; font-weight: 800; color: #1e3a8a; background: #e8eefd; border-radius: 99px; padding: 1px 9px; margin: 0 2px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .kc-go { display: inline-block; font-size: 12.5px; font-weight: 800; color: #134E4A; background: #e8eefd; border-radius: 99px; padding: 1px 9px; margin: 0 2px; cursor: pointer; text-decoration: none; white-space: nowrap; }
   .kc-go:hover { background: #d3defb; }
   .kc-ed { border: 1px solid #e3e6ea; border-radius: 12px; margin: 10px 0; overflow: hidden; background: #fff; }
   .kc-ed .h { font-size: 12.5px; font-weight: 800; color: #545b66; background: #f4f5f7; padding: 6px 10px; }
   .kc-ed pre { margin: 0; padding: 6px 10px; font: 12px/1.5 'JetBrains Mono', monospace; white-space: pre-wrap; word-break: break-all; }
-  .kc-ed .del { background: #fee2e2; color: #991b1b; } .kc-ed .ins { background: #e8eefd; color: #1e3a8a; }
+  .kc-ed .del { background: #fee2e2; color: #991b1b; } .kc-ed .ins { background: #e8eefd; color: #134E4A; }
   .kc-ed .bad { font-size: 12.5px; color: #b91c1c; font-weight: 800; padding: 6px 10px; }
   .kc-eda { display: flex; gap: 8px; align-items: center; margin: 6px 0 2px; font-size: 13px; color: #545b66; }
   .kc-eda button { white-space: nowrap; flex: none; border: 0; border-radius: 99px; padding: 6px 14px; font: 800 13px 'Noto Sans KR', sans-serif; cursor: pointer; background: #f2f3f6; color: #2b3038; }
-  .kc-eda button.go { background: #1e3a8a; color: #fff; } .kc-eda button:disabled { opacity: .4; cursor: default; }
+  .kc-eda button.go { background: #134E4A; color: #fff; } .kc-eda button:disabled { opacity: .4; cursor: default; }
   /* ═══ 폰(사용자 지정 2026-09-29 "모바일 UI 도") ═══
      세로 폰: 오른쪽 패널(380px)이 390px 화면을 다 덮어 묻는 장이 안 보였다 → 아래에서 올라오는 판으로. 무대는 남은 위쪽에 맞춘다(deck.js fit).
      위 손잡이를 끌면 높이가 바뀌고(이 브라우저에 기억), 누르면 반 · 거의 전체를 오간다. 글을 치는 동안은 자판 위 전체를 쓴다(visualViewport). */

@@ -25,8 +25,8 @@
     box-shadow: 0 1px 4px rgba(20,24,40,.12); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color .12s; }
   #de-slides .th > .slide { transform: scale(var(--th-k)); transform-origin: 0 0; width: 1600px; height: 900px; pointer-events: none; transition: none; }
   #de-slides .it:hover .th { outline-color: #c3c8cf; }
-  #de-slides .it.sel .th { outline-color: #9DB2F7; } #de-slides .it.cur .th, #de-slides .it.cur:hover .th { outline-color: #416AF0; }
-  #de-slides .it.cur .no { color: #1E3A8A; }
+  #de-slides .it.sel .th { outline-color: #9DB2F7; } #de-slides .it.cur .th, #de-slides .it.cur:hover .th { outline-color: #0F766E; }
+  #de-slides .it.cur .no { color: #134E4A; }
   #de-sgrip { position: fixed; top: calc(var(--fit-top, 104px) - 4px); bottom: 0; left: calc(var(--de-sw) - 5px); width: 10px; z-index: 72; cursor: col-resize; touch-action: none; display: none; }
   body.dedit #de-sgrip { display: block; }
   #de-sgrip::after { content: ''; position: absolute; left: 4px; top: 50%; width: 3px; height: 44px; margin-top: -22px; border-radius: 99px; background: #c3c8cf; opacity: 0; transition: opacity .15s; }

@@ -3,7 +3,7 @@
 // 쓰는 법:  node deck_shot.cjs <주소> <장 번호(1부터)> <그림 저장 경로>      → 표준 출력에 JSON {errors, slides:[{i,name,problems}]}
 //          장 번호를 쉼표로 여러 개(3,5,9) 주면 장마다 <경로>-<번호>.jpg 로 찍는다(덱은 한 번만 연다 — 여러 장 고치기, 2026-09-30) → JSON 에 shots:[번호…]
 // 왜 서버에서 찍나: 브라우저 안에서는 화면을 그림으로 뜰 표준 방법이 없고(SVG · 입체 막대가 많아 html2canvas 류는 어긋난다),
-//   gemma-4-26b 는 그림을 읽을 수 있어 "보고 스스로 검증"하게 하려면 실제 렌더링 그림이 필요하다(2026-09-29 사용자 지정).
+//   로컬 LLM 는 그림을 읽을 수 있어 "보고 스스로 검증"하게 하려면 실제 렌더링 그림이 필요하다(2026-09-29 사용자 지정).
 const path = require('path');
 // playwright 는 NODE_PATH(서버가 넣는다) 또는 프로젝트 node_modules 에서
 const { chromium } = (() => { try { return require('playwright'); } catch (e) { return require(path.resolve(__dirname, '../../node_modules/playwright')); } })();

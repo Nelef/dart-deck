@@ -1,0 +1,16 @@
+# DART Deck — 개인 NAS 배포용. 로컬 LLM(DECK_LLM_BASE · DECK_ASK_URL)은 비워 두면 Claude(개인 구독)만 쓴다
+name: dart-deck
+services:
+  ppt:
+    image: dart-deck:latest
+    container_name: dart-deck
+    restart: unless-stopped
+    ports:
+      - "8900:8900"
+    environment:
+      - PPT_PORT=8900
+      - PPT_DATA_DIR=/data
+      - DECK_ASK_URL=
+      - DECK_LLM_BASE=
+    volumes:
+      - ./data:/data

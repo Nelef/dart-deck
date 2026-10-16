@@ -1,4 +1,4 @@
-# AI PPT
+# DART Deck
 
 누구에게 무엇을 알려 줄지 알려 주면, **Claude Code 가 한국 발표 자료 규칙에 맞춰 발표 자료를 만들고**, 이후 AI 에게 부탁하거나 직접(✎ 편집) 고치는 웹 서비스.
 
@@ -16,11 +16,10 @@ npm i -g @anthropic-ai/claude-code
 python3 server/app.py      # http://<이 컴퓨터>:8900 — 처음 계정 admin / admin
 ```
 
-## 배포
+## 배포 (개인 NAS)
 
 ```sh
-sh scripts/build-tar.sh    # → build/ai-ppt.tar.gz · build/docker-compose.yml
-docker load -i ai-ppt.tar.gz && docker compose -f docker-compose.yml up -d
+docker build -t dart-deck:latest . && docker compose up -d   # 데이터는 ./data (계정 · 세션 · 덱 — 커밋 금지)
 ```
 
-환경 변수: `PPT_PORT`(8900) · `PPT_DATA_DIR`(./data, 이미지에서는 /data) · `DECK_ASK_URL`(부탁 종류를 판단할 LLM, 없어도 동작)
+환경 변수: `PPT_PORT`(8900) · `PPT_DATA_DIR`(./data, 이미지에서는 /data) · `DECK_ASK_URL` · `DECK_LLM_BASE`(로컬 LLM — 선택, 비우면 Claude 개인 구독만)

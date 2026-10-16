@@ -1,8 +1,8 @@
 {
-  "name": "ai-ppt",
+  "name": "dart-deck",
   "version": "0.1.0",
   "private": true,
-  "description": "AI PPT — 계정별 발표 자료 저장 · Claude Code 로 만들고 고치는 덱 서버",
+  "description": "DART Deck — 계정별 발표 자료 저장 · Claude Code 로 만들고 고치는 덱 서버",
   "scripts": {
     "start": "python3 server/app.py",
     "build:tar": "bash scripts/build-tar.sh"

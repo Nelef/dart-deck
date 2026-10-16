@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="fonts/base.css">
 <link rel="stylesheet" href="css/deck.css">
 <style>
-/* {{TITLE}} — AI PPT 로 만든 덱. 엔진 사용법 · 작성 규칙은 DECK.md(명사형 제목 · 개조식 · 글자 크기 --fs-* · 색 --c-* · 인포그래픽).
+/* {{TITLE}} — DART Deck 로 만든 덱. 엔진 사용법 · 작성 규칙은 DECK.md(명사형 제목 · 개조식 · 글자 크기 --fs-* · 색 --c-* · 인포그래픽).
    무대 1600×900 = PPT 16:9 13.33in → 1pt = 1.667px */
 .slide h2 { font-size: var(--fs-title); line-height: 1.2; margin: 8px 0 10px; max-width: none; }
 .slide .eyebrow { font-size: var(--fs-small); }
@@ -27,7 +27,7 @@ ul.pts b { color: var(--ink); }
 <body>
 <div id="ldr" style="position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:#0f1115;color:#e8eaf0;font:600 15px 'Noto Sans KR',sans-serif;transition:opacity .3s">
   <div style="width:min(440px,86vw)"><div id="ldr-t" style="font-size:18px;margin-bottom:10px">불러오는 중…</div>
-  <div style="height:8px;background:#2a2f3a;border-radius:99px;overflow:hidden"><i id="ldr-b" style="display:block;height:100%;width:3%;background:#416AF0;transition:width .2s"></i></div></div></div>
+  <div style="height:8px;background:#2a2f3a;border-radius:99px;overflow:hidden"><i id="ldr-b" style="display:block;height:100%;width:3%;background:#0F766E;transition:width .2s"></i></div></div></div>
 <script>
 (() => {
   const t0 = performance.now(); const $ = (i) => document.getElementById(i);
@@ -70,7 +70,7 @@ const deck = Deck.create({ inits: INIT,
     deck: document.title, codemap: null, noCode: true, wholeDeck: true, editable: true, current: () => deck.slides[deck.cur], goto: (i) => deck.show(i, 0),
     stageOf: () => null, contextOf: (s) => { try { return (CTX[s.dataset.name] || (() => ''))(); } catch (e) { return ''; } },
     suggest: (s) => SUGGEST[s.dataset.name] || [],
-    intro: 'AI PPT 로 만든 발표 자료. 답은 쉬운 한국어로 짧게, 덱에 있는 내용만 근거로 한다.',
+    intro: 'DART Deck 로 만든 발표 자료. 답은 쉬운 한국어로 짧게, 덱에 있는 내용만 근거로 한다.',
   }); },
 });
 </script>

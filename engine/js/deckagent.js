@@ -1,16 +1,16 @@
 // 덱 AI 패널의 「Claude Code」 엔진 — 서버(server/deckagent.py)가 Claude Code 를 돌려 덱 사본을 고치고, 여기서는 진행 · 결과 카드 · [적용]을 그린다.
-// AI PPT(2026-09-30 이전 프로토타입 에서 옮김): 엔진은 이전 프로토타입 와 같이 gemma 26b · Claude Code 둘 — **새 덱 만들기만 Claude Code**(사용자 지정).
+// DART Deck: 엔진은 Claude Code(개인 구독) · 로컬 LLM(선택) 둘 — **새 덱 만들기만 Claude Code**(사용자 지정).
 //   (옮길 때 '클로드 코드만'을 패널 전체로 잘못 읽어 gemma 를 뺐다가 되살림 — 사용자 지적 2026-09-30 "로컬 llm 으로 사용하기 있지 않았나"). 구독 토큰은 계정에 묶여 서버에 있고
 //   (브라우저는 연결 여부만 /api/me 로 안다), 새 덱(?new=1)은 열리자마자 받은 정보(brief.json)로 Claude Code 가 처음부터 만든다(A.build).
 // 사용자 지정(2026-09-30): "클로드 코드 도구를 연결 · 구독 계정으로, 클로드 계정 있으면 그걸로". js/deckkit.js 가 고칠 수 있는 덱(editable)에서만 불러온다.
-// 엔진 두 가지(사용자 지정 2026-09-30 "설명은 빠른 답, 수정은 gemma 26b thinking, Claude Code 는 연결 안 되면 못 보내게, 모델 선택도"):
-//   · gemma 26b — 부탁마다 먼저 설명인지 수정인지 gemma 에게 한 단어로 묻는다(1~2초). 설명 → 빠른 답(예전 패널, 생각 끔 · 수정 문맥 없이),
+// 엔진 두 가지(사용자 지정 2026-09-30 "설명은 빠른 답, 수정은 로컬 LLM thinking, Claude Code 는 연결 안 되면 못 보내게, 모델 선택도"):
+//   · 로컬 LLM — 부탁마다 먼저 설명인지 수정인지 gemma 에게 한 단어로 묻는다(1~2초). 설명 → 빠른 답(예전 패널, 생각 끔 · 수정 문맥 없이),
 //     수정 → gemma 생각 켬으로 사본을 고친다. 고치는 틀은 Claude Code 도구 틀(LiteLLM 경유)을 쓴다 — 하네스 비교에서 같은 gemma 생각으로
 //     이 틀이 17/24, 패널 한 번에 쓰기 + 생각은 빈 답 11/24(생각 3만 자에서 잘림)였다. Claude 계정은 쓰지 않는다.
 //   · Claude Code — 쓰는 사람의 Claude 구독으로만(토큰은 이 브라우저 localStorage 에만 — 부탁할 때 서버로 보내고 서버는 저장하지 않는다).
 //     연결 전에는 보내기를 막는다. 모델 선택 기본은 **Sonnet 5.5 · 노력 medium**(브라우저에 고른 값이 없을 때, 사용자 지정 2026-10-01 — 새로 만들기와 같은 Sonnet. 그 전엔 Opus · low, 023aa34) — 모델 자동 · Opus · Sonnet · Haiku · 계정 기본(구독 등급에 따라 못 쓰는 것이 있을 수 있다).
 //     「모델 자동」 = 부탁 종류를 gemma 가 먼저 한 단어로 판단해 설명 → Haiku · 작은 수정 → Sonnet(노력 medium) · 큰 수정 / 여러 장 → Sonnet(노력 high) — Opus 는 사람이 고를 때만(b9911ef).
-//     사용자 제안(2026-09-30 "모델 각 선택해서 토큰 절약"). 판단은 로컬 gemma 라 구독 사용량을 쓰지 않는다.
+//     사용자 제안(2026-09-30 "모델 각 선택해서 토큰 절약"). 판단은 로컬 LLM 라 구독 사용량을 쓰지 않는다.
 (() => {
   const K = window.DeckKit; if (!K || window.DeckAgent) return;
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -23,7 +23,7 @@
   };
   // 첨부 문서(사용자 지정 2026-09-30 "ppt, pdf 같은 거 첨부 가능한가") — pdf · pptx · docx. 썸네일은 확장자를 적은 작은 SVG(그림 썸네일 자리에 그대로 쓴다)
   const DOC_RE = /\.(pdf|pptx|docx)$/i;
-  const docThumb = (name) => { const x = (name.match(DOC_RE)?.[1] || '').toUpperCase().replace('PPTX', 'PPT').replace('DOCX', 'DOC'); const c = { PDF: '#DC2626', PPT: '#d97706', DOC: '#416AF0' }[x] || '#6b7280';
+  const docThumb = (name) => { const x = (name.match(DOC_RE)?.[1] || '').toUpperCase().replace('PPTX', 'PPT').replace('DOCX', 'DOC'); const c = { PDF: '#DC2626', PPT: '#d97706', DOC: '#0F766E' }[x] || '#6b7280';
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="14" fill="#f2f3f6"/><path d="M36 20h36l20 20v60H36z" fill="#fff" stroke="${c}" stroke-width="4"/><text x="64" y="84" font-family="sans-serif" font-size="22" font-weight="900" fill="${c}" text-anchor="middle">${x}</text></svg>`); };
   const CSS = `
   /* 머리 정리(사용자 지적 2026-09-30 "자리만 차지 · 버튼 UX 별로") — 윗줄 = 덱 · 페이지 + 아이콘(대화 목록 · 새 대화 · 닫기), 아랫줄 = 엔진 · 모델 · 노력 · 웹 · ⋯ 한 줄.
@@ -36,11 +36,11 @@
   #kpanel .khead .ka-ic { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 10px; border-radius: 99px; background: #f2f3f6; color: #2b3038; font: 800 12.5px 'Noto Sans KR', sans-serif; position: relative; transition: background .15s, transform .08s; }
   #kpanel .khead .ka-ic svg { flex: none; }
   #kpanel .khead .ka-ic:hover { background: #e6e8ec; } #kpanel .khead .ka-ic:active { transform: scale(0.96); }
-  #kpanel .khead .ka-ic .dot { position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 99px; background: #416AF0; box-shadow: 0 0 0 2px #fff; }
+  #kpanel .khead .ka-ic .dot { position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 99px; background: #0F766E; box-shadow: 0 0 0 2px #fff; }
   /* 웹 검색 — 입력창 안, 보내기 단추 왼쪽(사용자 지정 2026-09-30). 켜면 파랑 */
   .ka-webin { flex: none; align-self: center; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 99px; border: 0; background: #f2f3f6; color: #545b66; font: 800 12px 'Noto Sans KR', sans-serif; cursor: pointer; transition: background .15s, color .15s, transform .08s; }
   .ka-webin:hover { background: #e6e8ec; } .ka-webin:active { transform: scale(0.98); }
-  .ka-webin.on { background: #E8EEFD; color: #416AF0; }
+  .ka-webin.on { background: #E8EEFD; color: #0F766E; }
   #kpanel.ka-solo .khead .kx { margin-left: 0; width: 34px; height: 34px; padding: 0; border-radius: 10px; }
   .ka-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #eceef1; font: 700 12px 'Noto Sans KR', sans-serif; color: #545b66; flex-wrap: nowrap; min-width: 0; position: relative; }
   .ka-seg { flex: none; } .ka-seg button { white-space: nowrap; }
@@ -58,14 +58,14 @@
   /* 모델 · 노력 — 한 단추(지금 설정을 보여 줌)를 누르면 판이 열려 둘을 함께 고른다(사용자 지정 2026-10-01 "모델 선택과 노력 수치를 한 버튼으로") */
   .ka-mdl { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #e3e6ea; border-radius: 99px; background: #fff; color: #2b3038; font: 800 12px 'Noto Sans KR', sans-serif; cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s, transform .08s; }
   .ka-mdl span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ka-mdl i { flex: none; font-style: normal; color: #9aa1ab; font-size: 9px; transition: transform .15s; }
-  .ka-mdl:hover { background: #f7f8fa; } .ka-mdl:active { transform: scale(0.98); } .ka-mdl.on { border-color: #416AF0; box-shadow: 0 0 0 3px rgba(65,106,240,.12); } .ka-mdl.on i { transform: rotate(180deg); }
+  .ka-mdl:hover { background: #f7f8fa; } .ka-mdl:active { transform: scale(0.98); } .ka-mdl.on { border-color: #0F766E; box-shadow: 0 0 0 3px rgba(65,106,240,.12); } .ka-mdl.on i { transform: rotate(180deg); }
   .ka-mpop { position: absolute; left: 12px; top: calc(100% - 2px); z-index: 6; width: min(340px, calc(100% - 24px)); max-height: min(70dvh, 560px); overflow-y: auto; background: #fff; border-radius: 14px; box-shadow: 0 12px 34px rgba(20,24,40,.22); padding: 12px 12px 10px; display: none; font: 600 12.5px/1.45 'Noto Sans KR', sans-serif; color: #2b3038; }
   .ka-mpop.on { display: block; }
   @media (max-width: 640px) { .ka-mpop { max-height: max(180px, calc(var(--kh, 58dvh) - 110px)); } }   /* 폰은 아래에서 올라오는 판 안 — 판 높이 안에서 스크롤 */
   .ka-mpop h5 { margin: 2px 2px 6px; font: 900 11.5px 'Noto Sans KR', sans-serif; color: #7a828e; letter-spacing: .02em; } .ka-mpop h5 ~ h5, .ka-mpop .chips ~ h5 { margin-top: 12px; }
   .ka-mpop .opt { display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 7px 8px; cursor: pointer; font: inherit; color: inherit; }
   .ka-mpop .opt:hover { background: #f2f3f6; } .ka-mpop .opt.on { background: #f3f6ff; }
-  .ka-mpop .opt .rd { flex: none; width: 15px; height: 15px; margin-top: 2px; border-radius: 99px; border: 2px solid #c9ced6; box-sizing: border-box; } .ka-mpop .opt.on .rd { border-color: #416AF0; background: radial-gradient(#416AF0 42%, transparent 46%); }
+  .ka-mpop .opt .rd { flex: none; width: 15px; height: 15px; margin-top: 2px; border-radius: 99px; border: 2px solid #c9ced6; box-sizing: border-box; } .ka-mpop .opt.on .rd { border-color: #0F766E; background: radial-gradient(#0F766E 42%, transparent 46%); }
   .ka-mpop .opt b { display: block; font-weight: 800; } .ka-mpop .opt small { display: block; color: #7a828e; font-weight: 600; font-size: 11.5px; }
   .ka-mpop .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px; }
   .ka-mpop .chips button { border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 11px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; } .ka-mpop .chips button:hover { background: #f2f3f6; }
@@ -78,7 +78,7 @@
   .ka-acct.on { border-color: #d97706; color: #92400e; background: #fffbeb; }
   .ka-web { flex: none; border-width: 1px; border-style: solid; border-color: #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #545b66; cursor: pointer; transition: transform .08s, background .15s, color .15s, border-color .15s; }
   .ka-web:hover { background: #f2f3f6; } .ka-web:active { transform: scale(0.98); }
-  .ka-web.on { border-color: #416AF0; background: #E8EEFD; color: #416AF0; }
+  .ka-web.on { border-color: #0F766E; background: #E8EEFD; color: #0F766E; }
   .ka-steps { margin: 4px 0 8px; font: 600 12.5px/1.6 'Noto Sans KR', sans-serif; color: #545b66; }
   .ka-steps summary { cursor: pointer; font-weight: 800; }
   .ka-steps li { list-style: none; padding-left: 2px; } .ka-steps li.bad { color: #b91c1c; }
@@ -91,7 +91,7 @@
   #ka-login input { width: 100%; box-sizing: border-box; border: 1px solid #d5d9df; border-radius: 10px; padding: 9px 11px; font: 16px 'JetBrains Mono', monospace; margin: 6px 0; }
   #ka-login .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
   #ka-login button { border: 0; border-radius: 99px; padding: 8px 16px; font: 800 13.5px 'Noto Sans KR', sans-serif; cursor: pointer; background: #f2f3f6; color: #16181d; }
-  #ka-login button.go { background: #16181d; color: #fff; } #ka-login a.open { display: inline-block; margin: 4px 0; font-weight: 800; color: #416AF0; }
+  #ka-login button.go { background: #16181d; color: #fff; } #ka-login a.open { display: inline-block; margin: 4px 0; font-weight: 800; color: #0F766E; }
   #ka-login .err { color: #b91c1c; font-size: 13px; font-weight: 700; }
   .ka-u { margin: 12px 0; } .ka-ul { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; } .ka-ul span { color: #545b66; font-weight: 700; }
   .ka-ub { height: 10px; border-radius: 99px; background: #eef0f3; overflow: hidden; margin: 6px 0 3px; } .ka-ub i { display: block; height: 100%; border-radius: 99px; }
@@ -103,18 +103,18 @@
   .ka-f button { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 99px; border: 0; background: rgba(22,24,29,.75); color: #fff; font-size: 10px; cursor: pointer; padding: 0; }
   .ka-att { flex: none; align-self: center; border: 0; background: #f2f3f6; border-radius: 99px; width: 30px; height: 30px; padding: 0; font: 700 20px/30px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; margin-right: 4px; }
   .ka-att:hover { background: #e6e8ec; }
-  #kpanel.ka-drop .kc-box { border-color: #416AF0; box-shadow: 0 0 0 3px rgba(65,106,240,.18); }
-  #kpanel.ka-drop .kc-box textarea::placeholder { color: #416AF0; }
+  #kpanel.ka-drop .kc-box { border-color: #0F766E; box-shadow: 0 0 0 3px rgba(65,106,240,.18); }
+  #kpanel.ka-drop .kc-box textarea::placeholder { color: #0F766E; }
 
   .ka-att:disabled { opacity: .4; cursor: default; }
   .ka-uthumbs { display: flex; gap: 4px; justify-content: flex-end; margin-top: 6px; } .ka-uthumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
   .ka-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; } .ka-shots.one { grid-template-columns: 1fr; } .ka-shots img { width: 100%; display: block; border-radius: 6px; }
-  .ka-shots .tag { position: absolute; left: 8px; top: 8px; padding: 2px 9px; border-radius: 99px; font: 800 11.5px 'Noto Sans KR', sans-serif; color: #fff; background: #416AF0; } .ka-shots .tag.del { background: #b91c1c; }
+  .ka-shots .tag { position: absolute; left: 8px; top: 8px; padding: 2px 9px; border-radius: 99px; font: 800 11.5px 'Noto Sans KR', sans-serif; color: #fff; background: #0F766E; } .ka-shots .tag.del { background: #b91c1c; }
   .ka-more-shots { padding: 0 8px 8px; font: 700 12px 'Noto Sans KR', sans-serif; color: #7a828e; }
   /* 대화 목록(대화방) — 패널 위로 왼쪽에서 밀려 나오는 서랍. TOSS: 행 높이 64 · hover 틴트 · 누르면 scale(0.98) · 뜨는 효과 없음 */
   .ka-hist { position: relative; border: 1px solid #e3e6ea; background: #fff; border-radius: 99px; padding: 4px 10px; font: 800 12px 'Noto Sans KR', sans-serif; color: #2b3038; cursor: pointer; transition: transform .08s, background .15s; }
   .ka-hist:hover { background: #f2f3f6; } .ka-hist:active, .ka-new:active, .ka-acct:active { transform: scale(0.98); }
-  .ka-hist .dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 99px; background: #416AF0; box-shadow: 0 0 0 2px #fff; animation: ka-pulse 1.4s ease-in-out infinite; }
+  .ka-hist .dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 99px; background: #0F766E; box-shadow: 0 0 0 2px #fff; animation: ka-pulse 1.4s ease-in-out infinite; }
   /* 닫힌 서랍은 패널 왼쪽 밖(무대 위)에 걸려 보이지 않게 — 밀려 나간 뒤 숨긴다 */
   #ka-th { position: absolute; inset: 0; z-index: 5; background: #fff; display: flex; flex-direction: column; transform: translateX(-104%); opacity: 0; visibility: hidden; transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .2s, visibility 0s linear .28s; box-shadow: 8px 0 30px rgba(0,0,0,.08); }
   #ka-th.on { transform: none; opacity: 1; visibility: visible; transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .2s; }
@@ -130,9 +130,9 @@
   #ka-th .row .tx { flex: 1; min-width: 0; }
   #ka-th .row .tt { font: 800 15px/1.4 'Noto Sans KR', sans-serif; color: #16181d; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   #ka-th .row .sb { font: 600 12.5px 'Noto Sans KR', sans-serif; color: #8b929c; margin-top: 2px; display: flex; gap: 6px; align-items: center; }
-  #ka-th .row .run { color: #416AF0; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
+  #ka-th .row .run { color: #0F766E; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
   #ka-th .row .pd { color: #92400e; background: #fffbeb; border-radius: 99px; padding: 0 7px; font-weight: 800; }
-  #ka-th .row .run i { width: 7px; height: 7px; border-radius: 99px; background: #416AF0; animation: ka-pulse 1.4s ease-in-out infinite; }
+  #ka-th .row .run i { width: 7px; height: 7px; border-radius: 99px; background: #0F766E; animation: ka-pulse 1.4s ease-in-out infinite; }
   #ka-th .row .del { position: absolute; right: 8px; top: 50%; margin-top: -15px; width: 30px; height: 30px; border: 0; border-radius: 99px; background: transparent; color: #8b929c; font-size: 13px; cursor: pointer; opacity: 0; transition: opacity .15s, background .15s; }
   #ka-th .row:hover .del { opacity: 1; } #ka-th .row .del:hover { background: #e6e8ec; color: #b91c1c; }
   @media (hover: none) { #ka-th .row .del { opacity: 1; } }
@@ -150,11 +150,11 @@
   @keyframes ka-sk { to { background-position: -200% 0; } }
   @keyframes ka-toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { #ka-th, #ka-th .row, #kpanel .kc-list.ka-swap > *, #kpanel .ka-pop { transition: none; animation: none; } }
-  #ka-login a.cl { margin-right: auto; align-self: center; font: 800 13px 'Noto Sans KR', sans-serif; color: #416AF0; text-decoration: none; }
+  #ka-login a.cl { margin-right: auto; align-self: center; font: 800 13px 'Noto Sans KR', sans-serif; color: #0F766E; text-decoration: none; }
   `;
   const A = {
     // 엔진 — 고른 적 없으면 구독이 연결돼 있으면 Claude Code, 아니면 gemma
-    get engine() { const e = ls.get('deckagent.engine'); return e === 'claude' || e === 'gemma' ? e : (A.me?.claude ? 'claude' : 'gemma'); }, set engine(v) { ls.set('deckagent.engine', v); },
+    get engine() { const e = ls.get('deckagent.engine'); return e === 'claude' || e === 'gemma' ? e : 'claude'; }, set engine(v) { ls.set('deckagent.engine', v); },
     get model() { return ls.get('deckagent.model') ?? 'sonnet'; }, set model(v) { ls.set('deckagent.model', v); },
     // 노력(effort) — Claude Code --effort. 기본 medium(고른 값 없을 때). 「노력 자동」 = 작은 수정 medium · 큰 수정 / 여러 장 high · 설명(Haiku)은 주지 않음(사용자 지정 2026-09-30 "effort 도 조절")
     get effort() { return ls.get('deckagent.effort') ?? 'medium'; }, set effort(v) { ls.set('deckagent.effort', v); },
@@ -301,7 +301,7 @@
       const EFFORTS = [['auto', '자동', '자동', '작은 수정은 medium · 큰 수정 · 여러 페이지는 high · 설명은 지정하지 않음'], ['low', 'low', 'low', '가장 빠름 — 간단한 글 고치기'], ['medium', 'medium', 'med', '보통 — 대부분의 수정 (기본)'],
         ['high', 'high', 'high', '오래 생각함 — 큰 수정 · 레이아웃, 사용량이 늘어남'], ['xhigh', 'xhigh', 'xhigh', '더 깊게 — 매우 오래 걸리고 사용량이 많음'], ['max', 'max', 'max', '최대 — 가장 오래 걸리고 사용량이 가장 많음']];
       const bar = document.createElement('div'); bar.className = 'ka-bar';
-      bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 gemma-4-26b — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
+      bar.innerHTML = `<span class="ka-seg"><button data-e="gemma" class="${cc ? '' : 'on'}" title="로컬 LLM — 설명은 빠른 답, 수정은 생각 켜고 사본을 고치며 화면으로 확인">gemma</button><button data-e="claude" class="${cc ? 'on' : ''}" title="${sub ? 'Claude Code — 내 Claude 구독 연결됨' : 'Claude Code — 내 Claude 구독으로'}">Claude${sub ? '<i class="ok"></i>' : ''}</button></span>`
         + (cc && sub ? `<button class="ka-mdl" title="모델 · 노력(effort) 고르기"><span></span><i>▼</i></button><div class="ka-mpop" role="dialog" aria-label="모델 · 노력"></div>`
           + `<button class="ka-more" title="사용량 · 구독 연결">⋯</button><div class="ka-menu"><button data-m="use">남은 사용량 보기</button><button data-m="acct">구독 연결 끊기</button><div class="sub">Claude 구독 연결됨</div></div>` : '')
         + (cc && !sub ? '<button class="ka-connect ka-acct">Claude 구독 연결</button>' : '');
@@ -364,7 +364,7 @@
       let body;
       const ST = { allowed: '여유', allowed_warning: '한도 가까움', rejected: '한도 도달' };
       try { const j = await K.post('/api/agent/usage', { probe });
-        body = j.rows.length ? j.rows.map((r) => { const p = Math.max(0, Math.min(100, Number(r.pct) || 0)); const col = p >= 90 ? '#DC2626' : p >= 70 ? '#d97706' : '#416AF0';
+        body = j.rows.length ? j.rows.map((r) => { const p = Math.max(0, Math.min(100, Number(r.pct) || 0)); const col = p >= 90 ? '#DC2626' : p >= 70 ? '#d97706' : '#0F766E';
           const hasP = r.pct != null;
           return `<div class="ka-u"><div class="ka-ul"><b>${esc(NM[r.key] || r.key)}</b><span>${hasP ? `${p.toFixed(0)}% 사용 · 남은 ${(100 - p).toFixed(0)}%` : esc(ST[r.status] || r.status || '')}${r.overage ? ' · 초과 사용 중' : ''}</span></div>${hasP ? `<div class="ka-ub"><i style="width:${p}%;background:${col}"></i></div>` : ''}<div class="ka-ur">${esc(when(r.resets))}</div></div>`; }).join('')
           + (j.source === 'events' ? `<div class="ka-ur">Claude Code 가 부탁할 때 받은 값 · ${j.age < 90 ? '방금' : `${Math.round(j.age / 60)}분 전`}</div>` : '')
@@ -402,9 +402,9 @@
       if (!o2.forceGemma && (kind === '여러 장' || kind === '큰 수정')) return A.warn(q, att, kind);
       if (kind === '설명') {
         await ask0(q, { noEdit: true, userImages: att.map((f) => f.data), thumbs: att.map((f) => f.thumb) }); const m = K.chat[K.chat.length - 1];
-        if (m?.role === 'assistant') { m.model = '빠른 답 · gemma-4-26b'; K.updateMsg(K.chat.length - 1);
+        if (m?.role === 'assistant') { m.model = '빠른 답 · 로컬 LLM'; K.updateMsg(K.chat.length - 1);
           // 빠른 답은 Claude Code 작업이 아니라 서버 기록이 없다 — 대화방에 따로 남겨 다시 열 때 같이 보이게
-          if (m.text && !m.err && !m.stopped) K.post('/api/agent/note', { file: location.pathname, thread: A.thread || (A.thread = A.newId()), prompt: q, slide: m.slide, text: m.text, model: 'gemma-4-26b' }).then(() => A.refreshThreads()).catch(() => {}); }
+          if (m.text && !m.err && !m.stopped) K.post('/api/agent/note', { file: location.pathname, thread: A.thread || (A.thread = A.newId()), prompt: q, slide: m.slide, text: m.text, model: '로컬 LLM' }).then(() => A.refreshThreads()).catch(() => {}); }
         return;
       }
       return A.ask(q, { att, plan, kind, noUser: o2.noUser });
@@ -413,7 +413,7 @@
     warn(q, att, kind) {
       const slide = K.cfg.current().dataset.name;
       K.chat.push({ role: 'user', text: q, slide, ...(att.length ? { thumbs: att.map((f) => f.thumb) } : {}) });
-      K.chat.push({ role: 'assistant', text: '', slide, root: q, agent: { warn: true, done: true, kind, att, steps: [] }, model: `gemma 26b · ${kind.replace(/장/g, '페이지')}` });
+      K.chat.push({ role: 'assistant', text: '', slide, root: q, agent: { warn: true, done: true, kind, att, steps: [] }, model: `로컬 LLM · ${kind.replace(/장/g, '페이지')}` });
       K.draft = ''; K.render();
     },
     decide(i, how) {
@@ -504,7 +504,7 @@
       const ef = o.build || A.effort === 'auto' ? o.effort : A.effort;
       // 실제 모델 ID(Claude Code 결과의 modelUsage) — 보조 호출용 작은 모델(haiku)이 같이 찍히면 둘 다
       const used = (a.agent.models || []).join(', ');
-      a.model = a.agent.quick ? '빠른 답 · gemma-4-26b' : a.agent.engine === 'gemma' ? `gemma 26b 생각 · 수정${o.kind ? ` (${String(o.kind).replace(/장/g, '페이지')})` : ''}`
+      a.model = a.agent.quick ? '빠른 답 · 로컬 LLM' : a.agent.engine === 'gemma' ? `로컬 LLM 생각 · 수정${o.kind ? ` (${String(o.kind).replace(/장/g, '페이지')})` : ''}`
         : `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${o.web ? ' · 웹 검색' : ''}${used ? ` · 실제: ${used}` : ''}`;
       // 구독 인증 실패 — 연결을 지우고 다시 연결하게(잘못된 토큰으로 계속 401 이 나지 않게). 지난 대화를 다시 그릴 때는 건드리지 않는다
       if (live && a.agent.engine === 'sub' && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
@@ -614,7 +614,7 @@
       const g = m.agent; const i = K.chat.indexOf(m);
       if (g.warn) {
         const what = g.kind === '여러 장' ? '여러 페이지 · 새 페이지' : '레이아웃(배치 · 그래프 모양)';
-        return `<div class="kc-body"><p>로컬 gemma 로는 <b>${what}</b> 수정이 많이 부족합니다. Claude Code 로 하면 훨씬 정확합니다.</p></div>`
+        return `<div class="kc-body"><p>로컬 LLM 로는 <b>${what}</b> 수정이 많이 부족합니다. Claude Code 로 하면 훨씬 정확합니다.</p></div>`
           + (g.decided ? `<div class="kc-eda">${{ claude: '▶ Claude Code 로 — 아래', gemma: '▶ gemma 로 진행 — 아래', cancel: '취소함' }[g.decided]}</div>`
             : `<div class="kc-eda"><button class="go" data-ka="w-claude" data-mi="${i}">Claude Code 로 하기</button><button data-ka="w-gemma" data-mi="${i}">무시하고 진행</button><button data-ka="w-cancel" data-mi="${i}">취소</button></div>`);
       }

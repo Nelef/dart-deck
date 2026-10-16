@@ -16,11 +16,11 @@
   --fs-box: 28px;    /* 17pt 상자·카드 제목 */
   --fs-small: 24px;  /* 14pt 상자 안 설명·표 */
   --fs-foot: 20px;   /* 12pt 각주·출처 — 읽지 않아도 되는 글만 */
-  /* 색 체계(DECK.md 7) —  파랑 한 가족 + 회색 + 경고 빨강 하나. 60-30-10: 바탕 60 · 글자·회색 30 · 파랑 강조 10.
-     파랑 #416AF0 은  홈페이지 대표색(example.com 에서 가장 많이 쓰는 색, 2026-09-29 확인). 흰 바탕 대비는 괄호.
+  /* 색 체계(DECK.md 7) — 청록 한 가족 + 회색 + 경고 빨강 하나. 60-30-10: 바탕 60 · 글자·회색 30 · 파랑 강조 10.
+     파랑 #0F766E 은 브랜드 대표색. 흰 바탕 대비는 괄호.
      새 덱은 이 값만 쓴다. 위의 엔진별 색(--vl --pps --aio --llm --code)과 --ok 초록은 옛 덱용이다. */
-  --c-brand: #416AF0;       /* 강조 파랑 (4.62 — 글자 가능) · v2 · 좋은 쪽 · 핵심 숫자 */
-  --c-brand-deep: #1E3A8A;  /* 진한 남색 (10.4) · 이름표 · 굵은 글자 */
+  --c-brand: #0F766E;       /* 강조 파랑 (4.62 — 글자 가능) · v2 · 좋은 쪽 · 핵심 숫자 */
+  --c-brand-deep: #134E4A;  /* 진한 남색 (10.4) · 이름표 · 굵은 글자 */
   --c-brand-mid: #9DB2F7;   /* 중간 파랑 (2.1 — 면 채우기만) · 두 번째 막대 조각 */
   --c-brand-tint: #E8EEFD;  /* 옅은 파랑 (면 채우기만) · 강조 상자 바탕 */
   --c-neutral: #8D95A1;     /* 회색 (면 채우기) · v1 · 비교 대상 */
@@ -178,7 +178,7 @@ svg text { font-family: 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif; }
 #dsheet button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; padding: 0 20px; text-align: left; font-size: 16px; font-weight: 600; color: #16181d; }
 #dsheet button:active { background: #f2f3f6; }
 #dsheet button i { font-style: normal; font-size: 13px; font-weight: 800; color: #9aa1ab; min-width: 22px; }
-#dsheet button.on { color: #1E3A8A; background: #E8EEFD; } #dsheet button.on i { color: #416AF0; }
+#dsheet button.on { color: #134E4A; background: #E8EEFD; } #dsheet button.on i { color: #0F766E; }
 @keyframes shup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes shfade { from { opacity: 0; } }
 
@@ -202,7 +202,7 @@ body.dfs { cursor: auto; }
   #bar #de-btn { left: 14px; } #bar #k-ai { right: 14px; } #bar #k-code { right: 88px; }
 }
 
-/* ═══ AI PPT 로고 — 왼쪽 위, 누르면 발표 자료 목록(사용자 지정 2026-09-30 "목록 단추는 왼쪽 위에 · AI PPT 로고로") ═══
+/* ═══ DART Deck 로고 — 왼쪽 위, 누르면 발표 자료 목록(사용자 지정 2026-09-30 "목록 단추는 왼쪽 위에 · DART Deck 로고로, 이전 프로토타입 처럼") ═══
    덱 HTML 을 고치지 않게 엔진(deck.js)이 붙인다. 어두운 무대 바탕 위라 흰 알약 안에. 무대가 로고에 가리지 않게 위를 비운다(--fit-top) —
    편집 중(리본이 그 자리) · 전체화면에서는 숨기고 비우지 않는다. 조작줄의 옛 ☰ 는 숨긴다(덱 파일엔 남아 있어도 된다) */
 #ppt-home { position: fixed; left: 14px; top: 9px; z-index: 45; display: flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 99px; background: #fff;

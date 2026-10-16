@@ -1,6 +1,6 @@
-# AI PPT 서버(:8900, 0.0.0.0) — 계정마다 발표 자료(덱)를 저장하고, 관리자는 전부 본다. 사용자 지정 2026-09-30:
+# DART Deck 서버(:8900, 0.0.0.0) — 계정마다 발표 자료(덱)를 저장하고, 관리자는 전부 본다. 사용자 지정 2026-09-30:
 #   "새 포트로 계정별 PPT 저장 · 관리자는 전부 · 처음 만들 때 '어떤 사람에게 어떤 정보를?' 설문 또는 내용 붙여넣기 → Claude Code 가 엔진 규칙으로 만든다 · Claude Code 만"
-# 뼈대는 이전 프로토타입 research/serve.py(덱 고치기 · 캡처 · AI 패널)를 옮긴 것이고, 여기서 더한 것은 계정 · 세션 · 덱 목록 · 권한 검사다.
+# 뼈대는 덱 고치기 · 캡처 · AI 패널이고, 여기에 더한 것은 계정 · 세션 · 덱 목록 · 권한 검사다.
 #   주소: /            → web/index.html(로그인 · 목록 · 새 덱 · 계정 · 사용자 관리)
 #         /d/<계정>/<덱>/ → 덱(data/decks/<계정>/<덱>/index.html). js/ css/ tools/ DECK.md 는 engine/ 에서, fonts/ 는 data/fonts → engine/fonts 순으로
 #   권한: 덱 주인 또는 관리자만. 캡처 도구(서버 안에서 도는 크롬)는 이 컴퓨터에서 온 요청 + 서버가 켤 때 만든 캡처 키(x-shot-key)로 들어온다 —
@@ -29,8 +29,8 @@ COOKIE = 'ppt_sid'
 _fc_spec = _ilu.spec_from_file_location('fontcache', os.path.join(ENGINE, 'tools', 'fontcache.py')); FONTCACHE = _ilu.module_from_spec(_fc_spec); _fc_spec.loader.exec_module(FONTCACHE)
 FONTCACHE.FONTS = FONT_DIR   # 편집에서 새로 받은 글꼴은 data/ 에(엔진 폴더는 배포 이미지 안이라 다시 배포하면 사라진다)
 
-ASK_URL = os.environ.get('DECK_ASK_URL', 'http://gpu-server:8002/v1/chat/completions')
-ASK_MODEL = os.environ.get('DECK_ASK_MODEL', 'gemma-4-26b')
+ASK_URL = os.environ.get('DECK_ASK_URL', '')
+ASK_MODEL = os.environ.get('DECK_ASK_MODEL', 'local')
 ASK_MAX_BODY = 200_000      # 덱이 싣는 문맥(코드 발췌 + 실행 기록) 최대치 — 한 장 분량은 40KB 안팎
 ASK_MAX_REQ = 3_000_000     # 요청 본문 상한 — 자가검증은 캡처 그림(JPEG base64 약 150KB)을 싣는다
 ASK_MAX_IMAGES = 2
@@ -369,7 +369,7 @@ def build_messages(req):
         msgs.append({'role': m['role'], 'content': str(m['content'])[:ASK_TURN_CHARS]})
     text = f'[문맥]\n{ctx}\n\n[질문]\n{q}'
     imgs = [u for u in (req.get('images') or []) if isinstance(u, str) and u.startswith('data:image/')][:ASK_MAX_IMAGES]
-    # 그림이 있으면 OpenAI 식 여러 조각 내용 — gemma-4-26b(vLLM)는 그림을 읽는다
+    # 그림이 있으면 OpenAI 식 여러 조각 내용 — 로컬 LLM(vLLM 등 OpenAI 호환)는 그림을 읽는다
     msgs.append({'role': 'user', 'content': [{'type': 'text', 'text': text}] + [{'type': 'image_url', 'image_url': {'url': u}} for u in imgs] if imgs else text})
     return q, msgs
 
@@ -973,7 +973,7 @@ class H(http.server.BaseHTTPRequestHandler):
         req.pop('token', None)
         if path == '/api/agent/run':
             self.deck_access(u, req.get('file'))
-            # 엔진 — Claude Code(내 구독) 또는 로컬 gemma(LiteLLM 경유). 새 덱 만들기는 Claude Code 만(사용자 지정 2026-09-30)
+            # 엔진 — Claude Code(내 구독) 또는 로컬 LLM(LiteLLM 경유). 새 덱 만들기는 Claude Code 만(사용자 지정 2026-09-30)
             req['display'] = req.get('prompt')
             if req.get('engine') == 'gemma' and not req.get('build'):
                 req['model'] = req['effort'] = None
@@ -1048,8 +1048,9 @@ class H(http.server.BaseHTTPRequestHandler):
         try: deckagent.follow(rid, send, frm, deck)
         except (BrokenPipeError, ConnectionResetError): pass
 
-    # ── LLM(gemma) — 부탁 종류 판단 · 빠른 설명. 없는 환경이면 판단은 '작은 수정'으로 떨어지고 패널이 Claude 로 간다 ──
+    # ── 로컬 LLM(선택) — 부탁 종류 판단 · 빠른 설명. 없는 환경이면 판단은 '작은 수정'으로 떨어지고 패널이 Claude 로 간다 ──
     def classify(self, req):
+        if not ASK_URL: return self.reply(200, {'kind': '작은 수정', 'raw': ''})   # 로컬 LLM 이 없으면 판단을 건너뛴다
         sysm = ('너는 분류기다. 슬라이드 덱에 대한 사용자 부탁을 보고 숫자 하나만 답한다. 다른 말은 쓰지 않는다.\n'
                 '1 = 설명 · 질문 · 요약(덱을 바꾸지 않음)\n2 = 작은 수정: 문구 · 색 · 글자 크기 · 요소 한두 개 고치기 · 지우기\n'
                 '3 = 큰 수정: 한 장 안에서 배치 · 레이아웃 · 그래프 모양 바꾸기 · 새 그림 · 여러 요소를 다시 짜기\n'
@@ -1068,6 +1069,7 @@ class H(http.server.BaseHTTPRequestHandler):
         return self.reply(200, {'kind': {'1': '설명', '2': '작은 수정', '3': '큰 수정', '4': '여러 장'}[m.group(0)] if m else '작은 수정', 'raw': t[:20]})
 
     def ask(self, req):
+        if not ASK_URL: return self.reply(503, {'error': '빠른 답(로컬 LLM)이 꺼져 있습니다 — Claude Code 로 물어봐 주세요'})
         q, msgs = build_messages(req)
         if not q: raise ValueError('질문이 비었습니다')
         think = bool(req.get('thinking'))
@@ -1117,12 +1119,12 @@ class H(http.server.BaseHTTPRequestHandler):
 class S(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
-    request_queue_size = 128   # 덱 한 장을 열 때 몰리는 연결(글꼴 조각 · 스크립트 30여 개) — 기본 5 로는 넘쳐 Windows 가 21초 뒤 다시 시도했다(이전 프로토타입 실측)
+    request_queue_size = 128   # 덱 한 장을 열 때 몰리는 연결(글꼴 조각 · 스크립트 30여 개) — 기본 5 로는 넘쳐 Windows 가 21초 뒤 다시 시도했다(실측)
 
 if __name__ == '__main__':
     os.makedirs(DECKS, exist_ok=True)
     for dd in glob.glob(os.path.join(DECKS, '*', '*')):
         if os.path.isdir(dd): link_engine(dd)
     with S((os.environ.get('PPT_HOST', '0.0.0.0'), PORT), H) as s:   # PPT_HOST=127.0.0.1 이면 이 컴퓨터에서만(이 맥은 Tailscale 이 tailnet 주소의 8900 을 GPU 서버으로 넘겨 0.0.0.0 으로는 못 연다)
-        sys.stderr.write(f'AI PPT http://0.0.0.0:{PORT} · 데이터 {DATA_DIR}\n'); sys.stderr.flush()
+        sys.stderr.write(f'DART Deck http://0.0.0.0:{PORT} · 데이터 {DATA_DIR}\n'); sys.stderr.flush()
         s.serve_forever()

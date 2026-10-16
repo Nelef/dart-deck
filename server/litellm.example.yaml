@@ -1,0 +1,11 @@
+# (선택) 로컬 LLM — Claude Code 도구 틀을 OpenAI 호환 서버(vLLM 등)로 돌릴 때 LiteLLM 이 쓰는 설정. 이 파일을 litellm.yaml 로 복사하고 DECK_LLM_BASE 를 정한다.
+# 기본 배포는 쓰지 않는다(Claude 개인 구독만). 모델 이름(local-think · local-nothink)은 deckagent 의 --model 과 맞춘다.
+model_list:
+  - model_name: gemma-nothink
+    litellm_params: { model: hosted_vllm/local, api_base: "${DECK_LLM_BASE}", api_key: none, use_chat_completions_api: true, extra_body: { chat_template_kwargs: { enable_thinking: false } } }
+  - model_name: gemma-think
+    litellm_params: { model: hosted_vllm/local, api_base: "${DECK_LLM_BASE}", api_key: none, use_chat_completions_api: true, extra_body: { chat_template_kwargs: { enable_thinking: true } } }
+  - model_name: "*"
+    litellm_params: { model: hosted_vllm/local, api_base: "${DECK_LLM_BASE}", api_key: none, use_chat_completions_api: true, extra_body: { chat_template_kwargs: { enable_thinking: false } } }
+litellm_settings:
+  drop_params: true

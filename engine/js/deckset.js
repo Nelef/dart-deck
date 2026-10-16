@@ -19,16 +19,16 @@
   #dset small { display: block; margin-top: 7px; color: #6b7280; font-size: 12px; }
   #dset button { font: 700 13px 'Noto Sans KR', sans-serif; cursor: pointer; border-radius: 10px; border: 1px solid #d5d9e2; background: #fff; color: #16181d; padding: 8px 13px; }
   #dset button:hover { background: #f3f5f9; } #dset button:disabled { opacity: .55; cursor: default; }
-  #dset button.pri { background: #416AF0; border-color: #416AF0; color: #fff; } #dset button.pri:hover { background: #3459d6; }
+  #dset button.pri { background: #0F766E; border-color: #0F766E; color: #fff; } #dset button.pri:hover { background: #3459d6; }
   #dset button.warn { color: #c2272d; }
   #dset .url { display: flex; gap: 6px; } #dset .url input { flex: 1; min-width: 0; font: 500 12.5px ui-monospace, Menlo, monospace; padding: 8px 10px; border: 1px solid #d5d9e2; border-radius: 10px; background: #f7f8fa; color: #16181d; }
-  #dset .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } #dset .row a { align-self: center; color: #416AF0; font-weight: 700; text-decoration: none; padding: 0 6px; }
+  #dset .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } #dset .row a { align-self: center; color: #0F766E; font-weight: 700; text-decoration: none; padding: 0 6px; }
   #dset .pins { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e0e3ea; } #dset .pins h5 { margin: 0 0 6px; font-size: 12.5px; font-weight: 800; color: #545b66; }
   #dset .pin { padding: 8px 0; border-bottom: 1px solid #f0f1f5; } #dset .pin:last-child { border-bottom: 0; } #dset .pn b { display: block; font-size: 13px; font-weight: 800; } #dset .pn span { display: block; color: #7a828e; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #dset .pin .row { margin-top: 6px; } #dset .pin .row button { padding: 5px 11px; font-size: 12.5px; }
   #dset .exr { padding: 6px 0 10px; } #dset .exr + .exr { border-top: 1px solid #f0f1f5; padding-top: 10px; } #dset .exr small { margin-top: 5px; }
-  #dset .est { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } #dset .est b { color: #416AF0; }
-  #dset .bar { height: 7px; border-radius: 99px; background: #e8ebf2; overflow: hidden; margin-top: 9px; } #dset .bar i { display: block; height: 100%; width: 0; background: #416AF0; transition: width .4s linear; }
+  #dset .est { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } #dset .est b { color: #0F766E; }
+  #dset .bar { height: 7px; border-radius: 99px; background: #e8ebf2; overflow: hidden; margin-top: 9px; } #dset .bar i { display: block; height: 100%; width: 0; background: #0F766E; transition: width .4s linear; }
   #dset .err { margin-top: 8px; color: #c2272d; font-size: 12.5px; }
   `;
   const fmt = (s) => (s < 60 ? `${Math.round(s)}초` : `${Math.floor(s / 60)}분 ${Math.round(s % 60)}초`);
