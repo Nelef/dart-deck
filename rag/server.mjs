@@ -26,7 +26,7 @@ createServer(async (req, res) => {
       const q = String(p.get('q') || '').slice(0, 500); if (!q) return send(res, 400, { error: 'q 가 필요합니다' });
       const company = p.get('company'); const k = Math.min(20, +p.get('k') || 8);
       // 회사를 따로 주면 그 회사로만, 아니면 질문 속 회사 이름으로 거른다
-      const r = await search(idx, company ? `${company} ${q}` : q, { k, filter: true, w: [0.25, 1], dense: QD ? { url: QD, collection: 'dart' } : 'scan' }   // dev 로 고른 가중(BM25 0.25 : 벡터 1));
+      const r = await search(idx, company ? `${company} ${q}` : q, { k, filter: true, w: [0.25, 1], dense: QD ? { url: QD, collection: 'dart' } : 'scan' });   // 가중은 dev 로 고름(BM25 0.25 : 벡터 1)
       return send(res, 200, { companies: r.companies, hits: r.hits.map((h) => ({ rank: h.rank, ...cite(h.chunk) })), ms: r.ms });
     }
     if (u.pathname === '/section') {   // 한 장 · 절의 청크를 순서대로 이어 붙여 준다(긴 절은 앞 12개까지)
