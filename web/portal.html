@@ -1,4 +1,18 @@
 <!doctype html>
+<!--
+  uyai 첫 화면(포털) - 어떻게 만들었나. 2026-10-20 정리, 근거: Claude Code 대화 기록 · job-tracker/할일.md · git log.
+  - 처음 판(03f2774 ~ 6a5c766, 2026-10-16 낮): 스킬 없이 대화로 작성.
+  - 디자인 체계(97db6b7 ~ be96d94, 2026-10-16 오후): awwwards 스킬(~/.claude/skills/awwwards, "Elite Creative Direction")을
+    법숲 화면 리디자인 때 불러온 뒤 같은 대화에서 포털을 재설계. 이 파일의 oklch 색 토큰(:root), Pretendard + JetBrains Mono,
+    power4 이징(--ease), 줄마다 올라오는 제목(.hero h1 .ln), 한 번만 드러나기(.rv), 움직임 줄이기 대응이 그때 것.
+  - 소개 영상(web/media/promo-*.mp4): product-launch-video 스킬(HyperFrames 기반, ~/.claude/skills/product-launch-video)로
+    ~/Documents/uygit/uyai-video/videos/uyai-keywords 를 만든 뒤 서비스마다 프로젝트로 나눔(uyai-aippt · uyai-beopsoop).
+    uyai-byori · uyai-radar 는 2026-10-19 같은 형식으로 만들어 HyperFrames 로 렌더(스킬은 다시 부르지 않음, uyai-radar 는 uyai-byori 복사).
+    1920x1080 원본(renders/video.mp4)을 웹용 720p 로, 무음.
+  - 그 뒤 수정(f2dff68 ~ b74b6c8, 2026-10-16 저녁 ~ 10-20: 기술 키워드, 카드 3장 -> 4장, 모바일 2x2, 청약 레이더 데모 단추): 스킬 없이 대화로.
+  - 첫 화면 카드 정리(2026-10-20): awwwards 스킬을 다시 불러서. 카드 폭 · 제목 폭 맞춤, 이름 · 한 줄 소개를 영상 아래로,
+    사용 기술은 세 개만 글자 한 줄로(자동 넘김 없음, 올리거나 누르면 설명 말풍선), 단추는 네 카드 같은 높이(subgrid).
+-->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -6,7 +20,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light">
 <title>uyai — 말로 맡기는 AI 에이전트</title>
-<meta name="description" content="말로 맡기면 일하고 스스로 확인하는 AI 에이전트 — 발표 자료를 고치는 AI PPT, 디스코드 서버를 관리하는 별이 AI, 법 조문으로 답하는 법숲.">
+<meta name="description" content="말로 맡기면 일하고 스스로 확인하는 AI 에이전트 — 발표 자료를 고치는 AI PPT, 법 조문으로 답하는 법숲, 디스코드 서버를 관리하는 별이 AI, 청약 공고를 모아 알리는 청약 레이더.">
 <link rel="icon" type="image/png" href="/web/media/favicon-uyai.png">
 <link rel="apple-touch-icon" href="/web/media/uyai-icon-192.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -14,7 +28,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-/* uyai 첫 화면 — 세 서비스(AI PPT · 법숲 · 별이 AI, 영상 + 사용 기술) · 증명 칸 · 구성도 · 관리자 로그인. 서버(server/app.py): /api/me · /api/login · /api/logout · /api/demo · /api/site
+/* uyai 첫 화면 — 네 서비스(AI PPT · 법숲 · 별이 AI · 청약 레이더, 영상 + 이름 + 사용 기술 + 데모 단추) · 증명 칸 · 구성도 · 관리자 로그인. 서버(server/app.py): /api/me · /api/login · /api/logout · /api/demo · /api/site
    미디어(web/media)는 화면에 가까워질 때만 받는다 — 첫 화면은 서비스별 소개 영상(각 0.4~0.5MB). 별이 AI 는 byori.uk 에서 따로 돈다(이 관문 밖) */
 :root {
   --paper: oklch(97.6% 0.007 95); --paper-2: oklch(94.6% 0.01 95); --card: oklch(99.2% 0.003 95);
@@ -84,23 +98,38 @@ a { color: inherit; }
 .hero h1 em { font-style: normal; color: var(--accent); }
 @keyframes rise { to { transform: none; } }
 .hero .lead { margin: 0; max-width: 32em; font-size: clamp(15.5px, 1.25vw, 18px); color: var(--ink-2); line-height: 1.65; }
-/* 네 서비스 카드 — 첫 화면에 다. 각자 소개 영상 + 사용 기술 + 데모 단추. 데스크톱 4열, 1000px 이하 2×2 */
-.duo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 22px); margin-top: clamp(16px, 2.6vh, 32px); }
-@media (min-width: 1001px) { .duo { max-width: max(960px, calc((100svh - 520px) * 7.11 + 66px)); } }
-@media (max-width: 1000px) and (min-width: 701px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 760px; } }
+/* 네 서비스 카드 — 첫 화면에 다. 영상 -> 이름 · 한 줄 소개 -> 사용 기술 세 개(글자 한 줄) -> 데모 단추. 데스크톱 4열, 1000px 이하 2×2
+   칸마다 높이가 달라도 네 카드의 이름 · 기술 · 단추가 같은 줄에 오게 subgrid 로 맞춘다(2026-10-20 정리) */
+.duo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: clamp(12px, 1.6vw, 22px); row-gap: clamp(22px, 3vh, 34px); margin-top: clamp(16px, 2.6vh, 32px); }
+/* 낮은 화면에서는 카드가 첫 화면에 들어오게 폭을 줄인다 — 위 제목 · 소개 글도 같은 폭으로 가운데에 두어 오른쪽 끝이 어긋나지 않게 */
+@media (min-width: 1001px) { .hero { --heroW: max(960px, calc((100svh - 600px) * 7.11 + 66px)); } .hero-top, .duo { width: 100%; max-width: var(--heroW); margin-inline: auto; } }
+@media (max-width: 1000px) and (min-width: 701px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hero-top, .duo { width: 100%; max-width: 760px; margin-inline: auto; } }
 .duo-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.duo-card > .duo-row { margin-top: auto; }
+@supports (grid-template-rows: subgrid) { .duo-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 12px; } .duo-card > .duo-row { margin-top: 0; align-self: end; } }
 .duo-media.frame { border-radius: 16px; }
 .duo-media.frame video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--night); }
 .duo-row { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .btn.big { font-size: clamp(16px, 1.3vw, 18px); font-weight: 750; padding: 15px clamp(26px, 3vw, 40px); min-width: min(100%, 300px); justify-content: center; box-shadow: 0 12px 26px -14px oklch(19% 0.03 250 / .6); }
 .btn.big:disabled { box-shadow: none; }
-.duo-sub { text-decoration: none; font-size: 13.5px; color: var(--ink-3); }
-.duo-sub:hover { color: var(--accent-ink); }
-.duo-name { text-decoration: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.duo-name b { font-weight: 800; font-size: clamp(18px, 1.6vw, 22px); letter-spacing: -0.03em; }
-.duo-name span { font-size: 13.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.duo-name { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 4px; }
+.duo-name b { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: clamp(17px, 1.45vw, 21px); letter-spacing: -0.03em; line-height: 1.2; }
+.duo-name b .blogo { width: 24px; height: 24px; border-radius: 6px; }
+.duo-name span { font-size: 13.5px; color: var(--ink-3); line-height: 1.45; }
 .duo-name:hover b { color: var(--accent-ink); }
 .duo-row .btn { flex: none; }
+.duo .btn.big { width: 100%; min-width: 0; padding: 14px 18px; font-size: clamp(15px, 1.15vw, 17px); white-space: nowrap; box-shadow: 0 10px 22px -16px oklch(19% 0.03 250 / .55); }
+/* 카드 안 사용 기술 — 알약 대신 조용한 글자 한 줄(세 개만). 올리거나 누르면 어디에 어떻게 썼는지 말풍선. 전체 목록은 모바일 목록 · 아래 구역에 */
+.duo .kws { justify-content: flex-start; gap: 2px 0; }
+.duo .kws li { display: flex; align-items: center; }
+.duo .kws li:nth-child(n+4) { display: none; }
+.duo .kws li:nth-child(-n+2)::after { content: '·'; margin: 0 .55em; color: var(--ink-4); }   /* 구분점은 앞 낱말 뒤에 — 줄이 꺾여도 새 줄이 점으로 시작하지 않게 */
+.duo .kw { border: 0; background: none; padding: 3px 0; border-radius: 0; font: 600 12.5px/1.4 var(--mono); color: var(--ink-3); text-decoration: underline dotted transparent; text-decoration-thickness: 1.5px; text-underline-offset: 5px; transition: color .15s, text-decoration-color .15s; }
+.duo .kw:hover, .duo .kw:focus-visible, .duo .kw.on { color: var(--ink); background: none; text-decoration-color: var(--kc); }
+.duo .kw::before { display: none; }
+.kwtip { position: fixed; z-index: 40; left: 0; top: 0; max-width: min(300px, calc(100vw - 24px)); padding: 11px 13px 12px; border-radius: 12px; background: var(--night); color: var(--on-night-2); font-size: 13px; line-height: 1.55; border-top: 2px solid var(--kc, var(--accent)); box-shadow: 0 18px 40px -18px oklch(0% 0 0 / .55); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .18s var(--ease), transform .18s var(--ease); }
+.kwtip.on { opacity: 1; transform: none; }
+.kwtip b { color: var(--on-night); font-weight: 700; }
 /* 스크롤 안내 — 키워드 줄까지 한 화면에 안 들어올 때만, 화면 아래에 크게 페이드 인 */
 .scrollcue { position: fixed; z-index: 15; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 26px 16px max(14px, env(safe-area-inset-bottom)); text-decoration: none; background: linear-gradient(oklch(97.6% 0.007 95 / 0), var(--paper) 55%); color: var(--ink); font: 750 16px/1 var(--sans); letter-spacing: -0.01em; opacity: 0; transform: translateY(10px); pointer-events: none; transition: opacity .8s var(--ease), transform .8s var(--ease); }
 .scrollcue.show { opacity: 1; transform: none; pointer-events: auto; }
@@ -302,6 +331,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
 }
 @media (max-width: 700px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
 @media (max-width: 700px) { .techall { display: block; } .techall .kws { flex-wrap: wrap; justify-content: center; overflow: visible; gap: 5px; } .techall .kw { font-size: 12px; padding: 6px 9px 7px; } .tacap { min-height: 3.2em; } .duo .tech, .duo .bar2 .cap { display: none; } .duo .frame .bar2 { justify-content: flex-end; } .duo .btn.big { min-width: 0; width: 100%; padding: 11px 6px; font-size: 13px; gap: 5px; white-space: nowrap; } .duo .btn.big .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big .ar { display: none; } }
+@media (max-width: 700px) { .duo-name { padding-top: 0; } .duo-name span { display: none; } .duo-name b { font-size: 15px; gap: 7px; } .duo-name b .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big { box-shadow: none; } }
 @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } .night .stat + .stat { border-color: var(--night-line); } .bar { grid-template-columns: 6em 1fr 3em; } .who { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -336,28 +366,32 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
           <span class="ln"><span style="--d:2">AI 에이전트.</span></span>
         </h1>
       </div>
-      <p class="lead fade" style="--fd:.55s">발표 자료를 고친 뒤 화면을 찍어 확인하는 <b>AI PPT</b>, 근거가 모자라면 다시 찾고 없으면 답하지 않는 <b>법숲</b>, 위험한 설정은 확인부터 받는 디스코드 봇 <b>별이 AI</b>, 청약 공고를 모아 필요한 현금까지 정리하는 <b>청약 레이더</b>.<span class="m-hide"> AI PPT · 법숲은 로그인 없이 바로 써 볼 수 있습니다.</span></p>
+      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하는 AI 서비스 네 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있고, 별이 AI 는 디스코드 봇 사이트로 이어집니다.</span></p>
     </div>
     <div class="duo">
       <article class="duo-card fade" data-svc="ppt" style="--fd:.6s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-aippt-poster.webp?v=1016c" data-src="/web/media/promo-aippt.mp4?v=1016c" width="1280" height="720" aria-label="AI PPT 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 17초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
-        <div class="tech" data-svc="ppt"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="DART 사업보고서 95곳에서 먼저 찾아 그 안에서만 씁니다 — 각주에 <b>공시 접수번호</b>.">RAG</button></li><li><button class="kw" data-tip="Claude Code 에이전트가 사본을 고치고 <b>화면을 찍어 스스로 확인</b>합니다. 적용은 사람이.">AI Agent</button></li><li><button class="kw" data-tip="공시 검색 · 재무 · 장 읽기 — <b>MCP 도구 3개</b>를 에이전트가 직접 부릅니다.">MCP</button></li><li><button class="kw" data-tip="BM25 + bge-m3 순위 융합 — 공시 검색 hit@5 <b>0.36 → 0.75</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="공시 <b>43,047개 청크</b>를 Qdrant(HNSW)에 넣고 회사 이름으로 거릅니다.">Vector DB</button></li><li><button class="kw" data-tip="공시 334문항을 dev · test 로 나눠 <b>설정은 dev, 숫자는 test</b>.">LLM Eval</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
-        <div class="duo-row"><button class="btn go big deckDemo" data-demo="1" data-open="/deck/" data-label="AI PPT 데모 체험" data-logo="/web/media/logo-aippt.webp" disabled><img class="blogo" src="/web/media/logo-aippt.webp" alt="">AI PPT 준비 중</button><a class="duo-sub" href="#ppt">공시를 근거로, 말로 고치는 발표 자료</a></div>
+        <a class="duo-name" href="#ppt"><b><img class="blogo" src="/web/media/logo-aippt.webp" alt="">AI PPT</b><span>공시를 근거로, 말로 고치는 발표 자료</span></a>
+        <div class="tech" data-svc="ppt"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="DART 사업보고서 95곳에서 먼저 찾아 그 안에서만 씁니다 — 각주에 <b>공시 접수번호</b>.">RAG</button></li><li><button class="kw" data-tip="Claude Code 에이전트가 사본을 고치고 <b>화면을 찍어 스스로 확인</b>합니다. 적용은 사람이.">AI Agent</button></li><li><button class="kw" data-tip="공시 검색 · 재무 · 장 읽기 — <b>MCP 도구 3개</b>를 에이전트가 직접 부릅니다.">MCP</button></li><li><button class="kw" data-tip="BM25 + bge-m3 순위 융합 — 공시 검색 hit@5 <b>0.36 → 0.75</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="공시 <b>43,047개 청크</b>를 Qdrant(HNSW)에 넣고 회사 이름으로 거릅니다.">Vector DB</button></li><li><button class="kw" data-tip="공시 334문항을 dev · test 로 나눠 <b>설정은 dev, 숫자는 test</b>.">LLM Eval</button></li></ul></div>
+        <div class="duo-row"><button class="btn go big deckDemo" data-demo="1" data-open="/deck/" data-label="데모 체험" aria-label="AI PPT 데모 체험" disabled>준비 중</button></div>
       </article>
       <article class="duo-card fade" data-svc="law" style="--fd:.72s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-law-poster.webp?v=1016c" data-src="/web/media/promo-law.mp4?v=1016c" width="1280" height="720" aria-label="법숲 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
-        <div class="tech" data-svc="law"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="법령 16개 · <b>2,437개 조문</b>에서 먼저 찾아 그 안에서만 답합니다.">RAG</button></li><li><button class="kw" data-tip="BM25 + bge-m3 · 질의 재작성으로 정답 조문 hit@5 <b>0.71 → 0.90</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="근거가 모자랄 때만 다시 찾는 <b>적응형 흐름</b> — 쉬운 질문은 한 번에.">LangGraph</button></li><li><button class="kw" data-tip="법령 검색을 <b>MCP 서버</b>로도 내놓습니다.">MCP</button></li><li><button class="kw" data-tip="126문항 평가 · 답변 정확성 <b>30/31</b>.">LLM Eval</button></li><li><button class="kw" data-tip="조문 번호로만 인용하고, 근거가 없으면 <b>거절</b> — 범위 밖 10/10.">Grounding</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
-        <div class="duo-row"><a class="btn go big" href="/law/"><img class="blogo" src="/web/media/logo-beopsoop.webp" alt="">법숲 데모 체험 <span class="ar" aria-hidden="true">→</span></a><a class="duo-sub" href="#law">법 조문으로 답하고, 근거 없으면 거절</a></div>
+        <a class="duo-name" href="#law"><b><img class="blogo" src="/web/media/logo-beopsoop.webp" alt="">법숲</b><span>법 조문으로 답하고, 근거 없으면 거절</span></a>
+        <div class="tech" data-svc="law"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="법령 16개 · <b>2,437개 조문</b>에서 먼저 찾아 그 안에서만 답합니다.">RAG</button></li><li><button class="kw" data-tip="BM25 + bge-m3 · 질의 재작성으로 정답 조문 hit@5 <b>0.71 → 0.90</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="근거가 모자랄 때만 다시 찾는 <b>적응형 흐름</b> — 쉬운 질문은 한 번에.">LangGraph</button></li><li><button class="kw" data-tip="법령 검색을 <b>MCP 서버</b>로도 내놓습니다.">MCP</button></li><li><button class="kw" data-tip="126문항 평가 · 답변 정확성 <b>30/31</b>.">LLM Eval</button></li><li><button class="kw" data-tip="조문 번호로만 인용하고, 근거가 없으면 <b>거절</b> — 범위 밖 10/10.">Grounding</button></li></ul></div>
+        <div class="duo-row"><a class="btn go big" href="/law/" aria-label="법숲 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
       </article>
       <article class="duo-card fade" data-svc="byori" style="--fd:.84s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-byori-poster.webp?v=1019" data-src="/web/media/promo-byori.mp4?v=1019" width="1280" height="720" aria-label="별이 AI 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
-        <div class="tech" data-svc="byori"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="말로 시키면 LLM 이 실행 계획을 짜고 봇이 설정을 바꿉니다 — <b>AI 액션 38종</b> 안에서만.">AI Agent</button></li><li><button class="kw" data-tip="여러 설정을 한 번에 — <b>LangGraph 오케스트레이터</b>가 계획 · 실행 · 결과 정리를 맡습니다.">LangGraph</button></li><li><button class="kw" data-tip="위험도 3단계 — 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 <b>대상을 밝혀 확인</b>받습니다.">Guardrails</button></li><li><button class="kw" data-tip="봇이 켜질 때마다 실제 명령 목록을 프롬프트에 넣어 <b>명령이 바뀌어도 AI 가 따라갑니다</b>.">Context Eng.</button></li><li><button class="kw" data-tip="Gemini · Kimi · Claude 를 <b>어댑터 하나</b>로 갈아 끼우고, LLM 이 멈추면 키워드로 대신합니다.">LLM Adapter</button></li><li><button class="kw" data-tip="배포 전 LLM 스모크 · <b>액션 38종 라벨 전수 검사</b>.">LLM Eval</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
-        <div class="duo-row"><a class="btn go big" href="https://byori.uk/" target="_blank" rel="noopener"><img class="blogo" src="/web/media/logo-byori.webp" alt="">별이 AI 열기 <span class="ar" aria-hidden="true">↗</span></a><a class="duo-sub" href="#byori">말로 디스코드 서버를 관리하는 AI 컨시어지</a></div>
+        <a class="duo-name" href="#byori"><b><img class="blogo" src="/web/media/logo-byori.webp" alt="">별이 AI</b><span>말로 디스코드 서버를 관리하는 AI 컨시어지</span></a>
+        <div class="tech" data-svc="byori"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="말로 시키면 LLM 이 실행 계획을 짜고 봇이 설정을 바꿉니다 — <b>AI 액션 38종</b> 안에서만.">AI Agent</button></li><li><button class="kw" data-tip="여러 설정을 한 번에 — <b>LangGraph 오케스트레이터</b>가 계획 · 실행 · 결과 정리를 맡습니다.">LangGraph</button></li><li><button class="kw" data-tip="위험도 3단계 — 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 <b>대상을 밝혀 확인</b>받습니다.">Guardrails</button></li><li><button class="kw" data-tip="봇이 켜질 때마다 실제 명령 목록을 프롬프트에 넣어 <b>명령이 바뀌어도 AI 가 따라갑니다</b>.">Context Eng.</button></li><li><button class="kw" data-tip="Gemini · Kimi · Claude 를 <b>어댑터 하나</b>로 갈아 끼우고, LLM 이 멈추면 키워드로 대신합니다.">LLM Adapter</button></li><li><button class="kw" data-tip="배포 전 LLM 스모크 · <b>액션 38종 라벨 전수 검사</b>.">LLM Eval</button></li></ul></div>
+        <div class="duo-row"><a class="btn go big" href="https://byori.uk/" target="_blank" rel="noopener" aria-label="별이 AI 사이트 열기(새 창)">사이트 열기 <span class="ar" aria-hidden="true">↗</span></a></div>
       </article>
       <article class="duo-card fade" data-svc="radar" style="--fd:.96s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-radar-poster.webp?v=1019" data-src="/web/media/promo-radar.mp4?v=1019" width="1280" height="720" aria-label="청약 레이더 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
-        <div class="tech" data-svc="radar"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="청약홈 · LH · SH 게시판과 공공데이터포털 API 2종을 <b>주기적으로 모읍니다</b>.">Scheduler</button></li><li><button class="kw" data-tip="공고문 PDF 의 표를 읽어 <b>분양가 · 납부 일정</b>을 뽑습니다.">PDF Parsing</button></li><li><button class="kw" data-tip="요청할 때만 LLM 이 공고문을 읽고 <b>필요 현금 · 순위</b>를 정리합니다.">LLM Analysis</button></li><li><button class="kw" data-tip="분석 진행을 <b>SSE 로 실시간</b> 보여 줍니다.">SSE</button></li><li><button class="kw" data-tip="<b>FastAPI REST API 12개</b> · 개인 NAS Docker.">FastAPI</button></li><li><button class="kw" data-tip="새 공고 · 접수 <b>D-7 · D-1</b> 을 텔레그램으로 알립니다.">Alerts</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
-        <div class="duo-row"><a class="btn go big" href="/radar/"><img class="blogo" src="/web/media/logo-radar.webp" alt="">청약 레이더 데모 체험 <span class="ar" aria-hidden="true">→</span></a><a class="duo-sub" href="#radar">청약 공고를 모아 알리고, 필요 현금까지 정리</a></div>
+        <a class="duo-name" href="#radar"><b><img class="blogo" src="/web/media/logo-radar.webp" alt="">청약 레이더</b><span>청약 공고를 모아 알리고, 필요 현금까지 정리</span></a>
+        <div class="tech" data-svc="radar"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="청약홈 · LH · SH 게시판과 공공데이터포털 API 2종을 <b>주기적으로 모읍니다</b>.">Scheduler</button></li><li><button class="kw" data-tip="공고문 PDF 의 표를 읽어 <b>분양가 · 납부 일정</b>을 뽑습니다.">PDF Parsing</button></li><li><button class="kw" data-tip="요청할 때만 LLM 이 공고문을 읽고 <b>필요 현금 · 순위</b>를 정리합니다.">LLM Analysis</button></li><li><button class="kw" data-tip="분석 진행을 <b>SSE 로 실시간</b> 보여 줍니다.">SSE</button></li><li><button class="kw" data-tip="<b>FastAPI REST API 12개</b> · 개인 NAS Docker.">FastAPI</button></li><li><button class="kw" data-tip="새 공고 · 접수 <b>D-7 · D-1</b> 을 텔레그램으로 알립니다.">Alerts</button></li></ul></div>
+        <div class="duo-row"><a class="btn go big" href="/radar/" aria-label="청약 레이더 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
       </article>
     </div>
     <div class="techall" aria-label="사용 기술 전체"><ul class="kws" id="techallList"></ul><p class="tacap" id="techallCap" aria-live="polite"></p></div>
@@ -607,22 +641,27 @@ let ME = null;
 // 머리줄 — 내려가면 아래 선
 addEventListener('scroll', () => $('#top').classList.toggle('scrolled', scrollY > 8), { passive: true });
 
-// 카드 안 사용 기술 — 카드마다 하나씩 자동으로 강조하고 아래 한 줄 설명을 바꾼다(올리거나 누르면 그 기술로, 잠시 멈춤)
-const KW_MS = 2800;
-$$('.tech').forEach((tech, ti) => {
-  const kws = $$('.kw', tech), cap = $('.kwcap', tech); let idx = 0, pause = 0, seen = true;
-  const pick = (b, auto) => {
-    kws.forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('auto', x === b && !!auto); });
-    b.style.setProperty('--kwdur', KW_MS + 'ms');
-    cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap'); cap.innerHTML = b.dataset.tip;
-  };
-  new IntersectionObserver((es) => { seen = es[0].isIntersecting; }).observe(tech);
-  setTimeout(() => setInterval(() => { if (still || document.hidden || !seen || Date.now() < pause) return; idx = (idx + 1) % kws.length; pick(kws[idx], true); }, KW_MS), ti * KW_MS / 3);   // 세 카드가 엇갈려 넘어가게
-  const hold = (e, ms) => { const b = e.target.closest('.kw'); if (!b) return; idx = kws.indexOf(b); pause = Date.now() + ms; pick(b); };
-  tech.addEventListener('click', (e) => hold(e, 9000));
-  if (matchMedia('(hover: hover)').matches) tech.addEventListener('mouseover', (e) => hold(e, 6000));
-  pick(kws[0], !still);
+// 카드 안 사용 기술 — 자동으로 넘기지 않는다(2026-10-20 정리). 올리거나(키보드 초점 포함) 누르면 그 기술을 어디에 어떻게 썼는지 말풍선으로
+const kwtip = document.createElement('div'); kwtip.className = 'kwtip'; kwtip.setAttribute('role', 'tooltip'); kwtip.id = 'kwtip'; document.body.appendChild(kwtip);
+let tipFor = null;
+const showTip = (b) => {
+  if (tipFor) tipFor.classList.remove('on');
+  tipFor = b; b.classList.add('on'); b.setAttribute('aria-describedby', 'kwtip');
+  kwtip.innerHTML = b.dataset.tip; kwtip.style.setProperty('--kc', getComputedStyle(b).getPropertyValue('--kc'));
+  const r = b.getBoundingClientRect(), w = kwtip.offsetWidth, h = kwtip.offsetHeight;
+  const x = Math.max(12, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 12));
+  const y = r.top - h - 10 < 72 ? r.bottom + 10 : r.top - h - 10;   // 위 머리줄에 가리면 아래로
+  kwtip.style.left = x + 'px'; kwtip.style.top = y + 'px'; kwtip.classList.add('on');
+};
+const hideTip = () => { if (tipFor) { tipFor.classList.remove('on'); tipFor.removeAttribute('aria-describedby'); } tipFor = null; kwtip.classList.remove('on'); };
+$$('.duo .kw').forEach((b) => {
+  b.type = 'button';
+  b.addEventListener('mouseenter', () => showTip(b)); b.addEventListener('mouseleave', hideTip);
+  b.addEventListener('focus', () => showTip(b)); b.addEventListener('blur', hideTip);
+  b.addEventListener('click', (e) => { e.stopPropagation(); showTip(b); });   // 터치 화면은 눌러서
 });
+document.addEventListener('click', hideTip); addEventListener('scroll', hideTip, { passive: true }); addEventListener('resize', hideTip);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 
 // 모바일 전체 기술 목록 — 카드 키워드를 기술 이름별로 모아, 누르면 쓰인 서비스와 서비스별 설명(카드의 data-tip 그대로)
 const SVC = { ppt: ['AI PPT', 'var(--accent)'], law: ['법숲', 'var(--law)'], byori: ['별이 AI', 'var(--byori)'], radar: ['청약 레이더', 'var(--radar)'] };
