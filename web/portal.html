@@ -25,6 +25,7 @@
   --on-night: oklch(95.5% 0.006 95); --on-night-2: oklch(77% 0.012 205); --on-night-3: oklch(60% 0.012 205); --mint: oklch(80% 0.1 172);
   --warm: oklch(60% 0.13 62); --warm-wash: oklch(95% 0.035 75);
   --byori: oklch(58% 0.15 290); --byori-glow: oklch(76% 0.12 290);   /* 별이 AI — 브랜드 라벤더(단색) */
+  --radar: oklch(60% 0.16 32);   /* 청약 레이더 — 로고의 레이더 선(산호색) */
   --sans: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1); --ease-io: cubic-bezier(0.76, 0, 0.24, 1);
@@ -83,10 +84,10 @@ a { color: inherit; }
 .hero h1 em { font-style: normal; color: var(--accent); }
 @keyframes rise { to { transform: none; } }
 .hero .lead { margin: 0; max-width: 32em; font-size: clamp(15.5px, 1.25vw, 18px); color: var(--ink-2); line-height: 1.65; }
-/* 세 서비스 카드 — 첫 화면에 다. 각자 소개 영상 + 사용 기술 + 데모 단추 */
-.duo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 22px); margin-top: clamp(16px, 2.6vh, 32px); }
-@media (min-width: 1001px) { .duo { max-width: max(900px, calc((100svh - 520px) * 5.34 + 44px)); } }
-@media (max-width: 1000px) and (min-width: 701px) { .duo { grid-template-columns: 1fr; max-width: 600px; } }
+/* 네 서비스 카드 — 첫 화면에 다. 각자 소개 영상 + 사용 기술 + 데모 단추. 데스크톱 4열, 1000px 이하 2×2 */
+.duo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 22px); margin-top: clamp(16px, 2.6vh, 32px); }
+@media (min-width: 1001px) { .duo { max-width: max(960px, calc((100svh - 520px) * 7.11 + 66px)); } }
+@media (max-width: 1000px) and (min-width: 701px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 760px; } }
 .duo-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .duo-media.frame { border-radius: 16px; }
 .duo-media.frame video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--night); }
@@ -122,6 +123,7 @@ a { color: inherit; }
 .kw { --kc: var(--accent); position: relative; overflow: hidden; font: 700 13px/1 var(--mono); letter-spacing: 0; color: var(--ink-3); background: transparent; border: 1px solid var(--line-2); padding: 7px 11px 8px; border-radius: 99px; cursor: pointer; white-space: nowrap; transition: color .35s var(--ease), background .4s var(--ease), border-color .4s var(--ease); }
 .tech[data-svc="law"] .kw { --kc: var(--law); }
 .tech[data-svc="byori"] .kw { --kc: var(--byori); }
+.tech[data-svc="radar"] .kw { --kc: var(--radar); }
 .kw:hover { color: var(--ink); border-color: var(--kc); }
 .kw.on { color: var(--paper); background: var(--kc); border-color: var(--kc); }
 .kw::before { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: oklch(100% 0 0 / .55); transform-origin: left; transform: scaleX(0); }
@@ -289,7 +291,8 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   .top nav { display: none; }
   .svc-b.flip .frame { order: -1; }
 }
-@media (max-width: 700px) { .duo { grid-template-columns: 1fr; gap: 12px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
+@media (max-width: 700px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
+@media (max-width: 700px) { .duo .tech, .duo .bar2 .cap { display: none; } .duo .frame .bar2 { justify-content: flex-end; } .duo .btn.big { min-width: 0; width: 100%; padding: 11px 6px; font-size: 13px; gap: 5px; white-space: nowrap; } .duo .btn.big .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big .ar { display: none; } }
 @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } .night .stat + .stat { border-color: var(--night-line); } .bar { grid-template-columns: 6em 1fr 3em; } .who { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -304,7 +307,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
 <body>
 <header class="top" id="top"><div class="wrap">
   <a href="/" aria-label="uyai 첫 화면"><img src="/web/media/uyai-lockup.png" alt="uyai" width="97" height="31"></a>
-  <nav aria-label="구역"><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
+  <nav aria-label="구역"><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#radar">청약 레이더</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
   <span class="sp"></span>
   <span class="who" id="who"></span>
   <a class="btn sm" id="aDeck" href="/deck/" hidden>발표 자료</a>
@@ -324,7 +327,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
           <span class="ln"><span style="--d:2">AI 에이전트.</span></span>
         </h1>
       </div>
-      <p class="lead fade" style="--fd:.55s">발표 자료를 고친 뒤 화면을 찍어 확인하는 <b>AI PPT</b>, 근거가 모자라면 다시 찾고 없으면 답하지 않는 <b>법숲</b>, 위험한 설정은 확인부터 받는 디스코드 봇 <b>별이 AI</b>.<span class="m-hide"> AI PPT · 법숲은 로그인 없이 바로 써 볼 수 있습니다.</span></p>
+      <p class="lead fade" style="--fd:.55s">발표 자료를 고친 뒤 화면을 찍어 확인하는 <b>AI PPT</b>, 근거가 모자라면 다시 찾고 없으면 답하지 않는 <b>법숲</b>, 위험한 설정은 확인부터 받는 디스코드 봇 <b>별이 AI</b>, 청약 공고를 모아 필요한 현금까지 정리하는 <b>청약 레이더</b>.<span class="m-hide"> AI PPT · 법숲은 로그인 없이 바로 써 볼 수 있습니다.</span></p>
     </div>
     <div class="duo">
       <article class="duo-card fade" data-svc="ppt" style="--fd:.6s">
@@ -341,6 +344,11 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-byori-poster.webp?v=1019" data-src="/web/media/promo-byori.mp4?v=1019" width="1280" height="720" aria-label="별이 AI 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <div class="tech" data-svc="byori"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="말로 시키면 LLM 이 실행 계획을 짜고 봇이 설정을 바꿉니다 — <b>AI 액션 38종</b> 안에서만.">AI Agent</button></li><li><button class="kw" data-tip="여러 설정을 한 번에 — <b>LangGraph 오케스트레이터</b>가 계획 · 실행 · 결과 정리를 맡습니다.">LangGraph</button></li><li><button class="kw" data-tip="위험도 3단계 — 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 <b>대상을 밝혀 확인</b>받습니다.">Guardrails</button></li><li><button class="kw" data-tip="봇이 켜질 때마다 실제 명령 목록을 프롬프트에 넣어 <b>명령이 바뀌어도 AI 가 따라갑니다</b>.">Context Eng.</button></li><li><button class="kw" data-tip="Gemini · Kimi · Claude 를 <b>어댑터 하나</b>로 갈아 끼우고, LLM 이 멈추면 키워드로 대신합니다.">LLM Adapter</button></li><li><button class="kw" data-tip="배포 전 LLM 스모크 · <b>액션 38종 라벨 전수 검사</b>.">LLM Eval</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
         <div class="duo-row"><a class="btn go big" href="https://byori.uk/" target="_blank" rel="noopener"><img class="blogo" src="/web/media/logo-byori.webp" alt="">별이 AI 열기 <span class="ar" aria-hidden="true">↗</span></a><a class="duo-sub" href="#byori">말로 디스코드 서버를 관리하는 AI 컨시어지</a></div>
+      </article>
+      <article class="duo-card fade" data-svc="radar" style="--fd:.96s">
+        <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/radar-poster.webp?v=1019b" data-src="/web/media/radar.mp4?v=1019b" width="1280" height="800" aria-label="청약 레이더 실제 화면"></video><div class="bar2"><span class="cap">실제 화면 · 8초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
+        <div class="tech" data-svc="radar"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="청약홈 · LH · SH 게시판과 공공데이터포털 API 2종을 <b>주기적으로 모읍니다</b>.">Scheduler</button></li><li><button class="kw" data-tip="공고문 PDF 의 표를 읽어 <b>분양가 · 납부 일정</b>을 뽑습니다.">PDF Parsing</button></li><li><button class="kw" data-tip="요청할 때만 LLM 이 공고문을 읽고 <b>필요 현금 · 순위</b>를 정리합니다.">LLM Analysis</button></li><li><button class="kw" data-tip="분석 진행을 <b>SSE 로 실시간</b> 보여 줍니다.">SSE</button></li><li><button class="kw" data-tip="<b>FastAPI REST API 12개</b> · 개인 NAS Docker.">FastAPI</button></li><li><button class="kw" data-tip="새 공고 · 접수 <b>D-7 · D-1</b> 을 텔레그램으로 알립니다.">Alerts</button></li></ul><p class="kwcap" aria-live="polite"></p></div>
+        <div class="duo-row"><a class="btn go big" href="#radar"><img class="blogo" src="/web/media/logo-radar.webp" alt="">청약 레이더 보기 <span class="ar" aria-hidden="true">↓</span></a><a class="duo-sub" href="#radar">청약 공고를 모아 알리고, 필요 현금까지 정리</a></div>
       </article>
     </div>
     <a class="scrollcue" id="scrollcue" href="#ppt" hidden><span>스크롤해 주세요</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg></a>
@@ -445,6 +453,41 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <div class="stat"><b><span data-to="3" data-dec="0">3</span>단계</b><small>위험도 확인<br>safe · caution · danger</small></div>
       <div class="stat"><b><span data-to="3" data-dec="0">3</span></b><small>LLM 공급자<br>Gemini · Kimi · Claude</small></div>
       <div class="stat"><b><span data-to="20" data-dec="0">20</span></b><small>대시보드 언어<br>봇 응답은 한 · 영 · 일</small></div>
+    </div>
+  </div></section>
+
+  <!-- ── 04 청약 레이더(개인 NAS — 공개 주소 없음. 녹화는 읽기 전용 게스트 화면, 개인 조건 태그 · 통근 목적지는 가림) ── -->
+  <section class="svc-sec" id="radar"><div class="wrap">
+    <div class="svc-h rv">
+      <span class="no">04</span>
+      <div>
+        <span class="label">Scheduled Collection · PDF Parsing · LLM Analysis</span>
+        <h2><img class="svc-logo" src="/web/media/logo-radar.webp" alt="" width="84" height="84">청약 레이더</h2>
+        <p class="sub">서울 · 경기 청약 공고를 여러 게시판과 공공 API에서 모아 새 공고와 접수 일정을 알리고, 요청하면 AI가 공고문을 읽어 필요한 현금과 납부 일정을 정리합니다. 개인 NAS에서 쓰는 서비스라 화면 녹화로 보여 드립니다.</p>
+      </div>
+      <div class="acts"></div>
+    </div>
+    <div class="svc-b flip">
+      <div class="frame rv" style="--k:1">
+        <video id="radarVid" class="v-real" muted playsinline loop preload="none" poster="/web/media/radar-poster.webp?v=1019b" data-src="/web/media/radar.mp4?v=1019b" width="1280" height="800" aria-label="청약 레이더 화면 녹화"></video>
+        <div class="bar2"><span class="cap">실제 화면 녹화 · 읽기 전용 게스트 화면(개인 조건 태그는 가림)</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div>
+      </div>
+      <div class="rv" style="--k:2">
+        <ol class="flow">
+          <li style="--i:0"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 12l5-5"/><path d="M12 4v2M20 12h-2"/></svg></span><span><span class="t">공고 모으기</span><br><span class="s">청약홈 · LH · SH 게시판 + 공공데이터포털 API 2종 — 주기 수집(APScheduler)</span></span></li>
+          <li style="--i:1"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20h4"/></svg></span><span><span class="t">새 공고 · 일정 알림</span><br><span class="s">새 공고와 접수 D-7 · D-1 을 텔레그램으로</span></span></li>
+          <li style="--i:2"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/></svg></span><span><span class="t">통근 시간 붙이기</span><br><span class="s">카카오 주소 → 좌표, ODsay 대중교통 길찾기</span></span></li>
+          <li style="--i:3"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg></span><span><span class="t">공고문 PDF 읽기</span><br><span class="s">표를 파싱해 분양가 · 평형 · 납부 일정 추출</span></span></li>
+          <li style="--i:4"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg></span><span><span class="t">AI 분석 — 요청할 때만</span><br><span class="s">분양은 필요 현금과 순위, 임대는 보증금 · 월세 정리 · 진행은 SSE 로 표시</span></span></li>
+        </ol>
+        <div class="note"><span class="tag ko">비용</span><span>공고문 분석은 <b>Gemini 무료 등급</b>으로, 버튼을 눌렀을 때만 돌립니다.</span></div>
+      </div>
+    </div>
+    <div class="stats rv" id="radarStats" style="--k:1">
+      <div class="stat"><b><span data-to="5" data-dec="0">5</span></b><small>공고 출처<br>게시판 3 · 공공 API 2</small></div>
+      <div class="stat"><b><span data-to="263" data-dec="0">263</span></b><small>모은 공고<br>2026-10-19 기준</small></div>
+      <div class="stat"><b>D-7 · D-1</b><small>접수 알림<br>텔레그램</small></div>
+      <div class="stat"><b><span data-to="12" data-dec="0">12</span></b><small>REST API<br>FastAPI · NAS Docker</small></div>
     </div>
   </div></section>
 
@@ -625,7 +668,7 @@ const countUp = (box) => $$('[data-to]', box).forEach((el) => {
   const tick = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (to - from) * e); if (k < 1) requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 });
-['#lawStats', '#byoriStats'].forEach((s) => new IntersectionObserver((es, ob) => { if (es.some((e) => e.isIntersecting)) { countUp($(s)); ob.disconnect(); } }, { threshold: 0.4 }).observe($(s)));
+['#lawStats', '#byoriStats', '#radarStats'].forEach((s) => new IntersectionObserver((es, ob) => { if (es.some((e) => e.isIntersecting)) { countUp($(s)); ob.disconnect(); } }, { threshold: 0.4 }).observe($(s)));
 
 // 로그인 상태에 맞게 머리 · 단추를 바꾼다
 const paint = () => {
