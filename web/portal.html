@@ -131,6 +131,15 @@ a { color: inherit; }
 @keyframes kwbar { to { transform: scaleX(1); } }
 .tech .kwcap { margin: 0; min-height: 1.5em; text-align: center; font-size: 13.5px; color: var(--ink-3); line-height: 1.5; }
 .tech .kwcap b { color: var(--ink); font-weight: 700; }
+/* 모바일 2×2 에서는 카드 안 키워드를 숨기는 대신 카드 아래에 모든 기술을 한 목록으로 — 누르면 쓰인 서비스 [청약 레이더, 별이 AI] 와 서비스별 설명(사용자 2026-10-19) */
+.techall { display: none; margin-top: 14px; }
+.tacap { margin-top: 10px; min-height: 4.8em; font-size: 13.5px; line-height: 1.55; color: var(--ink-3); }
+.tacap b { color: var(--ink); font-weight: 700; }
+.tacap .hint { display: block; text-align: center; }
+.tacap .svcs { display: block; font-weight: 800; color: var(--ink); margin-bottom: 3px; }
+.tacap .row { display: block; }
+.tacap .row i { font-style: normal; font-weight: 700; color: var(--ink-2); }
+.tacap .row i::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--dc); margin-right: 6px; vertical-align: 1px; }
 .tech 
 /* ── 증명 칸(벤토) ── */
 section.proof { padding: clamp(72px, 11vh, 140px) 0; }
@@ -292,7 +301,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   .svc-b.flip .frame { order: -1; }
 }
 @media (max-width: 700px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
-@media (max-width: 700px) { .duo .tech, .duo .bar2 .cap { display: none; } .duo .frame .bar2 { justify-content: flex-end; } .duo .btn.big { min-width: 0; width: 100%; padding: 11px 6px; font-size: 13px; gap: 5px; white-space: nowrap; } .duo .btn.big .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big .ar { display: none; } }
+@media (max-width: 700px) { .techall { display: block; } .techall .kws { flex-wrap: wrap; justify-content: center; overflow: visible; gap: 5px; } .techall .kw { font-size: 12px; padding: 6px 9px 7px; } .tacap { min-height: 3.2em; } .duo .tech, .duo .bar2 .cap { display: none; } .duo .frame .bar2 { justify-content: flex-end; } .duo .btn.big { min-width: 0; width: 100%; padding: 11px 6px; font-size: 13px; gap: 5px; white-space: nowrap; } .duo .btn.big .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big .ar { display: none; } }
 @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } .night .stat + .stat { border-color: var(--night-line); } .bar { grid-template-columns: 6em 1fr 3em; } .who { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -351,6 +360,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <div class="duo-row"><a class="btn go big" href="#radar"><img class="blogo" src="/web/media/logo-radar.webp" alt="">청약 레이더 보기 <span class="ar" aria-hidden="true">↓</span></a><a class="duo-sub" href="#radar">청약 공고를 모아 알리고, 필요 현금까지 정리</a></div>
       </article>
     </div>
+    <div class="techall" aria-label="사용 기술 전체"><ul class="kws" id="techallList"></ul><p class="tacap" id="techallCap" aria-live="polite"></p></div>
     <a class="scrollcue" id="scrollcue" href="#ppt" hidden><span>스크롤해 주세요</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg></a>
   </div></section>
 
@@ -613,6 +623,22 @@ $$('.tech').forEach((tech, ti) => {
   if (matchMedia('(hover: hover)').matches) tech.addEventListener('mouseover', (e) => hold(e, 6000));
   pick(kws[0], !still);
 });
+
+// 모바일 전체 기술 목록 — 카드 키워드를 기술 이름별로 모아, 누르면 쓰인 서비스와 서비스별 설명(카드의 data-tip 그대로)
+const SVC = { ppt: ['AI PPT', 'var(--accent)'], law: ['법숲', 'var(--law)'], byori: ['별이 AI', 'var(--byori)'], radar: ['청약 레이더', 'var(--radar)'] };
+const techMap = new Map();
+$$('.tech[data-svc]').forEach((tech) => $$('.kw', tech).forEach((b) => { const k = b.textContent.trim(); if (!techMap.has(k)) techMap.set(k, []); techMap.get(k).push([tech.dataset.svc, b.dataset.tip]); }));
+// 카드 키워드에는 없지만 실제로 쓴 곳(원자료 근거) — 목록에서만 덧붙인다
+[['FastAPI', 'byori', '관리 대시보드 · AI 컨시어지 API 를 <b>FastAPI</b> 로 — PostgreSQL · Redis 와 함께.']].forEach(([k, s, tip]) => { if (techMap.has(k) && !techMap.get(k).some(([x]) => x === s)) techMap.get(k).push([s, tip]); });
+const taList = $('#techallList'), taCap = $('#techallCap');
+[...techMap.keys()].sort((a, b) => techMap.get(b).length - techMap.get(a).length).forEach((k) => { const li = document.createElement('li'); const bt = document.createElement('button'); bt.className = 'kw'; bt.type = 'button'; bt.textContent = k; li.appendChild(bt); taList.appendChild(li); });
+const taPick = (b) => {
+  $$('.kw', taList).forEach((x) => x.classList.toggle('on', x === b));
+  const uses = techMap.get(b.textContent.trim());
+  taCap.innerHTML = '<span class="svcs">[' + uses.map(([s]) => SVC[s][0]).join(', ') + ']</span>' + uses.map(([s, tip]) => '<span class="row" style="--dc:' + SVC[s][1] + '"><i>' + SVC[s][0] + '</i> ' + tip + '</span>').join('');
+};
+taList.addEventListener('click', (e) => { const b = e.target.closest('.kw'); if (b) taPick(b); });
+taCap.innerHTML = '<span class="hint">기술을 누르면 어느 서비스에 어떻게 썼는지 보여 드립니다.</span>';
 
 // 스크롤 안내 — 조금이라도 내려가면 감춘다
 const cue = $('#scrollcue');
