@@ -28,6 +28,7 @@ COOKIE = 'ppt_sid'
 
 # ── uyai 사이트(2026-10-16) — 첫 화면(/) · 발표 자료(/deck/) · 법숲(/law/ → LAW_URL 로 중계) · 데모 체험 ──
 LAW_URL = os.environ.get('LAW_URL', '').rstrip('/')          # 법숲 컨테이너(같은 도커 네트워크) — 비우면 /law/ 는 404
+RADAR_URL = os.environ.get('RADAR_URL', '').rstrip('/')      # 청약 레이더 데모 컨테이너(개인 데이터 뺀 별도 인스턴스, 같은 도커 네트워크) — 비우면 /radar/ 는 404
 GATEWAY_KEY = os.environ.get('GATEWAY_KEY', '')              # 법숲이 이 서버가 보낸 요청인지 확인하는 비밀 값
 SHARED_TOKEN = os.environ.get('DECK_SHARED_TOKEN', '')       # 주인(개인) Claude 구독 토큰 — 데모 · 구독을 따로 연결하지 않은 계정이 쓴다
 DEMO_SAMPLES = [x.strip() for x in os.environ.get('DECK_DEMO_SAMPLES', '').split(',') if x.strip()]   # 데모에 줄 예시 덱 '계정/덱ID'(첫 것이 열린다)
@@ -811,6 +812,8 @@ class H(http.server.BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         if path == '/law': self.send_response(301); self.send_header('Location', '/law/'); self.send_header('Content-Length', '0'); self.end_headers(); return
         if path.startswith('/law/'): return self.law_proxy('GET', head_only)
+        if path == '/radar': self.send_response(301); self.send_header('Location', '/radar/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+        if path.startswith('/radar/'): return self.radar_proxy('GET', head_only)
         if path == '/api/site':   # 첫 화면 — 발표 자료 데모를 열 수 있는지(예시 덱이 실제로 있는지)
             ok = any(re.fullmatch(r'[a-z0-9][a-z0-9_.-]{1,31}/\d{8}-[0-9a-f]{6}', x) and os.path.isfile(os.path.join(STORE.deck_dir(*x.split('/')), 'index.html')) for x in DEMO_SAMPLES)
             return self.reply(200, {'demoDeck': ok})
@@ -970,6 +973,7 @@ class H(http.server.BaseHTTPRequestHandler):
             self.close_connection = True; return self.reply(413 if logged else 401, {'error': '본문이 너무 큽니다' if logged else '로그인이 필요합니다 — 새로고침해 다시 로그인해 주세요'})
         self._raw = self.rfile.read(n) if n > 0 else b''
         if path.startswith('/law/'): return self.law_proxy('POST')
+        if path.startswith('/radar/'): return self.radar_proxy('POST')
         try:
             if path == '/api/demo': return self.demo_start()
             if path == '/api/login':
@@ -1067,6 +1071,45 @@ class H(http.server.BaseHTTPRequestHandler):
         sid, urls = self._demo_session()
         if not sid: return go('/')
         return go(urls.get(did) or next(iter(urls.values())), self._demo_cookie(sid))
+
+    def radar_proxy(self, method, head_only=False):
+        """/radar/… → 청약 레이더 데모(RADAR_URL). 공개 데모라 로그인 없이 넘긴다. 데모 앱이 쓰기 · LLM · 알림을 막는다(DEMO_MODE)"""
+        if not RADAR_URL: return self.send_error(404)
+        sub_path = self.path[6:] or '/'
+        hd = {'x-forwarded-prefix': '/radar', 'x-forwarded-for': self.client_ip(), 'x-forwarded-proto': self.headers.get('X-Forwarded-Proto') or 'http'}
+        for k in ('Content-Type', 'Accept'):
+            if self.headers.get(k): hd[k.lower()] = self.headers.get(k)
+        ck = '; '.join(c.strip() for c in (self.headers.get('Cookie') or '').split(';') if c.strip() and not c.strip().startswith(COOKIE + '='))   # 이 서버의 로그인 쿠키는 넘기지 않는다
+        if ck: hd['cookie'] = ck
+        rq = urllib.request.Request(RADAR_URL + sub_path, data=(getattr(self, '_raw', b'') or b'') if method == 'POST' else None, headers=hd, method=method)
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k): return None
+        try: r = urllib.request.build_opener(_NoRedirect).open(rq, timeout=60)
+        except urllib.error.HTTPError as e: r = e
+        except Exception as e: return self.reply(502, {'error': f'청약 레이더 데모에 연결하지 못했습니다: {str(e)[:120]}'})
+        status = getattr(r, 'status', None) or r.code
+        def fix_headers():
+            loc = r.headers.get('Location')
+            if loc: self.send_header('Location', '/radar' + loc if loc.startswith('/') and not loc.startswith('/radar/') else loc)
+            for sc in r.headers.get_all('Set-Cookie') or []:
+                self.send_header('Set-Cookie', re.sub(r'(?i)path=/(?!radar)', 'Path=/radar/', sc) if re.search(r'(?i)path=', sc) else sc + '; Path=/radar/')
+        ctype = r.headers.get('Content-Type') or ''
+        if 'event-stream' in ctype or 'ndjson' in ctype:   # 스트리밍 — 받는 대로 넘긴다
+            self.send_response(status); self.send_header('Content-Type', ctype); self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Accel-Buffering', 'no'); self.send_header('Connection', 'close'); fix_headers(); self.end_headers()
+            try:
+                while True:
+                    chunk = r.readline()
+                    if not chunk: break
+                    self.wfile.write(chunk); self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError): pass
+            self.close_connection = True; return
+        body = r.read(); self.send_response(status)
+        for k in ('Content-Type', 'Cache-Control'):
+            v = r.headers.get(k)
+            if v: self.send_header(k, v)
+        fix_headers(); self.send_header('Content-Length', str(len(body))); self.end_headers()
+        if not head_only: self.wfile.write(body)
 
     def law_proxy(self, method, head_only=False):
         """/law/… → 법숲(LAW_URL). 로그인은 이 서버가 확인하고, 법숲에는 역할(user · demo)과 비밀 값만 넘긴다"""
