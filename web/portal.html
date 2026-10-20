@@ -298,6 +298,8 @@ section.proof { padding: clamp(72px, 11vh, 140px) 0; }
 .pipe::after { content: ''; position: absolute; top: -3px; left: 0; width: 7px; height: 7px; border-radius: 99px; background: var(--accent); animation: flowx 2.4s var(--ease-io) infinite; animation-delay: var(--d, 0s); }
 @keyframes flowx { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: calc(100% - 7px); opacity: 0; } }
 .arch .foot { margin-top: 22px; font-size: 14px; color: var(--ink-3); }
+.arch .foot.more { margin-top: 8px; }
+.arch .foot a { color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── 로그인 · 바닥 ── */
 .err { color: oklch(52% 0.18 28); font-size: 14px; min-height: 20px; margin: 10px 0 0; }
@@ -614,6 +616,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       </div>
     </div>
     <p class="foot rv" style="--k:2">개인 프로젝트 · 데모 세션과 그 안에서 고친 자료는 몇 시간 뒤 지워집니다 · AI 답변은 참고용입니다.</p>
+    <p class="foot more rv" style="--k:3">그 밖의 작업: <a href="https://snakedome.com" target="_blank" rel="noopener">Snake Dome</a> - Cloudflare Workers, Durable Objects 로 만든 1:1 실시간 스네이크 대전 게임</p>
   </div></section>
   <p class="err wrap" id="err"></p>
 </main>
