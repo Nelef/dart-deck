@@ -1056,6 +1056,8 @@ class H(http.server.BaseHTTPRequestHandler):
     def _demo_cookie(self, sid): return ('Set-Cookie', f'{COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age={storemod.DEMO_SEC}')
     def demo_start(self):
         """데모 체험 — 임시 계정 + 예시 덱 사본 → 첫 덱 주소(AI 창 연 채)"""
+        u = self.me()
+        if u and u['role'] != 'demo': return self.reply(200, {'ok': True, 'url': '/deck/'})   # 로그인한 계정 — 데모 쿠키로 로그인을 덮어쓰지 않고 내 발표 자료로(사용자 지적 2026-10-22)
         sid, urls = self._demo_session()
         if not sid: return self.reply(urls[0], {'error': urls[1]})
         return self.reply(200, {'ok': True, 'url': next(iter(urls.values())), 'runs': DEMO_RUNS}, [self._demo_cookie(sid)])

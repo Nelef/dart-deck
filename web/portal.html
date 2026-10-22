@@ -743,11 +743,24 @@ const paint = () => {
   const real = ME && ME.role !== 'demo';
   $('#who').textContent = ME ? (ME.role === 'demo' ? '데모 체험 중' : ME.name) : '';
   $('#bLogin').hidden = !!real; $('#bOut').hidden = !ME; $('#aDeck').hidden = !real;
+  paintDeck();
 };
 
-// 데모 체험 — 발표 자료는 늘 원본 사본으로 새로 시작
+// AI PPT 단추 — 방문자는 데모 체험(예시 자료가 있을 때만), 관리자로 로그인했으면 데모 대신 발표 자료 목록(제한 없이)
+let deckReady = false;
+const paintDeck = () => {
+  const real = ME && ME.role !== 'demo';
+  $$('.deckDemo').forEach((b) => {
+    b.disabled = !real && !deckReady; b.setAttribute('aria-label', real ? 'AI PPT 발표 자료 열기' : 'AI PPT 데모 체험');
+    if (!real && !deckReady) { b.textContent = '준비 중'; return; }
+    b.innerHTML = `${b.dataset.logo ? `<img class="blogo" src="${b.dataset.logo}" alt="">` : ''}${real ? '발표 자료 열기' : (b.dataset.label || '데모 체험')} <span class="ar" aria-hidden="true">→</span>`;
+  });
+};
+
+// 데모 체험 — 발표 자료는 늘 원본 사본으로 새로 시작. 로그인한 계정은 데모를 만들지 않는다(데모 쿠키가 로그인을 덮어써 관리자도 데모 한도에 걸렸다 — 사용자 지적 2026-10-22)
 $$('[data-demo]').forEach((b) => {
   b.onclick = async () => {
+    if (ME && ME.role !== 'demo' && b.dataset.open) { location.href = b.dataset.open; return; }
     $('#err').textContent = ''; b.disabled = true;
     try { const j = await post('/api/demo'); location.href = j.url; }
     catch (e) { $('#err').textContent = e.message; b.disabled = false; }
@@ -755,7 +768,7 @@ $$('[data-demo]').forEach((b) => {
 });
 
 // 뒤로가기로 돌아오면 브라우저가 누르던 순간의 화면(잠긴 단추)을 그대로 되살린다 — 다시 보일 때 풀어 준다
-addEventListener('pageshow', () => { $$('[data-demo]').forEach((b) => { b.disabled = !deckReady && b.classList.contains('deckDemo'); }); });
+addEventListener('pageshow', paintDeck);
 
 // 관리자 로그인
 const openLogin = () => { $('#loginBox').hidden = false; $('#lid').focus(); };
@@ -774,11 +787,7 @@ $('#lpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin();
 $('#bOut').onclick = async () => { await post('/api/logout').catch(() => {}); ME = null; paint(); };
 
 // 발표 자료 데모 — 예시 자료가 준비됐을 때만 연다
-let deckReady = false;
-fetch('/api/site', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
-  if (!j.demoDeck) return; deckReady = true;
-  $$('.deckDemo').forEach((b) => { b.disabled = false; b.innerHTML = `${b.dataset.logo ? `<img class="blogo" src="${b.dataset.logo}" alt="">` : ''}${b.dataset.label || '데모 체험'} <span class="ar" aria-hidden="true">→</span>`; });
-}).catch(() => {});
+fetch('/api/site', { cache: 'no-store' }).then((r) => r.json()).then((j) => { deckReady = !!j.demoDeck; paintDeck(); }).catch(() => {});
 fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
   ME = j.user; paint();
   if (!ME && nextOf()) openLogin();   // 로그인이 필요한 주소에서 왔으면 로그인 창을 연다
