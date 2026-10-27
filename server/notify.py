@@ -27,9 +27,17 @@ def agent_used(req, result, timed=False, stopped=False):
     models = ', '.join((r.get('modelUsage') or {}).keys()) or str(req.get('model') or '?')
     cache = (u.get('cache_read_input_tokens') or 0) + (u.get('cache_creation_input_tokens') or 0)
     ask = '새 발표 자료 만들기' if req.get('build') else ' '.join(str(req.get('display') or req.get('prompt') or '').split())[:80]
+    why = ''
+    if status in ('실패', '시간 초과'):   # 실패 까닭 - 한도 초과 · 인증 만료 등(사용자 질문 2026-10-27 "토큰 없어서 실패해도 오는거지?")
+        why = ' '.join(str(r.get('result') or '').split())[:120] or '결과 없음(인증 만료 · 사용 한도 · 실행 오류일 수 있음)'
     lines = [f"[uyai AI PPT] Claude 사용: {n.get('who', '?')}",
              f"부탁: {ask}",
-             f"결과: {status}, {round((r.get('duration_ms') or 0) / 1000)}초, {models}",
+             f"결과: {status}, {round((r.get('duration_ms') or 0) / 1000)}초, {models}" + (f"\n까닭: {why}" if why else ''),
              f"토큰: 입력 {u.get('input_tokens') or 0:,}(캐시 {cache:,}) / 출력 {u.get('output_tokens') or 0:,}, 약 ${float(r.get('total_cost_usd') or 0):.3f}"]
     if n.get('day'): lines.append(f"오늘 데모 부탁 {n['day']}")
     send('\n'.join(lines))
+
+
+def token_missing(who, ask):
+    """주인 공유 토큰(DECK_SHARED_TOKEN)이 없어 Claude 를 부르지도 못하고 막혔을 때"""
+    send(f"[uyai AI PPT] Claude 실행 못 함: {who}\n부탁: {' '.join(str(ask or '').split())[:80]}\n까닭: 공유 Claude 토큰이 설정돼 있지 않음(uyai-data/claude.env 의 DECK_SHARED_TOKEN 확인)")

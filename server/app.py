@@ -20,7 +20,7 @@ NODE_PATH = os.path.join(ROOT, 'node_modules')
 SHOT_KEY = secrets.token_hex(16); os.environ['DECK_SHOT_KEY'] = SHOT_KEY
 os.environ['NODE_PATH'] = NODE_PATH
 os.environ.setdefault('PPT_DATA_DIR', DATA_DIR)
-import store as storemod, deckagent, importer, versions as vers
+import store as storemod, deckagent, importer, versions as vers, notify
 STORE = storemod.Store(DATA_DIR)
 _dropped = STORE.drop_importing()   # 가져오다 서버가 꺼진 반쪽 덱 정리
 if _dropped: sys.stderr.write(f'가져오던 중이던 덱 {_dropped}개를 지웠습니다\n')
@@ -1169,7 +1169,9 @@ class H(http.server.BaseHTTPRequestHandler):
                     dm['runs'] = dm.get('runs', 0) + 1
                     req.update({'model': 'sonnet', 'effort': 'medium', 'web': False, 'engine': 'claude'})
                 own = STORE.claude_token(u['id']); tok = own or SHARED_TOKEN
-                if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
+                if not tok:
+                    if u['role'] != 'admin': notify.token_missing('데모 방문자' if u['role'] == 'demo' else f"계정 {u['id']}", req.get('prompt'))
+                    raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
                 req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
                 # 주인 구독(공유 토큰)이 남에게 쓰이면 텔레그램으로 알린다(사용자 지정 2026-10-27) — 관리자 본인 · 자기 구독을 연결한 계정은 빼고
                 if not own and u['role'] != 'admin':
