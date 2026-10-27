@@ -1125,7 +1125,9 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.send_header('Content-Length', '0'); self.end_headers(); return
             return self.reply(401, {'error': '로그인이 필요합니다'})
         hd = {'x-uyai-role': 'demo' if u['role'] == 'demo' else 'user', 'x-uyai-key': GATEWAY_KEY, 'x-forwarded-for': self.client_ip(),
-              'x-forwarded-proto': self.headers.get('X-Forwarded-Proto') or 'http'}
+              'x-forwarded-proto': self.headers.get('X-Forwarded-Proto') or 'http',
+              # 법숲이 '누가 주인 Claude 구독을 썼나' 텔레그램 알림에 쓴다(2026-10-27) — 관리자(주인)는 알리지 않는다
+              'x-uyai-user': '' if u['role'] == 'demo' else re.sub(r'[^A-Za-z0-9_.-]', '', str(u['id']))[:32], 'x-uyai-admin': '1' if u['role'] == 'admin' else '0'}
         if self.headers.get('Content-Type'): hd['content-type'] = self.headers.get('Content-Type')
         rq = urllib.request.Request(LAW_URL + sub_path, data=(getattr(self, '_raw', b'') or b'') if method == 'POST' else None, headers=hd, method=method)
         try: r = urllib.request.urlopen(rq, timeout=180)
@@ -1166,9 +1168,13 @@ class H(http.server.BaseHTTPRequestHandler):
                     if not _demo_day_take(): raise ValueError(f'오늘 데모 사용량이 다 찼습니다. 시연을 원하시면 {CONTACT} 으로 연락 주세요')
                     dm['runs'] = dm.get('runs', 0) + 1
                     req.update({'model': 'sonnet', 'effort': 'medium', 'web': False, 'engine': 'claude'})
-                tok = STORE.claude_token(u['id']) or SHARED_TOKEN
+                own = STORE.claude_token(u['id']); tok = own or SHARED_TOKEN
                 if not tok: raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
                 req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
+                # 주인 구독(공유 토큰)이 남에게 쓰이면 텔레그램으로 알린다(사용자 지정 2026-10-27) — 관리자 본인 · 자기 구독을 연결한 계정은 빼고
+                if not own and u['role'] != 'admin':
+                    req['_notify'] = {'who': '데모 방문자' if u['role'] == 'demo' else f"계정 {u['id']}",
+                                      'day': f'{_demo_day_used()}/{DEMO_DAILY}' if u['role'] == 'demo' else ''}
             if req.get('build'):
                 dd = os.path.dirname(edit_target(req.get('file')))
                 req.update({'prompt': build_prompt(dd), 'plan': False, 'model': 'sonnet', 'effort': req.get('effort') if req.get('effort') in ('medium', 'high') else 'high',   # 새로 만들기 = Sonnet medium · high 만

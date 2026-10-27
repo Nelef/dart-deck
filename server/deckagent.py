@@ -11,6 +11,7 @@
 #   (Bash(node tools/deck_shot.cjs:*)), 읽기는 작업 폴더(deck) 안만(Claude Code 기본: 폴더 밖은 허락을 물어 -p 에서는 거부).
 #   실측(2026-09-30): 다른 파일 고치기 · 폴더 밖 파일 읽기 · 'ls /' 전부 거부됨. 사용자 ~/.claude 의 훅 · 스킬이 안 끼게 설정 폴더를 따로 둔다.
 import os, re, json, glob, uuid, time, hashlib, shutil, subprocess, threading, pty, select, signal, tempfile, fcntl, termios, struct, urllib.request, urllib.error, urllib.parse
+import notify
 
 # 경로 — dart-deck. 덱은 DATA_DIR/decks/<계정>/<덱>/, 엔진은 engine/
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -478,6 +479,7 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
             os.killpg(p.pid, signal.SIGKILL); raise
         finally:
             killer.cancel(); p.wait()
+        if req.get('_notify'): notify.agent_used(req, result, bool(timed), job.stopped)   # 주인 구독이 남에게 쓰였을 때만(app.py 가 붙임)
         if job.stopped: send({'stopped': True}); return
         if not result or result.get('is_error'):
             # 시간 초과면 그렇게 말한다 — stderr 끝줄(모르는 모델 이름 안내 등)이 까닭처럼 보였다(gemma 여러 장 진행 실측: 15분 뒤 엉뚱한 줄)
