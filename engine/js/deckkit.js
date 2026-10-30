@@ -447,8 +447,12 @@
       const vv = window.visualViewport; if (!vv) return;
       const onVV = () => {
         const kb = document.body.classList.contains('kside') && innerHeight - vv.height > 120 && p.contains(document.activeElement);
-        if (kb) Object.assign(p.style, { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto', maxHeight: 'none' });
-        else { p.style.top = ''; p.style.height = ''; p.style.bottom = ''; p.style.maxHeight = ''; }
+        if (kb) {
+          // ✎ 편집 중엔 위에 리본(z 80)이 떠 있다 — 패널 머리가 리본에 가리지 않게 그 아래부터(2026-10-30)
+          const rb = document.body.classList.contains('dedit') ? (document.querySelector('#de-rb')?.getBoundingClientRect().bottom || 0) : 0;
+          const top = Math.max(vv.offsetTop, rb);
+          Object.assign(p.style, { top: `${top}px`, height: `${vv.offsetTop + vv.height - top}px`, bottom: 'auto', maxHeight: 'none' });
+        } else { p.style.top = ''; p.style.height = ''; p.style.bottom = ''; p.style.maxHeight = ''; }
       };
       vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV); p.addEventListener('focusout', () => setTimeout(onVV, 50));
     },

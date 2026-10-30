@@ -25,6 +25,15 @@
   body.dedit #de-ai { display: block; } body.dedit.kside #de-ai { display: none; }
   /* 편집 중 AI 패널은 리본 아래에서 — 리본(z 80)이 패널 머리를 가리지 않게 */
   body.dedit #kpanel { top: calc(var(--fit-top, 104px) - 4px); }
+  /* 폰 세로 — AI 패널은 아래에서 올라오는 판(deckkit). 위 줄(top)까지 주면 판이 리본 밑에 붙고(높이 · 위 · 아래가 다 정해지면 아래가 무시된다),
+     무대는 판이 아래에 있다고 보고 맞춰 판 뒤에 숨어 아래가 검게 비었다. 닫힌 판도 화면 아래 1/3 을 덮었다(사용자 버그 신고 2026-10-30).
+     판은 아래에 붙이고 높이만 리본 아래까지로 묶는다. 판이 열린 동안 [저장 · 편집 끝내기]는 숨기고(입력칸을 가리지 않게 — [✦ AI] 와 같이),
+     알림은 판 위로 올린다 */
+  @media (max-width: 640px) and (orientation: portrait) {
+    body.dedit #kpanel { top: auto; max-height: calc(100dvh - var(--fit-top, 104px) + 4px); }
+    body.dedit.kside #de-dock { display: none; }
+    body.dedit.kside #de-toast { bottom: calc(min(var(--kh, 58dvh), 100dvh - var(--fit-top, 104px) + 4px) + 12px); }
+  }
   #de-dock button { flex: 1 1 auto; height: 36px; padding: 0 8px; border-radius: 10px; border: 1px solid #e3e6ea; background: #fff; color: #2b3038; font: 800 12.5px 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif; cursor: pointer; white-space: nowrap; }
   #de-dock button:hover { background: #eef1f7; } #de-dock button:active { transform: scale(.98); }
   #de-dock .ed { color: #134E4A; flex: none; } #de-dock .sv { background: #134E4A; border-color: #134E4A; color: #fff; } #de-dock .sv:hover { background: #274aa8; }
