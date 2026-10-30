@@ -814,6 +814,8 @@ class H(http.server.BaseHTTPRequestHandler):
         if path.startswith('/law/'): return self.law_proxy('GET', head_only)
         if path == '/radar': self.send_response(301); self.send_header('Location', '/radar/'); self.send_header('Content-Length', '0'); self.end_headers(); return
         if path.startswith('/radar/'): return self.radar_proxy('GET', head_only)
+        if path == '/fashion': self.send_response(301); self.send_header('Location', '/fashion/'); self.send_header('Content-Length', '0'); self.end_headers(); return
+        if path == '/fashion/': return self.send_file(os.path.join(WEB, 'fashion', 'index.html'), head_only)
         if path == '/api/site':   # 첫 화면 — 발표 자료 데모를 열 수 있는지(예시 덱이 실제로 있는지)
             ok = any(re.fullmatch(r'[a-z0-9][a-z0-9_.-]{1,31}/\d{8}-[0-9a-f]{6}', x) and os.path.isfile(os.path.join(STORE.deck_dir(*x.split('/')), 'index.html')) for x in DEMO_SAMPLES)
             return self.reply(200, {'demoDeck': ok})

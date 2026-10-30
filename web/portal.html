@@ -20,13 +20,14 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light">
 <title>uyai — 말로 맡기는 AI 에이전트</title>
-<meta name="description" content="말로 맡기면 일하고 스스로 확인하는 AI 에이전트 — 발표 자료를 고치는 AI PPT, 법 조문으로 답하는 법숲, 디스코드 서버를 관리하는 별이 AI, 청약 공고를 모아 알리는 청약 레이더.">
+<meta name="description" content="직접 만들어 확인하는 AI 프로젝트 — AI PPT, 법숲, 별이 AI, 청약 레이더, 그리고 색상·소재·착장을 비교하는 Fashion Lab.">
 <link rel="icon" type="image/png" href="/web/media/favicon-uyai.png">
 <link rel="apple-touch-icon" href="/web/media/uyai-icon-192.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="/web/fashion/portal.css?v=1031a">
 <style>
 /* uyai 첫 화면 — 네 서비스(AI PPT · 법숲 · 별이 AI · 청약 레이더, 영상 + 이름 + 사용 기술 + 데모 단추) · 증명 칸 · 구성도 · 관리자 로그인. 서버(server/app.py): /api/me · /api/login · /api/logout · /api/demo · /api/site
    미디어(web/media)는 화면에 가까워질 때만 받는다 — 첫 화면은 서비스별 소개 영상(각 0.4~0.5MB). 별이 AI 는 byori.uk 에서 따로 돈다(이 관문 밖) */
@@ -348,7 +349,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
 <body>
 <header class="top" id="top"><div class="wrap">
   <a href="/" aria-label="uyai 첫 화면"><img src="/web/media/uyai-lockup.png" alt="uyai" width="97" height="31"></a>
-  <nav aria-label="구역"><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#radar">청약 레이더</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
+  <nav aria-label="구역"><a href="/fashion/">Fashion Lab</a><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#radar">청약 레이더</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
   <span class="sp"></span>
   <span class="who" id="who"></span>
   <a class="btn sm" id="aDeck" href="/deck/" hidden>발표 자료</a>
@@ -368,8 +369,13 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
           <span class="ln"><span style="--d:2">AI 에이전트.</span></span>
         </h1>
       </div>
-      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하는 AI 서비스 네 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있고, 별이 AI 는 디스코드 봇 사이트로 이어집니다.</span></p>
+      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하고 실험하는 AI 프로젝트 다섯 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있고, 별이 AI 는 디스코드 봇 사이트로 이어집니다.</span></p>
     </div>
+    <a class="fashion-feature" href="/fashion/" aria-label="Fashion Lab — 상품 색상·소재·착장 비교 쇼룸 열기">
+      <div><span class="fashion-overline">NEW EXPERIMENT / FASHION LAB</span><h2>한 벌에서 시작하는 다음 가능성.</h2><p>색을 바꾸고, 질감을 더하고, 입혀 보고. 실제 생성 결과를 원본과 비교해 보세요.</p></div>
+      <div class="fashion-images" aria-hidden="true"><img src="/web/fashion/assets/garment.webp" alt="" width="512" height="512"><img src="/web/fashion/assets/color.webp" alt="" width="512" height="512"><img src="/web/fashion/assets/tryon.webp" alt="" width="512" height="768"></div>
+      <span class="fashion-enter">쇼룸 둘러보기 <span aria-hidden="true">↗</span></span>
+    </a>
     <div class="duo">
       <article class="duo-card fade" data-svc="ppt" style="--fd:.6s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-aippt-poster.webp?v=1016c" data-src="/web/media/promo-aippt.mp4?v=1016c" width="1280" height="720" aria-label="AI PPT 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 17초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>

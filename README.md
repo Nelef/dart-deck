@@ -23,3 +23,25 @@ docker build -t dart-deck:latest . && docker compose up -d   # 데이터는 ./da
 ```
 
 환경 변수: `PPT_PORT`(8900) · `PPT_DATA_DIR`(./data, 이미지에서는 /data) · `DECK_ASK_URL` · `DECK_LLM_BASE`(로컬 LLM — 선택, 비우면 Claude 개인 구독만)
+
+
+## Fashion Lab — /fashion/
+
+2026-10-31 추가. 기존 uyai 첫 화면에서 들어가는 패션 이미지 쇼룸이다. awwwards 스킬의 Warm Editorial 방향으로 구현했다. 공개 페이지는 실제 로컬 생성 결과를 선택하고 비교하는 체험이며, 새 추론을 서버에서 실행하는 기능은 포함하지 않는다.
+
+- `web/fashion/`: HTML·CSS·JS, 비교 슬라이더, 색상/소재 선택, 착장·공개 LoRA 비교, 확대 dialog, 이미지 저장, 실제 프롬프트·실패 사례·실행 조건.
+- `server/app.py`: `/fashion` → `/fashion/` 리다이렉트와 HTML 진입만 추가. 정적 파일은 기존 `/web/` 처리 사용.
+- `web/portal.html`, `web/fashion/portal.css`: 기존 첫 화면과 메뉴에 Fashion Lab 연결.
+- `scripts/build_fashion_assets.py`: 별도 로컬 실험 저장소의 실제 샘플과 manifest를 검증하고, 픽셀이 같은 lossless WebP와 공개용 기록만 만든다. 모델·로그·실행 경로는 배포하지 않는다.
+- 디자인 방향 `docs/fashion-design.md`, 브라우저 확인 결과 `docs/fashion-verification.json`.
+
+이미지는 이미 저장돼 있어 NAS에서 GPU·추가 Python 패키지 없이 표시된다. 원본을 갱신할 때만 Pillow가 있는 Python으로 `scripts/build_fashion_assets.py --source <fashion-lab 폴더>`를 실행한다. `catalog.json`의 파일 경로·프롬프트는 이 변환 스크립트가 만든 제한된 공개 정보다.
+
+로컬 확인(격리된 데이터):
+
+```bash
+PPT_HOST=127.0.0.1 PPT_PORT=18913 PPT_DATA_DIR=/private/tmp/uyai-fashion-preview python3 server/app.py
+# http://127.0.0.1:18913/fashion/
+```
+
+배포는 기존 `./deploy.sh`를 사용한다. HEAD의 git archive로 배포하므로 수정 파일을 커밋한 뒤 실행한다.
