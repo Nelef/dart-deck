@@ -45,3 +45,5 @@ PPT_HOST=127.0.0.1 PPT_PORT=18913 PPT_DATA_DIR=/private/tmp/uyai-fashion-preview
 ```
 
 배포는 기존 `./deploy.sh`를 사용한다. HEAD의 git archive로 배포하므로 수정 파일을 커밋한 뒤 실행한다.
+
+이번처럼 `web/`와 `server/app.py`의 경로 처리만 바꾸고 의존성·engine·다른 서버 모듈을 바꾸지 않았다면 `./deploy.sh --web-only`로 배포할 수 있다. `Dockerfile.web`은 NAS의 현재 `uyai:latest` 실행 환경에 두 경로만 복사하므로 PDF 글꼴을 다시 생성하지 않는다. 의존성이나 engine을 바꾸면 기본 전체 빌드를 사용한다. 두 방식 모두 빌드 성공 후 교체하며 이전 이미지는 `uyai:prev`로 남긴다.
