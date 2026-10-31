@@ -31,7 +31,7 @@ docker build -t dart-deck:latest . && docker compose up -d   # 데이터는 ./da
 
 - `web/fashion/`: HTML·CSS·JS, 비교 슬라이더, 색상/소재 선택, 착장·공개 LoRA 비교, 확대 dialog, 이미지 저장, 실제 프롬프트·실패 사례·실행 조건.
 - `server/app.py`: `/fashion` → `/fashion/` 리다이렉트와 HTML 진입만 추가. 정적 파일은 기존 `/web/` 처리 사용.
-- `web/portal.html`, `web/fashion/portal.css`: 기존 첫 화면과 메뉴에 Fashion Lab 연결.
+- `web/portal.html`: 첫 화면 다섯째 카드와 메뉴로 Fashion Lab 연결(2026-10-31 맨 위 배너를 다른 네 카드와 같은 모양의 카드로 바꿈). 카드 미디어는 `scripts/build_fashion_card.py`가 쇼룸 이미지로 만든 원본 | 결과 한 쌍(`web/media/fashion-card-*.webp`)을 넘기는 슬라이드다.
 - `scripts/build_fashion_assets.py`: 별도 로컬 실험 저장소의 실제 샘플과 manifest를 검증하고, 픽셀이 같은 lossless WebP와 공개용 기록만 만든다. 모델·로그·실행 경로는 배포하지 않는다.
 - 디자인 방향 `docs/fashion-design.md`, 브라우저 확인 결과 `docs/fashion-verification.json`.
 

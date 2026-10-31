@@ -12,6 +12,9 @@
   - 그 뒤 수정(f2dff68 ~ b74b6c8, 2026-10-16 저녁 ~ 10-20: 기술 키워드, 카드 3장 -> 4장, 모바일 2x2, 청약 레이더 데모 단추): 스킬 없이 대화로.
   - 첫 화면 카드 정리(2026-10-20): awwwards 스킬을 다시 불러서. 카드 폭 · 제목 폭 맞춤, 이름 · 한 줄 소개를 영상 아래로,
     사용 기술은 세 개만 글자 한 줄로(자동 넘김 없음, 올리거나 누르면 설명 말풍선), 단추는 네 카드 같은 높이(subgrid).
+  - Fashion Lab 카드(2026-10-31): 맨 위 밝은 배너를 지우고 네 카드와 같은 모양의 다섯째 카드로(awwwards 스킬 참고, 기존 카드 체계 우선).
+    미디어는 영상 대신 쇼룸 생성 결과(원본 | 결과 한 쌍, scripts/build_fashion_card.py)를 천천히 넘기는 슬라이드 - 영상과 같은 재생 단추 · 보일 때만 · 움직임 줄이기면 자동으로 넘기지 않음.
+    격자: 데스크톱 5열 한 줄, 1000px 이하 3 + 2, 700px 이하 2 + 2 + 1(남는 줄은 가운데).
 -->
 <html lang="ko">
 <head>
@@ -27,7 +30,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap">
-<link rel="stylesheet" href="/web/fashion/portal.css?v=1031a">
 <style>
 /* uyai 첫 화면 — 네 서비스(AI PPT · 법숲 · 별이 AI · 청약 레이더, 영상 + 이름 + 사용 기술 + 데모 단추) · 증명 칸 · 구성도 · 관리자 로그인. 서버(server/app.py): /api/me · /api/login · /api/logout · /api/demo · /api/site
    미디어(web/media)는 화면에 가까워질 때만 받는다 — 첫 화면은 서비스별 소개 영상(각 0.4~0.5MB). 별이 AI 는 byori.uk 에서 따로 돈다(이 관문 밖) */
@@ -41,6 +43,7 @@
   --warm: oklch(60% 0.13 62); --warm-wash: oklch(95% 0.035 75);
   --byori: oklch(58% 0.15 290); --byori-glow: oklch(76% 0.12 290);   /* 별이 AI — 브랜드 라벤더(단색) */
   --radar: oklch(60% 0.16 32);   /* 청약 레이더 — 로고의 레이더 선(산호색) */
+  --fashion: oklch(47% 0.17 264);   /* Fashion Lab — 쇼룸의 코발트 블루 */
   --sans: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1); --ease-io: cubic-bezier(0.76, 0, 0.24, 1);
@@ -101,15 +104,24 @@ a { color: inherit; }
 .hero .lead { margin: 0; max-width: 32em; font-size: clamp(15.5px, 1.25vw, 18px); color: var(--ink-2); line-height: 1.65; }
 /* 네 서비스 카드 — 첫 화면에 다. 영상 -> 이름 · 한 줄 소개 -> 사용 기술 세 개(글자 한 줄) -> 데모 단추. 데스크톱 4열, 1000px 이하 2×2
    칸마다 높이가 달라도 네 카드의 이름 · 기술 · 단추가 같은 줄에 오게 subgrid 로 맞춘다(2026-10-20 정리) */
-.duo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: clamp(12px, 1.6vw, 22px); row-gap: clamp(22px, 3vh, 34px); margin-top: clamp(16px, 2.6vh, 32px); }
-/* 낮은 화면에서는 카드가 첫 화면에 들어오게 폭을 줄인다 — 위 제목 · 소개 글도 같은 폭으로 가운데에 두어 오른쪽 끝이 어긋나지 않게 */
-@media (min-width: 1001px) { .hero { --heroW: max(960px, calc((100svh - 600px) * 7.11 + 66px)); } .hero-top, .duo { width: 100%; max-width: var(--heroW); margin-inline: auto; } }
-@media (max-width: 1000px) and (min-width: 701px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hero-top, .duo { width: 100%; max-width: 760px; margin-inline: auto; } }
+/* 카드 다섯 장(2026-10-31 Fashion Lab 추가) — 데스크톱은 한 줄 5열. 1000px 이하는 3 + 2, 700px 이하는 2 + 2 + 1 이고 남는 줄은 가운데에 둔다
+   (6열 · 4열 격자에 카드마다 두 칸씩 — 카드 폭은 그대로, 시작 칸만 한 칸 밀어 가운데로) */
+.duo { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: clamp(12px, 1.6vw, 22px); row-gap: clamp(22px, 3vh, 34px); margin-top: clamp(16px, 2.6vh, 32px); }
+/* 낮은 화면에서는 카드가 첫 화면에 들어오게 폭을 줄인다 — 위 제목 · 소개 글도 같은 폭으로 가운데에 두어 오른쪽 끝이 어긋나지 않게(5열은 카드가 낮아 4열 때보다 덜 줄인다) */
+@media (min-width: 1001px) { .hero { --heroW: max(960px, calc((100svh - 580px) * 8.89 + 88px)); } .hero-top, .duo { width: 100%; max-width: var(--heroW); margin-inline: auto; } }
+@media (max-width: 1000px) and (min-width: 701px) { .duo { grid-template-columns: repeat(6, minmax(0, 1fr)); } .duo-card { grid-column: span 2; } .duo-card:nth-child(4) { grid-column: 2 / span 2; } .hero-top, .duo { width: 100%; max-width: 760px; margin-inline: auto; } }
 .duo-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .duo-card > .duo-row { margin-top: auto; }
 @supports (grid-template-rows: subgrid) { .duo-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 12px; } .duo-card > .duo-row { margin-top: 0; align-self: end; } }
 .duo-media.frame { border-radius: 16px; }
 .duo-media.frame video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--night); }
+/* Fashion Lab 미디어 — 영상 대신 쇼룸 생성 결과(원본 | 결과 한 쌍)를 천천히 넘긴다. 새 장만 위에서 서서히 나타나 사이에 어두워지지 않게 */
+.duo-media .sl-box { position: relative; isolation: isolate; aspect-ratio: 16 / 9; background: var(--night); }
+.duo-media .sl-box img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; opacity: 0; transition: opacity 1.2s var(--ease-io); }
+.duo-media .sl-box img.prev { opacity: 1; }
+.duo-media .sl-box img.on { opacity: 1; z-index: 1; }
+.duo-media.slides .bar2 { background: linear-gradient(transparent, oklch(15% 0.01 205 / .86)); }   /* 사진 바탕이 밝아 글자가 묻히지 않게 */
+.duo-media.slides .bar2 .cap { text-shadow: 0 1px 8px oklch(0% 0 0 / .5); }
 .duo-row { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .btn.big { font-size: clamp(16px, 1.3vw, 18px); font-weight: 750; padding: 15px clamp(26px, 3vw, 40px); min-width: min(100%, 300px); justify-content: center; box-shadow: 0 12px 26px -14px oklch(19% 0.03 250 / .6); }
 .btn.big:disabled { box-shadow: none; }
@@ -154,6 +166,7 @@ a { color: inherit; }
 .tech[data-svc="law"] .kw { --kc: var(--law); }
 .tech[data-svc="byori"] .kw { --kc: var(--byori); }
 .tech[data-svc="radar"] .kw { --kc: var(--radar); }
+.tech[data-svc="fashion"] .kw { --kc: var(--fashion); }
 .kw:hover { color: var(--ink); border-color: var(--kc); }
 .kw.on { color: var(--paper); background: var(--kc); border-color: var(--kc); }
 .kw::before { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: oklch(100% 0 0 / .55); transform-origin: left; transform: scaleX(0); }
@@ -332,7 +345,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   .top nav { display: none; }
   .svc-b.flip .frame { order: -1; }
 }
-@media (max-width: 700px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
+@media (max-width: 700px) { .duo { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; } .duo-card { grid-column: span 2; } .duo-card:nth-child(5) { grid-column: 2 / span 2; } .duo-card { gap: 6px; } .hero { padding: 10px 0 8px; } .hero .label { display: none; } .hero h1 { margin-top: 0; font-size: clamp(1.9rem, 8.4vw, 2.4rem); } .hero .lead { font-size: 14.5px; line-height: 1.5; } .duo-name b { font-size: 17px; } .duo-name span { font-size: 12.5px; } .frame .bar2 { padding: 8px 10px; font-size: 11.5px; } .pp { width: 28px; height: 28px; } .duo-sub, .m-hide, .tech .kwcap { display: none; } .kws { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .kws::-webkit-scrollbar { display: none; } .btn.big { padding: 13px 24px; font-size: 16px; min-width: 70%; } .scrollcue { font-size: 15px; } }
 @media (max-width: 700px) { .techall { display: block; } .techall .kws { flex-wrap: wrap; justify-content: center; overflow: visible; gap: 5px; } .techall .kw { font-size: 12px; padding: 6px 9px 7px; } .tacap { min-height: 3.2em; } .duo .tech, .duo .bar2 .cap { display: none; } .duo .frame .bar2 { justify-content: flex-end; } .duo .btn.big { min-width: 0; width: 100%; padding: 11px 6px; font-size: 13px; gap: 5px; white-space: nowrap; } .duo .btn.big .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big .ar { display: none; } }
 @media (max-width: 700px) { .duo-name { padding-top: 0; } .duo-name span { display: none; } .duo-name b { font-size: 15px; gap: 7px; } .duo-name b .blogo { width: 20px; height: 20px; border-radius: 5px; } .duo .btn.big { box-shadow: none; } }
 @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } .night .stat + .stat { border-color: var(--night-line); } .bar { grid-template-columns: 6em 1fr 3em; } .who { display: none; } }
@@ -349,7 +362,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
 <body>
 <header class="top" id="top"><div class="wrap">
   <a href="/" aria-label="uyai 첫 화면"><img src="/web/media/uyai-lockup.png" alt="uyai" width="97" height="31"></a>
-  <nav aria-label="구역"><a href="/fashion/">Fashion Lab</a><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#radar">청약 레이더</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
+  <nav aria-label="구역"><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#radar">청약 레이더</a><a href="/fashion/">Fashion Lab</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
   <span class="sp"></span>
   <span class="who" id="who"></span>
   <a class="btn sm" id="aDeck" href="/deck/" hidden>발표 자료</a>
@@ -369,13 +382,8 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
           <span class="ln"><span style="--d:2">AI 에이전트.</span></span>
         </h1>
       </div>
-      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하고 실험하는 AI 프로젝트 다섯 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있고, 별이 AI 는 디스코드 봇 사이트로 이어집니다.</span></p>
+      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하고 실험하는 AI 프로젝트 다섯 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있고, 별이 AI 는 디스코드 봇 사이트로, Fashion Lab 은 생성 결과를 모은 쇼룸으로 이어집니다.</span></p>
     </div>
-    <a class="fashion-feature" href="/fashion/" aria-label="Fashion Lab — 상품 색상·소재·착장 비교 쇼룸 열기">
-      <div><span class="fashion-overline">NEW EXPERIMENT / FASHION LAB</span><h2>한 벌에서 시작하는 다음 가능성.</h2><p>색을 바꾸고, 질감을 더하고, 입혀 보고. 실제 생성 결과를 원본과 비교해 보세요.</p></div>
-      <div class="fashion-images" aria-hidden="true"><img src="/web/fashion/assets/garment.webp" alt="" width="512" height="512"><img src="/web/fashion/assets/color.webp" alt="" width="512" height="512"><img src="/web/fashion/assets/tryon.webp" alt="" width="512" height="768"></div>
-      <span class="fashion-enter">쇼룸 둘러보기 <span aria-hidden="true">↗</span></span>
-    </a>
     <div class="duo">
       <article class="duo-card fade" data-svc="ppt" style="--fd:.6s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-aippt-poster.webp?v=1016c" data-src="/web/media/promo-aippt.mp4?v=1016c" width="1280" height="720" aria-label="AI PPT 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 17초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
@@ -400,6 +408,12 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <a class="duo-name" href="#radar"><b><img class="blogo" src="/web/media/logo-radar.webp" alt="">청약 레이더</b><span>청약 공고를 모아 알리고, 필요 현금까지 정리</span></a>
         <div class="tech" data-svc="radar"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="청약홈 · LH · SH 게시판과 공공데이터포털 API 2종을 <b>주기적으로 모읍니다</b>.">Scheduler</button></li><li><button class="kw" data-tip="공고문 PDF 의 표를 읽어 <b>분양가 · 납부 일정</b>을 뽑습니다.">PDF Parsing</button></li><li><button class="kw" data-tip="요청할 때만 LLM 이 공고문을 읽고 <b>필요 현금 · 순위</b>를 정리합니다.">LLM Analysis</button></li><li><button class="kw" data-tip="분석 진행을 <b>SSE 로 실시간</b> 보여 줍니다.">SSE</button></li><li><button class="kw" data-tip="<b>FastAPI REST API 12개</b> · 개인 NAS Docker.">FastAPI</button></li><li><button class="kw" data-tip="새 공고 · 접수 <b>D-7 · D-1</b> 을 텔레그램으로 알립니다.">Alerts</button></li></ul></div>
         <div class="duo-row"><a class="btn go big" href="/radar/" aria-label="청약 레이더 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
+      </article>
+      <article class="duo-card fade" data-svc="fashion" style="--fd:1.08s">
+        <div class="frame duo-media slides" data-gap="4200"><div class="sl-box" role="img" aria-label="Fashion Lab 생성 결과 — 원본 상품컷과 색상 · 소재 편집, 모델과 착장 시안"><img class="on" src="/web/media/fashion-card-color.webp?v=1031" alt="" width="960" height="540" data-cap="생성 결과 · 색상 편집"><img data-src="/web/media/fashion-card-material.webp?v=1031" alt="" width="960" height="540" data-cap="생성 결과 · 소재 편집"><img data-src="/web/media/fashion-card-tryon.webp?v=1031" alt="" width="960" height="540" data-cap="생성 결과 · 착장 시안"></div><div class="bar2"><span class="cap">생성 결과 · 색상 편집</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
+        <a class="duo-name" href="/fashion/"><b><img class="blogo" src="/web/media/logo-fashion.svg" alt="">Fashion Lab</b><span>상품컷 색상 · 소재 편집과 착장 시안을 원본과 비교</span></a>
+        <div class="tech" data-svc="fashion"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="브리프 구성 · SDXL 추론 · FLUX 참고 이미지 편집을 <b>사용자 노드 3개</b>로 만들어 워크플로로 묶었습니다.">ComfyUI</button></li><li><button class="kw" data-tip="FLUX.2 klein 4B 로 상품컷 · 색상 · 소재 편집과 <b>두 장을 참고한 착장 시안</b>을 만들었습니다.">FLUX</button></li><li><button class="kw" data-tip="SDXL 4 steps 에서 <b>공개 LCM-LoRA</b> 만 켜고 끈 결과를 같은 seed 로 비교합니다 — 직접 학습한 LoRA 는 아닙니다.">LoRA</button></li></ul></div>
+        <div class="duo-row"><a class="btn go big" href="/fashion/" aria-label="Fashion Lab 쇼룸 보기">쇼룸 보기 <span class="ar" aria-hidden="true">→</span></a></div>
       </article>
     </div>
     <div class="techall" aria-label="사용 기술 전체"><ul class="kws" id="techallList"></ul><p class="tacap" id="techallCap" aria-live="polite"></p></div>
@@ -673,7 +687,7 @@ document.addEventListener('click', hideTip); addEventListener('scroll', hideTip,
 addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 
 // 모바일 전체 기술 목록 — 카드 키워드를 기술 이름별로 모아, 누르면 쓰인 서비스와 서비스별 설명(카드의 data-tip 그대로)
-const SVC = { ppt: ['AI PPT', 'var(--accent)'], law: ['법숲', 'var(--law)'], byori: ['별이 AI', 'var(--byori)'], radar: ['청약 레이더', 'var(--radar)'] };
+const SVC = { ppt: ['AI PPT', 'var(--accent)'], law: ['법숲', 'var(--law)'], byori: ['별이 AI', 'var(--byori)'], radar: ['청약 레이더', 'var(--radar)'], fashion: ['Fashion Lab', 'var(--fashion)'] };
 const techMap = new Map();
 $$('.tech[data-svc]').forEach((tech) => $$('.kw', tech).forEach((b) => { const k = b.textContent.trim(); if (!techMap.has(k)) techMap.set(k, []); techMap.get(k).push([tech.dataset.svc, b.dataset.tip]); }));
 // 카드 키워드에는 없지만 실제로 쓴 곳(원자료 근거) — 목록에서만 덧붙인다
@@ -702,7 +716,7 @@ $$('.rv').forEach((el) => io.observe(el));
 // 영상 — 칸마다 [소개 영상 | 실제 화면]. 가까워지면 지금 고른 영상만 받고, 보일 때만 재생(움직임 줄이기면 자동 재생 안 함)
 const playIcon = '<path d="M2.5 1l8 5-8 5z"/>', pauseIcon = '<path d="M2 1h3v10H2zM7 1h3v10H7z"/>';
 const frames = new Map();   // 실제 화면 video → 그 칸의 바꾸기 함수(단계 버튼이 쓴다)
-$$('.frame').forEach((fr) => {
+$$('.frame').filter((fr) => $('video', fr)).forEach((fr) => {
   const vids = $$('video', fr), btn = $('.pp', fr), cap = $('.cap', fr); let cur = vids.find((v) => !v.hidden) || vids[0], user = false, seen = false;
   const load = (v) => { if (!v.src) { v.src = v.dataset.src; v.load(); } };
   const sync = () => { $('svg', btn).innerHTML = cur.paused ? playIcon : pauseIcon; btn.setAttribute('aria-label', cur.paused ? '재생' : '일시 정지'); };
@@ -720,6 +734,26 @@ $$('.frame').forEach((fr) => {
     seen = e.isIntersecting;
     if (seen) { load(cur); if (!still && !(user && cur.paused)) cur.play().catch(() => {}); } else if (!cur.paused) cur.pause();
   }), { threshold: 0.35, rootMargin: '200px 0px' }).observe(fr);
+  sync();
+});
+
+// Fashion Lab 카드 — 영상 대신 생성 결과를 몇 초마다 한 장씩. 영상과 같은 규칙: 보일 때만 넘기고, 단추로 멈추고 다시 넘기고, 움직임 줄이기면 단추를 누를 때만
+$$('.frame.slides').forEach((fr) => {
+  const imgs = $$('.sl-box img', fr), btn = $('.pp', fr), cap = $('.cap', fr), gap = Number(fr.dataset.gap) || 4200;
+  let i = 0, timer = 0, want = !still;
+  const load = () => imgs.forEach((im) => { if (!im.getAttribute('src') && im.dataset.src) im.src = im.dataset.src; });
+  const sync = () => { $('svg', btn).innerHTML = timer ? pauseIcon : playIcon; btn.setAttribute('aria-label', timer ? '일시 정지' : '재생'); };
+  const next = () => {
+    const n = (i + 1) % imgs.length;
+    if (document.hidden || !imgs[n].complete || !imgs[n].naturalWidth) return;   // 다음 장을 아직 못 받았으면 이번 차례는 건너뛴다
+    imgs.forEach((im) => im.classList.remove('prev'));
+    imgs[i].classList.replace('on', 'prev'); imgs[n].classList.add('on'); i = n;   // 새 장이 옛 장 위에서 나타난다
+    if (cap) cap.textContent = imgs[n].dataset.cap || '';
+  };
+  const run = () => { load(); if (!timer) timer = setInterval(next, gap); sync(); };
+  const stop = () => { clearInterval(timer); timer = 0; sync(); };
+  btn.onclick = () => { want = !timer; want ? run() : stop(); };
+  new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { if (want) run(); } else stop(); }), { threshold: 0.35, rootMargin: '200px 0px' }).observe(fr);
   sync();
 });
 
