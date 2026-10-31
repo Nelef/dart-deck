@@ -13,7 +13,8 @@
   - 첫 화면 카드 정리(2026-10-20): awwwards 스킬을 다시 불러서. 카드 폭 · 제목 폭 맞춤, 이름 · 한 줄 소개를 영상 아래로,
     사용 기술은 세 개만 글자 한 줄로(자동 넘김 없음, 올리거나 누르면 설명 말풍선), 단추는 네 카드 같은 높이(subgrid).
   - Fashion Lab 카드(2026-10-31): 맨 위 밝은 배너를 지우고 네 카드와 같은 모양의 다섯째 카드로(awwwards 스킬 참고, 기존 카드 체계 우선).
-    미디어는 영상 대신 쇼룸 생성 결과(원본 | 결과 한 쌍, scripts/build_fashion_card.py)를 천천히 넘기는 슬라이드 - 영상과 같은 재생 단추 · 보일 때만 · 움직임 줄이기면 자동으로 넘기지 않음.
+    미디어는 처음엔 쇼룸 생성 결과 슬라이드였으나 같은 날 다른 네 카드와 같은 HyperFrames 소개 영상(promo-fashion.mp4, 15초)으로 바꿈 -
+    hyperframes 스킬(product-launch-video)로 uyai-video/videos/uyai-fashion 을 uyai-radar 복사로 만들고, 장면 2 ~ 4 에 실제 생성 결과(FLUX.2 편집 · LoRA 학습 24장 · LoRA 끔/켬)를 넣음.
     격자: 데스크톱 5열 한 줄, 1000px 이하 3 + 2, 700px 이하 2 + 2 + 1(남는 줄은 가운데).
     LoRA 말풍선(2026-10-31 저녁): 쇼룸 04 구역(생성 이미지 24장으로 학습한 의류 LoRA)을 더하면서 '직접 학습한 LoRA 는 아닙니다'를 고침.
 -->
@@ -116,13 +117,6 @@ a { color: inherit; }
 @supports (grid-template-rows: subgrid) { .duo-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 12px; } .duo-card > .duo-row { margin-top: 0; align-self: end; } }
 .duo-media.frame { border-radius: 16px; }
 .duo-media.frame video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--night); }
-/* Fashion Lab 미디어 — 영상 대신 쇼룸 생성 결과(원본 | 결과 한 쌍)를 천천히 넘긴다. 새 장만 위에서 서서히 나타나 사이에 어두워지지 않게 */
-.duo-media .sl-box { position: relative; isolation: isolate; aspect-ratio: 16 / 9; background: var(--night); }
-.duo-media .sl-box img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; opacity: 0; transition: opacity 1.2s var(--ease-io); }
-.duo-media .sl-box img.prev { opacity: 1; }
-.duo-media .sl-box img.on { opacity: 1; z-index: 1; }
-.duo-media.slides .bar2 { background: linear-gradient(transparent, oklch(15% 0.01 205 / .86)); }   /* 사진 바탕이 밝아 글자가 묻히지 않게 */
-.duo-media.slides .bar2 .cap { text-shadow: 0 1px 8px oklch(0% 0 0 / .5); }
 .duo-row { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .btn.big { font-size: clamp(16px, 1.3vw, 18px); font-weight: 750; padding: 15px clamp(26px, 3vw, 40px); min-width: min(100%, 300px); justify-content: center; box-shadow: 0 12px 26px -14px oklch(19% 0.03 250 / .6); }
 .btn.big:disabled { box-shadow: none; }
@@ -411,7 +405,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <div class="duo-row"><a class="btn go big" href="/radar/" aria-label="청약 레이더 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
       </article>
       <article class="duo-card fade" data-svc="fashion" style="--fd:1.08s">
-        <div class="frame duo-media slides" data-gap="4200"><div class="sl-box" role="img" aria-label="Fashion Lab 생성 결과 — 원본 상품컷과 색상 · 소재 편집, 모델과 착장 시안"><img class="on" src="/web/media/fashion-card-color.webp?v=1031" alt="" width="960" height="540" data-cap="생성 결과 · 색상 편집"><img data-src="/web/media/fashion-card-material.webp?v=1031" alt="" width="960" height="540" data-cap="생성 결과 · 소재 편집"><img data-src="/web/media/fashion-card-tryon.webp?v=1031" alt="" width="960" height="540" data-cap="생성 결과 · 착장 시안"></div><div class="bar2"><span class="cap">생성 결과 · 색상 편집</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
+        <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-fashion-poster.webp?v=1031" data-src="/web/media/promo-fashion.mp4?v=1031" width="1280" height="720" aria-label="Fashion Lab 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="/fashion/"><b><img class="blogo" src="/web/media/logo-fashion.svg" alt="">Fashion Lab</b><span>상품컷 색상 · 소재 편집과 착장 시안을 원본과 비교</span></a>
         <div class="tech" data-svc="fashion"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="브리프 구성 · SDXL 추론 · FLUX 참고 이미지 편집을 <b>사용자 노드 3개</b>로 만들어 워크플로로 묶었습니다.">ComfyUI</button></li><li><button class="kw" data-tip="FLUX.2 klein 4B 로 상품컷 · 색상 · 소재 편집과 <b>두 장을 참고한 착장 시안</b>을 만들었습니다.">FLUX</button></li><li><button class="kw" data-tip="공개 LCM-LoRA 를 켜고 끈 비교와, <b>생성 이미지 24장으로 학습한 의류 LoRA</b>(SDXL) — 학습에 안 쓴 4장 기준 DINO 0.41 → 0.62.">LoRA</button></li></ul></div>
         <div class="duo-row"><a class="btn go big" href="/fashion/" aria-label="Fashion Lab 쇼룸 보기">쇼룸 보기 <span class="ar" aria-hidden="true">→</span></a></div>
@@ -735,26 +729,6 @@ $$('.frame').filter((fr) => $('video', fr)).forEach((fr) => {
     seen = e.isIntersecting;
     if (seen) { load(cur); if (!still && !(user && cur.paused)) cur.play().catch(() => {}); } else if (!cur.paused) cur.pause();
   }), { threshold: 0.35, rootMargin: '200px 0px' }).observe(fr);
-  sync();
-});
-
-// Fashion Lab 카드 — 영상 대신 생성 결과를 몇 초마다 한 장씩. 영상과 같은 규칙: 보일 때만 넘기고, 단추로 멈추고 다시 넘기고, 움직임 줄이기면 단추를 누를 때만
-$$('.frame.slides').forEach((fr) => {
-  const imgs = $$('.sl-box img', fr), btn = $('.pp', fr), cap = $('.cap', fr), gap = Number(fr.dataset.gap) || 4200;
-  let i = 0, timer = 0, want = !still;
-  const load = () => imgs.forEach((im) => { if (!im.getAttribute('src') && im.dataset.src) im.src = im.dataset.src; });
-  const sync = () => { $('svg', btn).innerHTML = timer ? pauseIcon : playIcon; btn.setAttribute('aria-label', timer ? '일시 정지' : '재생'); };
-  const next = () => {
-    const n = (i + 1) % imgs.length;
-    if (document.hidden || !imgs[n].complete || !imgs[n].naturalWidth) return;   // 다음 장을 아직 못 받았으면 이번 차례는 건너뛴다
-    imgs.forEach((im) => im.classList.remove('prev'));
-    imgs[i].classList.replace('on', 'prev'); imgs[n].classList.add('on'); i = n;   // 새 장이 옛 장 위에서 나타난다
-    if (cap) cap.textContent = imgs[n].dataset.cap || '';
-  };
-  const run = () => { load(); if (!timer) timer = setInterval(next, gap); sync(); };
-  const stop = () => { clearInterval(timer); timer = 0; sync(); };
-  btn.onclick = () => { want = !timer; want ? run() : stop(); };
-  new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { if (want) run(); } else stop(); }), { threshold: 0.35, rootMargin: '200px 0px' }).observe(fr);
   sync();
 });
 
