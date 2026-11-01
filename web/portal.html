@@ -405,7 +405,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
           <span class="ln"><span style="--d:2">AI 에이전트.</span></span>
         </h1>
       </div>
-      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하고 실험하는 AI 프로젝트 다섯 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있고, 별이 AI 는 디스코드 봇 사이트로, Fashion Lab 은 생성 결과를 모은 쇼룸으로 이어집니다.</span></p>
+      <p class="lead fade" style="--fd:.55s">직접 만들어 운영하고 실험하는 AI 프로젝트 다섯 가지입니다.<span class="m-hide"> AI PPT · 법숲 · 청약 레이더는 로그인 없이 바로 써 볼 수 있습니다. 별이 AI 는 디스코드 봇 사이트로, Fashion Lab 은 생성 결과를 모은 쇼룸으로 이어집니다.</span></p>
     </div>
     <div class="duo">
       <article class="duo-card fade" data-svc="ppt" style="--fd:.6s">
@@ -417,13 +417,13 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <article class="duo-card fade" data-svc="law" style="--fd:.72s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-law-poster.webp?v=1016c" data-src="/web/media/promo-law.mp4?v=1016c" width="1280" height="720" aria-label="법숲 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="#law"><b><img class="blogo" src="/web/media/logo-beopsoop.webp" alt="">법숲</b><span>법 조문으로 답하고, 근거 없으면 거절</span></a>
-        <div class="tech" data-svc="law"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="법령 16개 · <b>2,437개 조문</b>에서 먼저 찾아 그 안에서만 답합니다.">RAG</button></li><li><button class="kw" data-tip="BM25 + bge-m3 · 질의 재작성으로 정답 조문 hit@5 <b>0.71 → 0.90</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="근거가 모자랄 때만 다시 찾는 <b>적응형 흐름</b> — 쉬운 질문은 한 번에.">LangGraph</button></li><li><button class="kw" data-tip="법령 검색을 <b>MCP 서버</b>로도 내놓습니다.">MCP</button></li><li><button class="kw" data-tip="126문항 평가 · 답변 정확성 <b>30/31</b>.">LLM Eval</button></li><li><button class="kw" data-tip="조문 번호로만 인용하고, 근거가 없으면 <b>거절</b> — 범위 밖 10/10.">Grounding</button></li></ul></div>
+        <div class="tech" data-svc="law"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="법령 16개 · <b>2,437개 조문</b>에서 먼저 찾아 그 안에서만 답합니다.">RAG</button></li><li><button class="kw" data-tip="BM25 + bge-m3 · 질의 재작성으로 정답 조문 hit@5 <b>0.71 → 0.90</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="근거가 모자랄 때만 다시 찾는 <b>적응형 흐름</b> — 쉬운 질문은 한 번에.">LangGraph</button></li><li><button class="kw" data-tip="법령 검색을 <b>MCP 서버</b>로도 내놓습니다.">MCP</button></li><li><button class="kw" data-tip="126문항 평가 · 답변 정확성 <b>30/31</b>.">LLM Eval</button></li><li><button class="kw" data-tip="조문 번호로만 인용하고 근거가 없으면 <b>거절</b> — 범위 밖 10/10.">Grounding</button></li></ul></div>
         <div class="duo-row"><a class="btn go big" href="/law/" aria-label="법숲 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
       </article>
       <article class="duo-card fade" data-svc="byori" style="--fd:.84s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-byori-poster.webp?v=1019" data-src="/web/media/promo-byori.mp4?v=1019" width="1280" height="720" aria-label="별이 AI 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="#byori"><b><img class="blogo" src="/web/media/logo-byori.webp" alt="">별이 AI</b><span>말로 디스코드 서버를 관리하는 AI 컨시어지</span></a>
-        <div class="tech" data-svc="byori"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="말로 시키면 LLM 이 실행 계획을 짜고 봇이 설정을 바꿉니다 — <b>AI 액션 38종</b> 안에서만.">AI Agent</button></li><li><button class="kw" data-tip="여러 설정을 한 번에 — <b>LangGraph 오케스트레이터</b>가 계획 · 실행 · 결과 정리를 맡습니다.">LangGraph</button></li><li><button class="kw" data-tip="위험도 3단계 — 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 <b>대상을 밝혀 확인</b>받습니다.">Guardrails</button></li><li><button class="kw" data-tip="봇이 켜질 때마다 실제 명령 목록을 프롬프트에 넣어 <b>명령이 바뀌어도 AI 가 따라갑니다</b>.">Context Eng.</button></li><li><button class="kw" data-tip="Gemini · Kimi · Claude 를 <b>어댑터 하나</b>로 갈아 끼우고, LLM 이 멈추면 키워드로 대신합니다.">LLM Adapter</button></li><li><button class="kw" data-tip="배포 전 LLM 스모크 · <b>액션 38종 라벨 전수 검사</b>.">LLM Eval</button></li></ul></div>
+        <div class="tech" data-svc="byori"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="말로 시키면 LLM 이 실행 계획을 짜고 봇이 설정을 바꿉니다 — <b>AI 액션 38종</b> 안에서만.">AI Agent</button></li><li><button class="kw" data-tip="여러 설정을 한 번에 — <b>LangGraph 오케스트레이터</b>가 계획 · 실행 · 결과 정리를 맡습니다.">LangGraph</button></li><li><button class="kw" data-tip="위험도 3단계 — 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 <b>대상을 밝혀 확인</b>받습니다.">Guardrails</button></li><li><button class="kw" data-tip="봇이 켜질 때마다 실제 명령 목록을 프롬프트에 넣어 <b>명령이 바뀌어도 AI 가 따라갑니다</b>.">Context Eng.</button></li><li><button class="kw" data-tip="Gemini · Kimi · Claude 를 <b>어댑터 하나</b>로 갈아 끼우고 LLM 이 멈추면 키워드로 대신합니다.">LLM Adapter</button></li><li><button class="kw" data-tip="배포 전 LLM 스모크 · <b>액션 38종 라벨 전수 검사</b>.">LLM Eval</button></li></ul></div>
         <div class="duo-row"><a class="btn go big" href="https://byori.uk/" target="_blank" rel="noopener" aria-label="별이 AI 사이트 열기(새 창)">사이트 열기 <span class="ar" aria-hidden="true">↗</span></a></div>
       </article>
       <article class="duo-card fade" data-svc="radar" style="--fd:.96s">
@@ -435,7 +435,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <article class="duo-card fade" data-svc="fashion" style="--fd:1.08s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-fashion-poster.webp?v=1101d" data-src="/web/media/promo-fashion.mp4?v=1101d" width="1280" height="720" aria-label="Fashion Lab 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 20초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="/fashion/"><b><img class="blogo" src="/web/media/logo-fashion.svg" alt="">Fashion Lab</b><span>옷 사진 한 장으로 그 옷을 입히기까지의 실험</span></a>
-        <div class="tech" data-svc="fashion"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="FLUX.2 로 상품컷의 <b>색 · 소재를 바꾸는 편집</b>부터 시작했습니다.">FLUX</button></li><li><button class="kw" data-tip="옷 한 벌을 LoRA 로 학습하고, 캡션을 바꿔 <b>어깨 배색 0/48 → 44/48</b>.">LoRA</button></li><li><button class="kw" data-tip="옷 사진 한 장을 기존 인물에 입히는 가상 피팅(FASHN VTON) — 같은 24쌍 6항목 평균 <b>2.29 → 4.38</b>.">VTON</button></li></ul></div>
+        <div class="tech" data-svc="fashion"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="FLUX.2 로 상품컷의 <b>색 · 소재를 바꾸는 편집</b>부터 시작했습니다.">FLUX</button></li><li><button class="kw" data-tip="옷 한 벌을 LoRA 로 학습하고 캡션을 바꿔 <b>어깨 배색 0/48 → 44/48</b>.">LoRA</button></li><li><button class="kw" data-tip="옷 사진 한 장을 기존 인물에 입히는 가상 피팅(FASHN VTON) — 같은 24쌍 6항목 평균 <b>2.29 → 4.38</b>.">VTON</button></li></ul></div>
         <div class="duo-row"><a class="btn go big" href="/fashion/" aria-label="Fashion Lab 쇼룸 보기">쇼룸 보기 <span class="ar" aria-hidden="true">→</span></a></div>
       </article>
     </div>
@@ -451,7 +451,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <div>
         <span class="label">Agentic Document · DART RAG · MCP</span>
         <h2><img class="svc-logo" src="/web/media/logo-aippt.webp" alt="" width="84" height="84">AI PPT</h2>
-        <p class="sub">전자공시(DART) 사업보고서를 근거로 발표 자료를 만들고, 말로 부탁하면 에이전트가 사본을 고친 뒤 화면을 찍어 스스로 확인합니다. 바꿀지는 사람이 정합니다.</p>
+        <p class="sub">전자공시(DART) 사업보고서를 근거로 발표 자료를 만듭니다. 말로 부탁하면 에이전트가 사본을 고친 뒤 화면을 찍어 스스로 확인합니다. 바꿀지는 사람이 정합니다.</p>
       </div>
       <div class="acts"><button class="btn go deckDemo" data-demo="1" data-open="/deck/" disabled>준비 중</button></div>
     </div>
@@ -482,7 +482,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <div>
         <span class="label">Legal RAG · Hybrid Search · LangGraph</span>
         <h2><img class="svc-logo" src="/web/media/logo-beopsoop.webp" alt="" width="84" height="84">법숲</h2>
-        <p class="sub">일상의 법적 질문을 법령 조문으로 답합니다. 일상어를 법령 용어로 바꿔 찾고, 조문 번호로 인용하며, 근거가 없으면 답하지 않습니다.</p>
+        <p class="sub">일상의 법적 질문을 법령 조문으로 답합니다. 일상어를 법령 용어로 바꿔 찾고 조문 번호로 인용합니다. 근거가 없으면 답하지 않습니다.</p>
       </div>
       <div class="acts"><a class="btn go" href="/law/">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
     </div>
@@ -517,7 +517,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <div>
         <span class="label">AI Agent · LangGraph · Guardrails</span>
         <h2><img class="svc-logo" src="/web/media/logo-byori.webp" alt="" width="84" height="84">별이 AI</h2>
-        <p class="sub">디스코드 서버 관리 봇입니다. 관리자가 말로 시키면 AI 컨시어지가 실행 계획을 짜고, 봇이 레벨 보상 · 역할 · 자동 관리 같은 설정을 바꿉니다. 위험한 작업은 한 번 더 확인받습니다.</p>
+        <p class="sub">디스코드 서버 관리 봇입니다. 관리자가 말로 시키면 AI 컨시어지가 실행 계획을 짜고 봇이 레벨 보상 · 역할 · 자동 관리 같은 설정을 바꿉니다. 위험한 작업은 한 번 더 확인받습니다.</p>
       </div>
       <div class="acts"><a class="btn go" href="https://byori.uk/" target="_blank" rel="noopener">byori.uk 열기 <span class="ar" aria-hidden="true">↗</span></a></div>
     </div>
@@ -552,7 +552,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <div>
         <span class="label">Scheduled Collection · PDF Parsing · LLM Analysis</span>
         <h2><img class="svc-logo" src="/web/media/logo-radar.webp" alt="" width="84" height="84">청약 레이더</h2>
-        <p class="sub">서울 · 경기 청약 공고를 여러 게시판과 공공 API에서 모아 새 공고와 접수 일정을 알리고, 요청하면 AI가 공고문을 읽어 필요한 현금과 납부 일정을 정리합니다. 데모는 개인 메모와 조건을 뺀 사본 데이터로 열려 있습니다(수집, 알림, AI 분석은 꺼 둠).</p>
+        <p class="sub">서울 · 경기 청약 공고를 여러 게시판과 공공 API에서 모아 새 공고와 접수 일정을 알립니다. 요청하면 AI가 공고문을 읽어 필요한 현금과 납부 일정을 정리합니다. 데모는 개인 메모와 조건을 뺀 사본 데이터로 열려 있습니다(수집, 알림, AI 분석은 꺼 둠).</p>
       </div>
       <div class="acts"><a class="btn go" href="/radar/">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
     </div>
@@ -584,13 +584,13 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <section class="proof" id="proof" style="background:var(--paper-2)"><div class="wrap">
     <div class="sec-h rv">
       <div><span class="label">What's inside</span><h2>키워드마다<br>돌아가는 코드와 숫자.</h2></div>
-      <p>설명보다 측정값으로 보여 드립니다. 평가 문항은 개발용(dev)과 시험용(test)으로 나눠, 설정은 dev 로 고르고 숫자는 test 로 냈습니다.</p>
+      <p>설명보다 측정값으로 보여 드립니다. 평가 문항은 개발용(dev)과 시험용(test)으로 나눠 설정은 dev 로 고르고 숫자는 test 로 냈습니다.</p>
     </div>
     <div class="bento">
       <article class="tile dark w4 rv">
         <div class="tags"><span class="tag">RAG</span><span class="tag">Hybrid Search</span><span class="tag">Vector DB</span></div>
         <span class="t">공시 검색 — 하이브리드가 BM25 의 두 배</span>
-        <p>사업보고서 95곳을 800자 창으로 나눠 bge-m3 벡터를 Qdrant(HNSW)에 넣고, BM25 와 순위 융합(RRF)으로 합칩니다. 질문 속 회사 이름으로 먼저 거릅니다.</p>
+        <p>사업보고서 95곳을 800자 창으로 나눠 bge-m3 벡터를 Qdrant(HNSW)에 넣고 BM25 와 순위 융합(RRF)으로 합칩니다. 질문 속 회사 이름으로 먼저 거릅니다.</p>
         <div class="bars" style="margin-top:8px">
           <div class="bar" style="--v:.363;--k:0"><span style="color:var(--on-night-3)">BM25</span><i style="background:var(--night-line)"></i><b style="color:var(--on-night)">0.36</b></div>
           <div class="bar" style="--v:.696;--k:1"><span style="color:var(--on-night-3)">벡터 + 필터</span><i style="background:var(--night-line)"></i><b style="color:var(--on-night)">0.70</b></div>
@@ -622,13 +622,13 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <article class="tile accent w2 rv" style="--k:4">
         <div class="tags"><span class="tag">Grounding</span><span class="tag">LangGraph</span></div>
         <span class="t">근거 없으면 답하지 않기</span>
-        <p>조문 번호 · 공시 접수번호로만 인용합니다. 근거가 모자라면 LangGraph 흐름이 한 번 더 찾고, 그래도 없으면 거절합니다.</p>
+        <p>조문 번호 · 공시 접수번호로만 인용합니다. 근거가 모자라면 LangGraph 흐름이 한 번 더 찾고 그래도 없으면 거절합니다.</p>
         <div class="num"><b>10/10</b><small>범위 밖 질문 거절</small></div>
       </article>
       <article class="tile dark w3 rv" style="--k:5">
         <div class="tags"><span class="tag">AI Agent</span><span class="tag">Guardrails</span><span class="tag">LangGraph</span></div>
         <span class="t">말로 시켜도, 위험한 건 확인부터</span>
-        <p>별이 AI 는 LLM 이 짠 실행 계획을 정해 둔 액션 안에서만 실행합니다. 액션마다 위험도를 매겨 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 대상을 밝혀 확인받고, LLM 이 멈추면 키워드로 대신합니다.</p>
+        <p>별이 AI 는 LLM 이 짠 실행 계획을 정해 둔 액션 안에서만 실행합니다. 액션마다 위험도를 매겨 되돌리기 쉬운 변경은 한 번, 강퇴 · 차단은 대상을 밝혀 확인받습니다. LLM 이 멈추면 키워드로 대신합니다.</p>
         <div class="num"><b>38</b><small>AI 액션 · 위험도 3단계(safe · caution · danger)</small></div>
       </article>
       <article class="tile w3 rv" style="--k:6">
@@ -644,7 +644,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <section class="arch" id="arch"><div class="wrap">
     <div class="sec-h rv">
       <div><span class="label">Architecture</span><h2>한 주소, 한 로그인,<br>두 서비스.</h2></div>
-      <p>관문 서버가 로그인과 데모 세션을 맡고, 두 서비스는 각자의 검색 엔진과 LLM 을 씁니다. 모두 개인 서버의 Docker 컨테이너로 돌아갑니다.</p>
+      <p>관문 서버가 로그인과 데모 세션을 맡고 두 서비스는 각자의 검색 엔진과 LLM 을 씁니다. 모두 개인 서버의 Docker 컨테이너로 돌아갑니다.</p>
     </div>
     <div class="lanes rv" style="--k:1">
       <div class="node"><span class="k">Visitor</span><span class="t">브라우저</span><span class="s">데모 체험 · 관리자 로그인</span></div>
