@@ -11,7 +11,7 @@
 #   (Bash(node tools/deck_shot.cjs:*)), 읽기는 작업 폴더(deck) 안만(Claude Code 기본: 폴더 밖은 허락을 물어 -p 에서는 거부).
 #   실측(2026-09-30): 다른 파일 고치기 · 폴더 밖 파일 읽기 · 'ls /' 전부 거부됨. 사용자 ~/.claude 의 훅 · 스킬이 안 끼게 설정 폴더를 따로 둔다.
 import os, re, json, glob, uuid, time, hashlib, shutil, subprocess, threading, pty, select, signal, tempfile, fcntl, termios, struct, urllib.request, urllib.error, urllib.parse
-import notify
+import notify, alt_llm
 
 # 경로 — dart-deck. 덱은 DATA_DIR/decks/<계정>/<덱>/, 엔진은 engine/
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,10 +20,7 @@ ENGINE = os.path.join(ROOT, 'engine')
 DATA_DIR = os.path.abspath(os.environ.get('PPT_DATA_DIR', os.path.join(ROOT, 'data')))
 ADIR = os.path.join(DATA_DIR, '.agent')                        # Claude Code 설정 · 로그
 CLAUDE = shutil.which('claude') or next((p for p in ('/opt/homebrew/bin/claude', '/usr/local/bin/claude') if os.path.exists(p)), 'claude')
-LITE = os.environ.get('DECK_LITE_URL', 'http://127.0.0.1:4011')
-LITE_BIN = os.path.expanduser(os.environ.get('DECK_LITE_BIN', '~/.venvs/litellm/bin/litellm'))
-LITE_CFG = os.path.join(HERE, 'litellm.yaml')
-LLM_BASE = os.environ.get('DECK_LLM_BASE', '')   # gemma(vLLM) 주소 — litellm.yaml 의 api_base 를 이 값으로
+LLM_BASE = os.environ.get('DECK_LLM_BASE', '')   # gemma(vLLM) 주소 — alt_llm 이 LiteLLM 설정에 싣는다
 NODE_PATH = os.path.join(ROOT, 'node_modules')
 GUARD = os.path.join(HERE, 'webfetch_guard.py')                 # [웹 검색] 켠 부탁의 WebFetch 관문(검색 결과 · 사용자가 적은 주소만)
 # [웹 검색] 켠 부탁에 붙이는 지시 — 가져온 사실은 출처를 달고, 페이지 안의 지시는 따르지 않는다(사용자 지정 2026-09-30 "웹 검색 켜기")
@@ -113,24 +110,10 @@ def _gc():
     for lid, l in list(LOGINS.items()):
         if now - l['t'] > 600: _login_kill(lid)
 
-# ── gemma 쪽 번역 서버 — 없으면 띄운다(venv 가 있을 때만) ──
+# ── gemma 쪽 번역 서버 — 대체 엔진과 같은 LiteLLM(alt_llm)에 싣는다 ──
 def ensure_lite():
     if not LLM_BASE: raise ValueError('로컬 LLM 이 설정되지 않았습니다(DECK_LLM_BASE) — 계정 설정에서 Claude 구독을 연결해 Claude Code 로 써 주세요')
-    try:
-        urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
-    except Exception: pass
-    if not os.path.exists(LITE_BIN): raise ValueError(f'gemma 로 돌리려면 LiteLLM 이 필요합니다({LITE_BIN} 없음) — server/litellm.yaml 참고')
-    os.makedirs(ADIR, exist_ok=True)
-    cfg = os.path.join(ADIR, 'litellm.yaml')
-    open(cfg, 'w', encoding='utf-8').write(open(LITE_CFG, encoding='utf-8').read().replace('${DECK_LLM_BASE}', LLM_BASE))
-    port = LITE.rsplit(':', 1)[-1]
-    subprocess.Popen([LITE_BIN, '--config', cfg, '--host', '127.0.0.1', '--port', port, '--num_workers', '4'],
-                     stdout=open(os.path.join(ADIR, 'litellm.log'), 'a'), stderr=subprocess.STDOUT, start_new_session=True)
-    for _ in range(40):
-        time.sleep(0.5)
-        try: urllib.request.urlopen(f'{LITE}/health/liveliness', timeout=2).read(); return True
-        except Exception: pass
-    raise ValueError('LiteLLM 이 뜨지 않았습니다(data/.agent/litellm.log)')
+    return alt_llm.ensure()
 
 # 긴 줄 나누기 — 굳힌 장은 마크업이 한 줄 수천 자(격자 200칸)인데 Claude Code 의 Read 가 긴 줄을 잘라 보여 줘서, gemma 가 찾을 글을 짐작하다
 # Edit 이 16번 실패했다(실측 2026-09-30). 작업 사본에서만 <script> 밖의 긴 줄을 태그 경계(><)마다 주석 줄바꿈으로 나눈다 — 주석 안의 줄바꿈이라
@@ -259,7 +242,7 @@ def start(req, port, edit_target, slide_parts, shot, url_of, backup_name, owner)
     """부탁 하나를 서버 스레드로 시작하고 rid 를 돌려준다 — 따라 보기는 follow(rid, send).
     url_of(파일 경로) → 그 파일의 웹 주소(/d/<계정>/<덱>/…) — 캡처 도구가 덱 사본을 여는 주소"""
     _gc()
-    engine = 'sub' if req.get('token') else 'gemma'
+    engine = 'sub' if req.get('tokens') or req.get('token') or req.get('alt') else 'gemma'   # sub = Claude 길(한도면 예비 · Codex · Gemini 로 이어 감 — alt_llm)
     rid = str(req.get('rid') or '')
     with LOCK:
         if rid and rid in RUNS:
@@ -417,80 +400,108 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
         # 허용 목록(이번 사본만)에 막혀 '고치기'가 20번 헛돈 일이 있다(2026-09-30, 앞 차례 = 설명). 시스템 프롬프트에만 적어서는 옛 기억을 못 이긴다 —
         # 사용자 메시지 맨 앞에 이번 파일을 박는다
         ask = str(req.get('prompt') or '')[:BUILD_PROMPT_MAX if req.get('build') else 8000]
-        if r['session'] and not req.get('plan'):
-            ask = f"[이번 부탁의 작업 파일은 ./{r['work']} — 앞 대화에서 쓴 .deckagent-*.html 사본은 지워졌다. 이 파일을 새로 Read 해서 고친다]\n{ask}"
         # 계획 차례도 앞 대화를 이으면 '고치는 차례'로 착각해 옛 사본을 찾고 쓰기를 시도하다 "권한이 없다"고 답했다(2026-09-30, 작은 수정 → 여러 장).
         # 계획만 세우는 차례라는 것과 지금 덱을 읽을 파일을 메시지 앞에 박는다
         if req.get('plan'):
             ask = f"[이번 차례는 계획만 — 파일을 고치지 않는다. 지금 덱은 ./{r['work']} 를 Read 해서 보고, 고칠 곳을 적은 뒤 「이대로 진행할까요?」로 끝낸다. 사용자가 [진행]을 누르면 다음 차례에 고친다]\n{ask}"
         dart = engine == 'sub' and bool(DART_RAG_URL)   # 공시 검색(MCP) — 근거 · 숫자는 도구 결과에서만, 각주에 접수번호
-        args = [CLAUDE, '-p', ask, '--output-format', 'stream-json', '--verbose',
-                '--append-system-prompt', system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, '')), docs) + (WEB if web else '') + (DART_RULES if dart else '') + hint, '--permission-mode', 'default',
-                # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
-                '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if web else []), *(['mcp__dart__dart_search', 'mcp__dart__dart_finance', 'mcp__dart__dart_section'] if dart else []),
-                # 웹은 기본으로 막는다 — [웹 검색] 켠 부탁(Claude 구독)에만 열고, WebFetch 는 관문 훅이 검색 결과 주소로 좁힌다
-                '--disallowedTools', *([] if web else ['WebFetch', 'WebSearch']), 'Task', 'NotebookEdit',
-                # 덱 폴더의 js · css · tools · DECK.md 는 engine/ 을 가리키는 링크다 — 링크 너머 읽기가 '작업 폴더 밖'으로 막히지 않게 엔진 폴더를 읽기로 연다
-                '--add-dir', ENGINE]
-        env = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_CODE_OAUTH'))}
-        env.update({'DISABLE_AUTOUPDATER': '1', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1',
-                    # 개발 저장소 문맥을 끊는다 — 구독 시험(2026-09-30)에서 '왜 행을 빠뜨려?'에 최근 커밋(git 기록) · 저장소 CLAUDE.md 를 읽고 그 얘기로 답했다.
-                    # 덱 사용자에게 개발 기록이 새어 나가면 안 된다: git 안내 끔 · git 이 저장소를 못 찾게(research/ 에서 멈춤) · CLAUDE.md · 자동 메모리 끔
-                    'CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS': '1', 'GIT_CEILING_DIRECTORIES': DATA_DIR, 'NODE_PATH': NODE_PATH, 'CLAUDE_CODE_DISABLE_CLAUDE_MDS': '1', 'CLAUDE_CODE_DISABLE_AUTO_MEMORY': '1'})
-        if engine == 'sub':
-            env.update({'CLAUDE_CODE_OAUTH_TOKEN': str(req['token']), 'CLAUDE_CONFIG_DIR': os.path.join(ADIR, re.sub(r'[^a-z0-9_.-]', '', str(req.get('_cfg') or 'cfg-sub')) or 'cfg-sub')})
-            if req.get('model') in ('opus', 'sonnet', 'haiku'): args += ['--model', req['model']]
-            if req.get('effort') in ('low', 'medium', 'high', 'xhigh', 'max'): args += ['--effort', req['effort']]   # 노력 단계(사용자 지정 2026-09-30)
-        else:
-            ensure_lite()
-            # 생각 켬 — 벤치에서 Claude Code + gemma 는 생각을 켜야 좋았다(17/24 ↔ 끔 10/24)
-            env.update({'ANTHROPIC_BASE_URL': LITE, 'ANTHROPIC_API_KEY': 'x', 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '8000', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS': '65536',
-                        'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-gemma')})
-            args += ['--bare', '--model', 'gemma-think']
-        if web: args += ['--settings', json.dumps({'hooks': {'PreToolUse': [{'matcher': 'WebFetch', 'hooks': [{'type': 'command', 'command': f'{shutil.which("python3") or "python3"} {GUARD}'}]}]}})]
-        if dart: args += ['--mcp-config', json.dumps({'mcpServers': {'dart': {'command': 'node', 'args': [DART_MCP], 'env': {'DART_RAG_URL': DART_RAG_URL}}}})]
-        if r['session']: args += ['--resume', r['session']]
-        os.makedirs(env['CLAUDE_CONFIG_DIR'], exist_ok=True)
-        p = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
-        job.proc = p
-        err = []; threading.Thread(target=lambda: err.extend(p.stderr.readlines()), daemon=True).start()
-        timed = []
-        sec = BUILD_SEC if req.get('build') else RUN_SEC
-        killer = threading.Timer(sec, lambda: (timed.append(1), os.killpg(p.pid, signal.SIGKILL))); killer.start()
-        result = None
-        try:
-            for line in p.stdout:
-                try: j = json.loads(line)
-                except ValueError: continue
-                t = j.get('type')
-                if t == 'system' and j.get('subtype') == 'init': r['session'] = j.get('session_id') or r['session']; send({'session': r['session']}); meta_update(job.meta_f, {'sess': r['session']})
-                elif t == 'system' and j.get('subtype') == 'thinking_tokens': send({'think': 1})
-                elif t == 'assistant':
-                    for c in (j.get('message') or {}).get('content') or []:
-                        if c.get('type') == 'text' and c.get('text'): send({'d': c['text']})
-                        elif c.get('type') == 'tool_use': send({'step': _step(c.get('name'), c.get('input') or {})})
-                        elif c.get('type') == 'thinking': send({'think': len(c.get('thinking') or '')})
-                elif t == 'user':
-                    for c in (j.get('message') or {}).get('content') or []:
-                        if isinstance(c, dict) and c.get('type') == 'tool_result' and c.get('is_error'): send({'stepErr': str(c.get('content'))[:160]})
-                elif t == 'rate_limit_event' and engine == 'sub': _limit(req['token'], j.get('rate_limit_info'))   # 남은 사용량 재료(사용량 팝업)
-                elif t == 'result': result = j
-        except (BrokenPipeError, ConnectionResetError):
-            os.killpg(p.pid, signal.SIGKILL); raise
-        finally:
-            killer.cancel(); p.wait()
-        if req.get('_notify'): notify.agent_used(req, result, bool(timed), job.stopped)   # 주인 구독이 남에게 쓰였을 때만(app.py 가 붙임)
+        sysp = system_prompt(r['work'], slide, n, port, files, bool(req.get('plan')), url_of(os.path.join(cwd, '')), docs)
+        env0 = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_CODE_OAUTH', 'DECK_SHARED_TOKEN', 'GEMINI_', 'TELEGRAM_', 'GATEWAY_'))}
+        env0.update({'DISABLE_AUTOUPDATER': '1', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1',
+                     # 개발 저장소 문맥을 끊는다 — 구독 시험(2026-09-30)에서 '왜 행을 빠뜨려?'에 최근 커밋(git 기록) · 저장소 CLAUDE.md 를 읽고 그 얘기로 답했다.
+                     # 덱 사용자에게 개발 기록이 새어 나가면 안 된다: git 안내 끔 · git 이 저장소를 못 찾게(research/ 에서 멈춤) · CLAUDE.md · 자동 메모리 끔
+                     'CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS': '1', 'GIT_CEILING_DIRECTORIES': DATA_DIR, 'NODE_PATH': NODE_PATH, 'CLAUDE_CODE_DISABLE_CLAUDE_MDS': '1', 'CLAUDE_CODE_DISABLE_AUTO_MEMORY': '1'})
+        # 시도 순서 — Claude 길이면 주 토큰 → 예비 토큰 → Codex → Gemini(alt_llm.plan, 막힌 것은 건너뜀). 한도 · 인증 실패면 사본을 처음으로 돌리고 다음 후보로
+        tries = alt_llm.plan(req.get('tokens') or [req.get('token')]) if engine == 'sub' else [('gemma', None, 'gemma', 'gemma')]
+        if not tries: raise ValueError('쓸 수 있는 AI 가 없습니다 — Claude 토큰 · Codex 로그인 · Gemini 키가 모두 비어 있습니다')
+        sess0 = r['session']; sec = BUILD_SEC if req.get('build') else RUN_SEC; via = ''
+        for i, (eng, tok, label, bk) in enumerate(tries):
+            last = i == len(tries) - 1; claude = eng == 'sub'
+            if i:
+                open(workp, 'w', encoding='utf-8').write(unfold(open(path, encoding='utf-8').read()))   # 앞 시도가 반쯤 고친 사본은 버리고 처음부터
+                send({'step': f'{tries[i - 1][2]} 사용량이 다 되어 {label}(으)로 이어서 합니다'})
+            if label != 'Claude' and eng != 'gemma': via = label; meta_update(job.meta_f, {'via': label})
+            # 대화 기억(--resume)은 Claude 끼리만 — 세션은 이 서버의 설정 폴더에 있어 예비 토큰으로도 이어진다. 다시 시도면 앞 시도가 붙인 줄이 안 섞이게 갈래로
+            resume = sess0 if claude else ''; on_web = web and claude; on_dart = dart and claude
+            q = f"[이번 부탁의 작업 파일은 ./{r['work']} — 앞 대화에서 쓴 .deckagent-*.html 사본은 지워졌다. 이 파일을 새로 Read 해서 고친다]\n{ask}" if resume and not req.get('plan') else ask
+            args = [CLAUDE, '-p', q, '--output-format', 'stream-json', '--verbose',
+                    '--append-system-prompt', sysp + (WEB if on_web else '') + (DART_RULES if on_dart else '') + hint, '--permission-mode', 'default',
+                    # 계획 차례(여러 장 · 새 장 부탁의 첫 차례)는 고치기 도구를 주지 않는다 — 사람이 [진행]을 눌러야 고친다(사용자 지정 2026-09-30)
+                    '--allowedTools', *([] if req.get('plan') else [f"Edit(./{r['work']})", f"Write(./{r['work']})"]), 'Bash(node tools/deck_shot.cjs:*)', *(['WebSearch', 'WebFetch'] if on_web else []), *(['mcp__dart__dart_search', 'mcp__dart__dart_finance', 'mcp__dart__dart_section'] if on_dart else []),
+                    # 웹은 기본으로 막는다 — [웹 검색] 켠 부탁(Claude 구독)에만 열고, WebFetch 는 관문 훅이 검색 결과 주소로 좁힌다
+                    '--disallowedTools', *([] if on_web else ['WebFetch', 'WebSearch']), 'Task', 'NotebookEdit',
+                    # 덱 폴더의 js · css · tools · DECK.md 는 engine/ 을 가리키는 링크다 — 링크 너머 읽기가 '작업 폴더 밖'으로 막히지 않게 엔진 폴더를 읽기로 연다
+                    '--add-dir', ENGINE]
+            env = dict(env0)
+            if claude:
+                env.update({'CLAUDE_CODE_OAUTH_TOKEN': str(tok), 'CLAUDE_CONFIG_DIR': os.path.join(ADIR, re.sub(r'[^a-z0-9_.-]', '', str(req.get('_cfg') or 'cfg-sub')) or 'cfg-sub')})
+                if req.get('model') in ('opus', 'sonnet', 'haiku'): args += ['--model', req['model']]
+                if req.get('effort') in ('low', 'medium', 'high', 'xhigh', 'max'): args += ['--effort', req['effort']]   # 노력 단계(사용자 지정 2026-09-30)
+            elif eng == 'gemma':
+                ensure_lite()
+                # 생각 켬 — 벤치에서 Claude Code + gemma 는 생각을 켜야 좋았다(17/24 ↔ 끔 10/24)
+                env.update({'ANTHROPIC_BASE_URL': alt_llm.URL, 'ANTHROPIC_API_KEY': alt_llm.key() or 'x', 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '8000', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS': '65536',
+                            'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-gemma')})
+                args += ['--bare', '--model', 'gemma-think']
+            else:   # Codex · Gemini — 같은 Claude Code 틀 · 같은 도구 제한, 모델만 LiteLLM 으로
+                alt_llm.ensure(); e2, a2 = alt_llm.env_for(eng)
+                env.update({**e2, 'CLAUDE_CONFIG_DIR': os.path.join(ADIR, 'cfg-alt')}); args += a2
+            if on_web: args += ['--settings', json.dumps({'hooks': {'PreToolUse': [{'matcher': 'WebFetch', 'hooks': [{'type': 'command', 'command': f'{shutil.which("python3") or "python3"} {GUARD}'}]}]}})]
+            if on_dart: args += ['--mcp-config', json.dumps({'mcpServers': {'dart': {'command': 'node', 'args': [DART_MCP], 'env': {'DART_RAG_URL': DART_RAG_URL}}}})]
+            if resume: args += ['--resume', resume] + (['--fork-session'] if i else [])
+            os.makedirs(env['CLAUDE_CONFIG_DIR'], exist_ok=True)
+            p = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+            job.proc = p
+            err = []; threading.Thread(target=lambda: err.extend(p.stderr.readlines()), daemon=True).start()
+            timed = []; rejected = {}
+            killer = threading.Timer(sec, lambda: (timed.append(1), os.killpg(p.pid, signal.SIGKILL))); killer.start()
+            result = None
+            try:
+                for line in p.stdout:
+                    try: j = json.loads(line)
+                    except ValueError: continue
+                    t = j.get('type')
+                    if t == 'system' and j.get('subtype') == 'init' and claude: r['session'] = j.get('session_id') or r['session']; send({'session': r['session']}); meta_update(job.meta_f, {'sess': r['session']})
+                    elif t == 'system' and j.get('subtype') == 'thinking_tokens': send({'think': 1})
+                    elif t == 'assistant':
+                        for c in (j.get('message') or {}).get('content') or []:
+                            if c.get('type') == 'text' and c.get('text'): send({'d': c['text']})
+                            elif c.get('type') == 'tool_use': send({'step': _step(c.get('name'), c.get('input') or {})})
+                            elif c.get('type') == 'thinking': send({'think': len(c.get('thinking') or '')})
+                    elif t == 'user':
+                        for c in (j.get('message') or {}).get('content') or []:
+                            if isinstance(c, dict) and c.get('type') == 'tool_result' and c.get('is_error'): send({'stepErr': str(c.get('content'))[:160]})
+                    elif t == 'rate_limit_event' and claude:
+                        info = j.get('rate_limit_info') or {}; _limit(tok, info)   # 남은 사용량 재료(사용량 팝업)
+                        # 구독 한도(5시간 · 주간)가 찼다 — 추가 사용(유료 overage)으로 넘어가기 전에 다음 후보로. 모델별 한도(opus · sonnet)는 같은 토큰의 다른 모델이 되니 막지 않는다
+                        # (실측 2026-11-01: 주간 100% 뒤 status rejected · isUsingOverage true 로 계속 돌았다 — 그만큼 추가 요금)
+                        if info.get('status') == 'rejected' and not re.search(r'opus|sonnet', str(info.get('rateLimitType') or '')):
+                            rejected.update(info); alt_llm.block(bk, label, 'limit', info.get('resetsAt') or 0)
+                            if not last: os.killpg(p.pid, signal.SIGKILL)
+                    elif t == 'result': result = j
+            except (BrokenPipeError, ConnectionResetError):
+                os.killpg(p.pid, signal.SIGKILL); raise
+            finally:
+                killer.cancel(); p.wait()
+            if job.stopped or timed or (result and not result.get('is_error')): break
+            msg = (result or {}).get('result') or ''.join(ln for ln in err if 'unrecognized_model' not in ln)[-600:].strip()
+            why = 'limit' if rejected else alt_llm.kind(msg)
+            if why and not rejected: alt_llm.block(bk, label, why)
+            if not why or last: break
+        engine = eng if eng in ('codex', 'gemini') else engine
+        if req.get('_notify'): req['_via'] = via; notify.agent_used(req, result, bool(timed), job.stopped)   # 주인 구독이 남에게 쓰였을 때만(app.py 가 붙임)
         if job.stopped: send({'stopped': True}); return
         if not result or result.get('is_error'):
             # 시간 초과면 그렇게 말한다 — stderr 끝줄(모르는 모델 이름 안내 등)이 까닭처럼 보였다(gemma 여러 장 진행 실측: 15분 뒤 엉뚱한 줄)
             msg = (f'{sec // 60}분 안에 끝나지 않아 멈췄습니다' + (' — gemma 로는 여러 장 · 레이아웃이 어렵습니다. Claude Code 로 해 보세요' if engine == 'gemma' else '')) if timed \
-                else (result or {}).get('result') or ''.join(ln for ln in err if 'unrecognized_model' not in ln)[-600:].strip() or f'Claude Code 가 끝났습니다(코드 {p.returncode})'
-            if re.search(r'auth|login|token|401|403', msg, re.I) and engine == 'sub': msg = f'구독 인증 실패 — 계정을 다시 연결해 주세요 ({msg[:160]})'
+                else (result or {}).get('result') or ''.join(ln for ln in err if 'unrecognized_model' not in ln)[-600:].strip() or f'{label} 실행이 끝났습니다(코드 {p.returncode})'
+            if alt_llm.kind(msg) == 'limit' and len(tries) > 1: msg = f'준비된 AI 가 모두 사용량 한도에 걸렸습니다(Claude · 예비 · Codex · Gemini) — 잠시 뒤 다시 부탁해 주세요 ({msg[:160]})'
+            elif re.search(r'auth|login|token|401|403', msg, re.I) and eng == 'sub': msg = f'구독 인증 실패 — 계정을 다시 연결해 주세요 ({msg[:160]})'
             send({'error': msg[:600]}); return
         orig = open(path, encoding='utf-8').read(); new = fold(open(workp, encoding='utf-8').read())
         slides, other = changed_parts(orig, new, slide_parts)
         out = {'done': True, 'rid': rid, 'result': result.get('result') or '', 'turns': result.get('num_turns'), 'sec': round((result.get('duration_ms') or 0) / 1000),
-               'changed': new != orig, 'slides': slides, 'other': other, 'engine': engine,
+               'changed': new != orig, 'slides': slides, 'other': other, 'engine': engine, 'via': via,
                # 실제로 쓰인 모델 ID — 별칭(opus · sonnet · haiku)이 어느 판으로 이어졌는지 사람이 보게(사용자 질문 2026-09-30 "소넷 5.5 는 없었니")
                'models': [m for m in (result.get('modelUsage') or {}).keys()]}
         if new != orig:

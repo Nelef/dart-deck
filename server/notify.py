@@ -30,7 +30,7 @@ def agent_used(req, result, timed=False, stopped=False):
     why = ''
     if status in ('실패', '시간 초과'):   # 실패 까닭 - 한도 초과 · 인증 만료 등(사용자 질문 2026-10-27 "토큰 없어서 실패해도 오는거지?")
         why = ' '.join(str(r.get('result') or '').split())[:120] or '결과 없음(인증 만료 · 사용 한도 · 실행 오류일 수 있음)'
-    lines = [f"[uyai AI PPT] Claude 사용: {n.get('who', '?')}",
+    lines = [f"[uyai AI PPT] {req.get('_via') or 'Claude'} 사용: {n.get('who', '?')}",
              f"부탁: {ask}",
              f"결과: {status}, {round((r.get('duration_ms') or 0) / 1000)}초, {models}" + (f"\n까닭: {why}" if why else ''),
              f"토큰: 입력 {u.get('input_tokens') or 0:,}(캐시 {cache:,}) / 출력 {u.get('output_tokens') or 0:,}, 약 ${float(r.get('total_cost_usd') or 0):.3f}"]

@@ -20,7 +20,7 @@ NODE_PATH = os.path.join(ROOT, 'node_modules')
 SHOT_KEY = secrets.token_hex(16); os.environ['DECK_SHOT_KEY'] = SHOT_KEY
 os.environ['NODE_PATH'] = NODE_PATH
 os.environ.setdefault('PPT_DATA_DIR', DATA_DIR)
-import store as storemod, deckagent, importer, versions as vers, notify
+import store as storemod, deckagent, importer, versions as vers, notify, alt_llm
 STORE = storemod.Store(DATA_DIR)
 _dropped = STORE.drop_importing()   # 가져오다 서버가 꺼진 반쪽 덱 정리
 if _dropped: sys.stderr.write(f'가져오던 중이던 덱 {_dropped}개를 지웠습니다\n')
@@ -31,6 +31,7 @@ LAW_URL = os.environ.get('LAW_URL', '').rstrip('/')          # 법숲 컨테이�
 RADAR_URL = os.environ.get('RADAR_URL', '').rstrip('/')      # 청약 레이더 데모 컨테이너(개인 데이터 뺀 별도 인스턴스, 같은 도커 네트워크) — 비우면 /radar/ 는 404
 GATEWAY_KEY = os.environ.get('GATEWAY_KEY', '')              # 법숲이 이 서버가 보낸 요청인지 확인하는 비밀 값
 SHARED_TOKEN = os.environ.get('DECK_SHARED_TOKEN', '')       # 주인(개인) Claude 구독 토큰 — 데모 · 구독을 따로 연결하지 않은 계정이 쓴다
+SHARED_TOKEN_2 = os.environ.get('DECK_SHARED_TOKEN_2', '')   # 예비 Claude 구독 토큰(user@example.com) — 위 토큰이 한도면 이어 쓴다(alt_llm, 2026-11-02)
 DEMO_SAMPLES = [x.strip() for x in os.environ.get('DECK_DEMO_SAMPLES', '').split(',') if x.strip()]   # 데모에 줄 예시 덱 '계정/덱ID'(첫 것이 열린다)
 DEMO_RUNS = int(os.environ.get('DECK_DEMO_RUNS', '8'))       # 데모 세션 하나가 AI 에 부탁할 수 있는 횟수
 DEMO_DAILY = int(os.environ.get('DECK_DEMO_DAILY', '60'))    # 서버 전체 하루 데모 부탁 상한(구독 한도 보호)
@@ -1171,10 +1172,12 @@ class H(http.server.BaseHTTPRequestHandler):
                     dm['runs'] = dm.get('runs', 0) + 1
                     req.update({'model': 'sonnet', 'effort': 'medium', 'web': False, 'engine': 'claude'})
                 own = STORE.claude_token(u['id']); tok = own or SHARED_TOKEN
-                if not tok:
+                # 후보 — 이 계정 토큰(또는 주인 토큰) → 주인 예비 토큰. 한도가 차면 deckagent 가 다음 후보 → Codex → Gemini 로 넘긴다(alt_llm)
+                toks = [t for t in (tok, SHARED_TOKEN_2) if t]
+                if not toks and not alt_llm.alt_ready():
                     if u['role'] != 'admin': notify.token_missing('데모 방문자' if u['role'] == 'demo' else f"계정 {u['id']}", req.get('prompt'))
                     raise ValueError('Claude 구독이 연결돼 있지 않습니다 — 계정 설정에서 연결해 주세요')
-                req.update({'token': tok, '_cfg': f"cfg-{u['id']}"})
+                req.update({'token': tok, 'tokens': toks, 'alt': True, '_cfg': f"cfg-{u['id']}"})
                 # 주인 구독(공유 토큰)이 남에게 쓰이면 텔레그램으로 알린다(사용자 지정 2026-10-27) — 관리자 본인 · 자기 구독을 연결한 계정은 빼고
                 if not own and u['role'] != 'admin':
                     req['_notify'] = {'who': '데모 방문자' if u['role'] == 'demo' else f"계정 {u['id']}",
@@ -1324,6 +1327,7 @@ if __name__ == '__main__':
     for dd in glob.glob(os.path.join(DECKS, '*', '*')):
         if os.path.isdir(dd): link_engine(dd)
     import threading as _thr; _thr.Thread(target=demo_cleanup_loop, daemon=True).start()
+    _thr.Thread(target=alt_llm.keep_loop, daemon=True).start()   # 대체 엔진(LiteLLM) — 실을 모델이 생기면 띄운다. 법숲 · 청약 레이더도 같이 쓴다
     _rag = os.path.join(DATA_DIR, 'rag')
     if os.path.isfile(os.path.join(_rag, 'chunks.jsonl')):   # 공시 검색 서버(rag/server.mjs) — 데이터가 있을 때만, 이 컨테이너 안(127.0.0.1)에서
         subprocess.Popen(['node', os.path.join(ROOT, 'rag', 'server.mjs')], env={**os.environ, 'DART_DATA': _rag + os.sep, 'DART_MODELS': os.path.join(_rag, 'models') + os.sep, 'DART_OFFLINE': '1'},

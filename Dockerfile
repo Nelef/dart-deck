@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
 # Claude Code — 쓰는 사람의 구독 토큰으로 덱을 만들고 고친다(server/deckagent.py)
 RUN npm install -g @anthropic-ai/claude-code && claude --version
 
+# 대체 엔진(LiteLLM) — Claude 한도가 차면 Codex(ChatGPT 구독) · Gemini 로 이어 간다(server/alt_llm.py, 2026-11-02). 이 맥에서 시험한 판으로 고정
+RUN python3 -m venv /opt/litellm && /opt/litellm/bin/pip install --no-cache-dir 'litellm[proxy]==1.103.0' && /opt/litellm/bin/litellm --version >/dev/null
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -23,7 +26,7 @@ COPY web ./web
 COPY rag/server.mjs rag/mcp.mjs ./rag/
 COPY rag/lib ./rag/lib
 
-ENV PPT_PORT=8900 PPT_DATA_DIR=/data DISABLE_AUTOUPDATER=1 PYTHONUNBUFFERED=1
+ENV PPT_PORT=8900 PPT_DATA_DIR=/data DISABLE_AUTOUPDATER=1 PYTHONUNBUFFERED=1 DECK_LITE_BIN=/opt/litellm/bin/litellm ALT_LLM_HOST=0.0.0.0
 EXPOSE 8900
 VOLUME /data
 CMD ["python3", "server/app.py"]
