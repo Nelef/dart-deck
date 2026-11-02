@@ -419,7 +419,7 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
             last = i == len(tries) - 1; claude = eng == 'sub'
             if i:
                 open(workp, 'w', encoding='utf-8').write(unfold(open(path, encoding='utf-8').read()))   # 앞 시도가 반쯤 고친 사본은 버리고 처음부터
-                send({'step': f'{tries[i - 1][2]} 사용량이 다 되어 {label}(으)로 이어서 합니다'})
+                send({'step': f'{label}로 합니다'})   # 까닭(한도)은 화면에 내지 않는다 — 'Claude 예비로 합니다' · 'Codex로 합니다'(사용자 지정 2026-11-02)
             if label != 'Claude' and eng != 'gemma': via = label; meta_update(job.meta_f, {'via': label})
             # 대화 기억(--resume)은 Claude 끼리만 — 세션은 이 서버의 설정 폴더에 있어 예비 토큰으로도 이어진다. 다시 시도면 앞 시도가 붙인 줄이 안 섞이게 갈래로
             resume = sess0 if claude else ''; on_web = web and claude; on_dart = dart and claude
@@ -495,7 +495,7 @@ def _work(req, send, port, slide_parts, shot, url_of, backup_name, r, rid, job):
             # 시간 초과면 그렇게 말한다 — stderr 끝줄(모르는 모델 이름 안내 등)이 까닭처럼 보였다(gemma 여러 장 진행 실측: 15분 뒤 엉뚱한 줄)
             msg = (f'{sec // 60}분 안에 끝나지 않아 멈췄습니다' + (' — gemma 로는 여러 장 · 레이아웃이 어렵습니다. Claude Code 로 해 보세요' if engine == 'gemma' else '')) if timed \
                 else (result or {}).get('result') or ''.join(ln for ln in err if 'unrecognized_model' not in ln)[-600:].strip() or f'{label} 실행이 끝났습니다(코드 {p.returncode})'
-            if alt_llm.kind(msg) == 'limit' and len(tries) > 1: msg = f'준비된 AI 가 모두 사용량 한도에 걸렸습니다(Claude · 예비 · Codex · Gemini) — 잠시 뒤 다시 부탁해 주세요 ({msg[:160]})'
+            if alt_llm.kind(msg) == 'limit' and len(tries) > 1: msg = '지금은 AI 사용량이 모두 찼습니다 — 잠시 뒤 다시 부탁해 주세요'
             elif re.search(r'auth|login|token|401|403', msg, re.I) and eng == 'sub': msg = f'구독 인증 실패 — 계정을 다시 연결해 주세요 ({msg[:160]})'
             send({'error': msg[:600]}); return
         orig = open(path, encoding='utf-8').read(); new = fold(open(workp, encoding='utf-8').read())

@@ -1,4 +1,6 @@
-# Existing uyai runtime; only use when dependencies, engine, and server modules are unchanged.
+# Existing uyai runtime; only use when dependencies (Dockerfile RUN steps) and engine fonts are unchanged.
+# 서버 모듈 · 덱 화면 스크립트(engine/js)는 덮어써도 된다 — 글꼴 재생성(fontprint) 없이 몇 초면 끝난다
 FROM uyai:latest
-COPY server/app.py /app/server/app.py
+COPY server /app/server
+COPY engine/js /app/engine/js
 COPY web /app/web

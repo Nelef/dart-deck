@@ -22,7 +22,7 @@ PORT = int(os.environ.get('ALT_LLM_PORT', '4011'))
 URL = f'http://127.0.0.1:{PORT}'
 LLM_BASE = os.environ.get('DECK_LLM_BASE', '')                 # (선택) 로컬 gemma(vLLM) — 있으면 gemma-think · gemma-nothink 도 싣는다
 MODELS = {'codex': os.environ.get('ALT_CODEX_MODEL', 'chatgpt/gpt-6.1-terra'), 'gemini': os.environ.get('ALT_GEMINI_MODEL', 'gemini/gemini-3.5-flash-lite')}
-LABEL = {'codex': 'Codex(ChatGPT)', 'gemini': 'Gemini Flash'}
+LABEL = {'codex': 'Codex', 'gemini': 'Gemini'}   # 화면 · 알림에 그대로 나가는 이름 — 짧게(사용자 지정 2026-11-02 "codex로 합니다 정도")
 
 def key(): return os.environ.get('ALT_LLM_KEY', '')            # LiteLLM 마스터 키는 sk- 로 시작해야 한다(scripts/alt_login.sh 가 만든다)
 
@@ -53,7 +53,7 @@ def plan(tokens):
     """이번 부탁에 시도할 순서 [(엔진, 토큰, 이름, 막기 열쇠)] — 막힌 것은 빼고, 다 막혔으면 가장 먼저 풀리는 것 하나라도 시도"""
     out, seen = [], set()
     for t in tokens:
-        if t and t not in seen: seen.add(t); out.append(('sub', t, 'Claude' if not out else 'Claude 예비 계정', fp(t)))
+        if t and t not in seen: seen.add(t); out.append(('sub', t, 'Claude' if not out else 'Claude 예비', fp(t)))
     for e, ok in (('codex', codex_ready()), ('gemini', gemini_ready())):
         if ok: out.append((e, None, LABEL[e], e))
     live = [x for x in out if not blocked(x[3])]

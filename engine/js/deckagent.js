@@ -548,8 +548,8 @@
       // 실제 모델 ID(Claude Code 결과의 modelUsage) — 보조 호출용 작은 모델(haiku)이 같이 찍히면 둘 다
       const used = (a.agent.models || []).join(', ');
       a.model = a.agent.quick ? '빠른 답 · 로컬 LLM' : a.agent.engine === 'gemma' ? `로컬 LLM 생각 · 수정${o.kind ? ` (${String(o.kind).replace(/장/g, '페이지')})` : ''}`
-        // 대체 엔진(서버 alt_llm) — Claude 사용량이 다 차서 예비 계정 · Codex · Gemini 가 대신 했을 때(사용자 지정 2026-11-02)
-        : a.agent.via ? `${a.agent.via} (Claude 사용량이 다 되어 대신)${used ? ` · 실제: ${used}` : ''}`
+        // 대체 엔진(서버 alt_llm) — 예비 계정 · Codex · Gemini 가 했을 때는 이름만(사용자 지정 2026-11-02 "codex로 합니다 정도는 ㄱㅊ")
+        : a.agent.via ? `${a.agent.via}로 처리`
         : `Claude Code · ${NM[mm] || '계정 기본 모델'}${ef ? ` · 노력 ${ef}` : ''}${o.kind ? ` (자동: ${String(o.kind).replace(/장/g, '페이지')})` : ''}${o.web ? ' · 웹 검색' : ''}${used ? ` · 실제: ${used}` : ''}`;
       // 구독 인증 실패 — 연결을 지우고 다시 연결하게(잘못된 토큰으로 계속 401 이 나지 않게). 지난 대화를 다시 그릴 때는 건드리지 않는다
       if (live && a.agent.engine === 'sub' && /구독 인증 실패|401|OAuth access token/i.test(a.err || '')) { A.token = ''; a.err += ' — 연결을 지웠습니다. [Claude 구독 연결]로 다시 연결해 주세요'; K.render(); }
