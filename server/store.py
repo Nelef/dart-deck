@@ -20,7 +20,7 @@ class Store:
         self.demos = {}   # 데모 계정 → {t, exp, runs} — 메모리에만. 켤 때 남은 데모 사본은 지운다
         for o in os.listdir(os.path.join(data_dir, 'decks')):
             if o.startswith(DEMO_PREFIX): shutil.rmtree(os.path.join(data_dir, 'decks', o), ignore_errors=True)
-        if not self.users:   # 처음 켤 때 관리자 하나 — 이전 프로토타입 와 같게 admin/admin(첫 로그인 뒤 바꾸라고 화면에서 알린다)
+        if not self.users:   # 처음 켤 때 관리자 하나 — admin/admin(첫 로그인 뒤 바꾸라고 화면에서 알린다)
             self.add_user('admin', 'admin', 'admin', '관리자', must_change=True)
         self.shares = {}; self.pins = {}   # shares: 토큰 → (계정, 덱) 「최신」 링크 · pins: 토큰 → (계정, 덱, 버전 id) 「그 버전에 고정」 링크(2026-10-07)
         for x in self.decks():

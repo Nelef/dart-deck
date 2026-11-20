@@ -1,4 +1,4 @@
-/* 덱 엔진 공통 스타일(밝은 테마 하나) — deck 의 덱이 함께 쓴다(2026-09-28 사용자 지정: "엔진을 만들어 재사용",
+/* 덱 엔진 공통 스타일(밝은 테마 하나) — 모든 덱이 함께 쓴다(2026-09-28 사용자 지정: "엔진을 만들어 재사용",
    "밝은 테마만 — PPT 는 거의 하얀색"). 뼈대는 js/deck.js, 실제 기록 그림 부품은 js/deckviz.js.
    덱마다 다른 값만 그 덱의 <style> 에 남긴다(같은 선택자를 뒤에 다시 쓰면 덮인다).
    값의 출처: v2·v1 파이프라인 원리 덱이 쓰던 스타일 그대로 — 옮기면서 화면이 한 픽셀도 바뀌지 않게 했다. */
@@ -202,7 +202,7 @@ body.dfs { cursor: auto; }
   #bar #de-btn { left: 14px; } #bar #k-ai { right: 14px; } #bar #k-code { right: 88px; }
 }
 
-/* ═══ DART Deck 로고 — 왼쪽 위, 누르면 발표 자료 목록(사용자 지정 2026-09-30 "목록 단추는 왼쪽 위에 · DART Deck 로고로, 이전 프로토타입 처럼") ═══
+/* ═══ DART Deck 로고 — 왼쪽 위, 누르면 발표 자료 목록(사용자 지정 2026-09-30 "목록 단추는 왼쪽 위에 · DART Deck 로고로") ═══
    덱 HTML 을 고치지 않게 엔진(deck.js)이 붙인다. 어두운 무대 바탕 위라 흰 알약 안에. 무대가 로고에 가리지 않게 위를 비운다(--fit-top) —
    편집 중(리본이 그 자리) · 전체화면에서는 숨기고 비우지 않는다. 조작줄의 옛 ☰ 는 숨긴다(덱 파일엔 남아 있어도 된다) */
 #ppt-home { position: fixed; left: 14px; top: 9px; z-index: 45; display: flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 99px; background: #fff;

@@ -1,11 +1,11 @@
-# 웹 글꼴을 덱 폴더(deck/fonts/)에 받아 두는 도구 — 덱이 Google Fonts 를 거치지 않게(2026-09-29).
+# 웹 글꼴을 덱 폴더(fonts/)에 받아 두는 도구 — 덱이 Google Fonts 를 거치지 않게(2026-09-29).
 # 왜: 덱이 Google 글꼴 CSS 를 받을 때까지 첫 화면을 안 그렸다. Google 이 5초 늦으면 첫 화면 5.8초, 응답이 없으면 20초(실측) —
-#   느린 망 Windows PC 에서 "처음 로딩이 엄청 오래"의 원인. 여기 두면 첫 화면이 곧바로 뜨고, Google 이 막혀도 Windows · Mac 이 같은 글꼴로 그린다.
+#   느린 망의 Windows PC 에서 "처음 로딩이 엄청 오래"의 원인. 여기 두면 첫 화면이 곧바로 뜨고, Google 이 막혀도 Windows · Mac 이 같은 글꼴로 그린다.
 # 한글 글꼴은 Google 처럼 글자 범위(unicode-range)별 조각으로 둔다 — 파일은 많지만(굵기 5개에 수백 개) 브라우저는 화면에 나온 글자가 든 조각만 받는다
 # (첫 화면 기준 19개 · 약 200KB).
 # 쓰는 법:
-#   python3 deck/tools/fontcache.py base                 # 덱 기본 글꼴 → fonts/base.css
-#   python3 deck/tools/fontcache.py "Noto Serif KR" 400;700;900   # 글꼴 하나 → fonts/<이름>.css (✎ 편집이 저장할 때 serve.py 가 부른다)
+#   python3 engine/tools/fontcache.py base                 # 덱 기본 글꼴 → fonts/base.css
+#   python3 engine/tools/fontcache.py "Noto Serif KR" 400;700;900   # 글꼴 하나 → fonts/<이름>.css (✎ 편집이 저장할 때 serve.py 가 부른다)
 import os, re, sys, hashlib, urllib.request, concurrent.futures as cf
 
 HERE = os.path.dirname(os.path.abspath(__file__)); FONTS = os.path.join(os.path.dirname(HERE), 'fonts')

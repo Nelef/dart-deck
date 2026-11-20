@@ -31,7 +31,7 @@ LAW_URL = os.environ.get('LAW_URL', '').rstrip('/')          # 법숲 컨테이�
 RADAR_URL = os.environ.get('RADAR_URL', '').rstrip('/')      # 청약 레이더 데모 컨테이너(개인 데이터 뺀 별도 인스턴스, 같은 도커 네트워크) — 비우면 /radar/ 는 404
 GATEWAY_KEY = os.environ.get('GATEWAY_KEY', '')              # 법숲이 이 서버가 보낸 요청인지 확인하는 비밀 값
 SHARED_TOKEN = os.environ.get('DECK_SHARED_TOKEN', '')       # 주인(개인) Claude 구독 토큰 — 데모 · 구독을 따로 연결하지 않은 계정이 쓴다
-SHARED_TOKEN_2 = os.environ.get('DECK_SHARED_TOKEN_2', '')   # 예비 Claude 구독 토큰(user@example.com) — 위 토큰이 한도면 이어 쓴다(alt_llm, 2026-11-02)
+SHARED_TOKEN_2 = os.environ.get('DECK_SHARED_TOKEN_2', '')   # 예비 Claude 토큰 — 위 토큰이 한도면 이어 쓴다(alt_llm)
 DEMO_SAMPLES = [x.strip() for x in os.environ.get('DECK_DEMO_SAMPLES', '').split(',') if x.strip()]   # 데모에 줄 예시 덱 '계정/덱ID'(첫 것이 열린다)
 DEMO_RUNS = int(os.environ.get('DECK_DEMO_RUNS', '8'))       # 데모 세션 하나가 AI 에 부탁할 수 있는 횟수
 DEMO_DAILY = int(os.environ.get('DECK_DEMO_DAILY', '60'))    # 서버 전체 하루 데모 부탁 상한(구독 한도 보호)
@@ -501,7 +501,7 @@ def make_export(owner, did, vid, kind):
                 except OSError: pass
 
 # 내보내기 예상 시간 = 고정 + 페이지당(맥 실측으로 정한 기본값 — 만든 뒤에는 그 덱에서 잰 실제 속도로 맞춘다)
-EXP_BASE = {'pdf': (5.0, 1.0), 'pptx': (5.0, 1.0), 'pptx-edit': (6.0, 0.85)}   # GPU 서버 실측(24쪽): PDF 25.7초 · PPT 그림 29.6초 · PPT 편집 26.3초 — 만든 뒤에는 실제 속도로 보정
+EXP_BASE = {'pdf': (5.0, 1.0), 'pptx': (5.0, 1.0), 'pptx-edit': (6.0, 0.85)}   # 서버 실측(24쪽): PDF 25.7초 · PPT 그림 29.6초 · PPT 편집 26.3초 — 만든 뒤에는 실제 속도로 보정
 def exp_cached(d, kind):
     """지금 덱의 kind 내보내기를 이미 만들어 뒀나(내용 · 엔진이 같으면 바로 받는다)"""
     try:
@@ -605,7 +605,7 @@ def make_thumb(owner, did):
 BRIEF_KEYS = ('audience', 'info', 'key', 'pages', 'tone', 'material', 'text')
 # ── PPT 가져오기: 백그라운드 작업 + 남은 시간(사용자 지정 2026-10-01 "가져오기 누르면 몇 초 남았는지") ──
 # 올리는 동안은 브라우저가 바이트로 계산한다. 올린 뒤에는 서버가 작업(스레드)으로 돌리고 브라우저는 GET /api/import?job=… 으로 단계 · 남은 초를 받는다.
-# 단계 길이 어림 = 고정 + 쪽당(GPU 서버 실측 2026-10-01, 80쪽 18MB: PPT→PDF 23초 · 쪽 그림 18초 · 합 41초). 끝날 때마다 실제/어림 비율을 data/import-stats.json 에 이어 적어 이 서버 속도에 맞춘다
+# 단계 길이 어림 = 고정 + 쪽당(GPU 서버 서버 실측 2026-10-01, 80쪽 18MB: PPT→PDF 23초 · 쪽 그림 18초 · 합 41초). 끝날 때마다 실제/어림 비율을 data/import-stats.json 에 이어 적어 이 서버 속도에 맞춘다
 IMPORTS = {}; IMPORT_SEM = _th.Semaphore(2)   # 변환(LibreOffice)이 무거워 동시에 두 개까지
 IMP_BASE = {'pdf': (5.0, 0.23), 'pages': (1.0, 0.2), 'build': (1.0, 0.03)}   # 단계: (고정초, 쪽당 초)
 IMP_STAT_F = os.path.join(DATA_DIR, 'import-stats.json')
@@ -815,8 +815,6 @@ class H(http.server.BaseHTTPRequestHandler):
         if path.startswith('/law/'): return self.law_proxy('GET', head_only)
         if path == '/radar': self.send_response(301); self.send_header('Location', '/radar/'); self.send_header('Content-Length', '0'); self.end_headers(); return
         if path.startswith('/radar/'): return self.radar_proxy('GET', head_only)
-        if path == '/fashion': self.send_response(301); self.send_header('Location', '/fashion/'); self.send_header('Content-Length', '0'); self.end_headers(); return
-        if path == '/fashion/': return self.send_file(os.path.join(WEB, 'fashion', 'index.html'), head_only)
         if path == '/api/site':   # 첫 화면 — 발표 자료 데모를 열 수 있는지(예시 덱이 실제로 있는지)
             ok = any(re.fullmatch(r'[a-z0-9][a-z0-9_.-]{1,31}/\d{8}-[0-9a-f]{6}', x) and os.path.isfile(os.path.join(STORE.deck_dir(*x.split('/')), 'index.html')) for x in DEMO_SAMPLES)
             return self.reply(200, {'demoDeck': ok})

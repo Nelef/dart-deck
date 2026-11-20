@@ -1,11 +1,9 @@
-# 대체 엔진 — Claude 구독 한도가 차면 예비 Claude 계정 · Codex · Gemini 로 이어 간다(사용자 지정 2026-11-02 "클로드 토큰 다 쓰면 아예 못쓰게가 아니라
-#   다른 후보 토큰들도 쓸 수 있게 · user@example.com 도 있고 codex user@example.com 도 · 그게 안되면 재미니 flash라도").
+# 대체 엔진 — 주 Claude 토큰이 한도에 걸리면 예비 Claude 토큰 · Codex · Gemini 로 이어 간다(모두 운영자가 환경변수로 넣은 것만).
 # 순서: 주 Claude 토큰(계정 토큰 또는 DECK_SHARED_TOKEN) → 예비 Claude 토큰(DECK_SHARED_TOKEN_2) → Codex(ChatGPT 구독) → Gemini(무료 키).
 # Codex · Gemini 는 Claude Code 틀은 그대로 두고 모델만 LiteLLM 으로 바꾼다 — 도구 제한(사본 한 파일만 고치기 · 캡처 명령만)이 그대로 지켜진다.
 #   codex exec 를 직접 돌리면 셸이 열려 데모 방문자의 부탁으로 토큰 · 남의 덱을 읽힐 수 있어 쓰지 않는다.
-# LiteLLM 은 이 컨테이너 안에서 돌고(:4011), 같은 도커 네트워크의 법숲 · 청약 레이더도 http://uyai:4011 로 같이 쓴다.
-#   열쇠 = ALT_LLM_KEY(uyai-data/alt.env). 법숲 · 청약 레이더는 uyai-data/alt_client.env(ALT_LLM_URL · ALT_LLM_KEY)만 물린다 —
-#   GATEWAY_KEY(법숲이 uyai 를 믿는 값)는 청약 레이더에 주지 않는다.
+# LiteLLM 은 이 컨테이너 안에서 돈다(:4011). 같은 도커 네트워크의 다른 서비스도 같은 주소로 쓸 수 있다.
+#   열쇠 = ALT_LLM_KEY(환경변수).
 # 시험(2026-11-02, 이 맥): Codex gpt-6.1-terra 는 고치기 + grep 확인 5턴 12초, Gemini 3.5 flash-lite(무료 키)는 5턴 7초.
 #   Gemini 는 모델 이름에 'gemini-3' 이 있어야 LiteLLM 이 도구 호출 서명(thought_signature)을 채운다 — gemini-flash-latest 별칭은 400.
 #   무료 등급 gemini-3.8-flash 는 한 번 답에 40초가 넘어 대체용으로 쓰지 않는다.

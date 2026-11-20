@@ -1,5 +1,5 @@
 // 벡터를 Qdrant 에 올린다 — 컬렉션 dart(1024차원 · 코사인 · HNSW 기본값), payload = 회사 · 종목 · 연도 · 장(회사 필터용 색인).
-//   ssh -p 333 -N -L 16333:127.0.0.1:6333 user@nas.local &   # NAS 의 Qdrant 는 NAS 안에서만 열려 있다 — 터널로
+//   (Qdrant 가 다른 서버 안에서만 열려 있으면 ssh -L 로 터널을 연 뒤 DART_QDRANT 로 주소를 넘긴다)
 //   node rag/upload_qdrant.mjs http://127.0.0.1:16333 [--recreate]
 // 점 id = chunks.jsonl 의 줄 번호(검색 결과를 같은 청크 배열로 바로 찾는다).
 import { readFileSync, readdirSync } from 'node:fs';

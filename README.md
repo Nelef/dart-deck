@@ -1,49 +1,70 @@
-# DART Deck
+<h1 align="center">DART Deck</h1>
 
-누구에게 무엇을 알려 줄지 알려 주면, **Claude Code 가 한국 발표 자료 규칙에 맞춰 발표 자료를 만들고**, 이후 AI 에게 부탁하거나 직접(✎ 편집) 고치는 웹 서비스.
+<p align="center"><b>말로 만들고 말로 고치는 발표 자료</b><br>
+누구에게 무엇을 알려 줄지 적으면 Claude Code 에이전트가 한국 발표 자료 규칙에 맞춰 덱을 만들고, 페이지마다 대화로 고칩니다.</p>
 
-- 계정(아이디 · 비밀번호)마다 발표 자료 저장, 관리자는 전부 열람
-- 새 발표 자료: 간단 설문 또는 내용 통째로 붙여넣기 + 그림 → 열자마자 Claude Code 가 작성
-- AI 패널: 한 페이지 수정은 바로, 여러 페이지 · 새 페이지는 계획 → [진행]. 고친 뒤 화면을 찍어 스스로 확인하고, 사람이 [적용]
-- ✎ 편집: 끌어 옮기기 · 크기 · 글꼴 · 도형 · 그림, 페이지 추가 · 복제 · 삭제, 되돌리기
-- Claude 는 **쓰는 사람의 Claude 구독**(Pro · Max)으로 돈다 — 계정 설정에서 한 번 연결
+<p align="center">
+<img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+<img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python">
+<img src="https://img.shields.io/badge/Claude%20Code-agent-D97757" alt="Claude Code">
+<img src="https://img.shields.io/badge/export-PPTX%20%C2%B7%20PDF-B7472A" alt="PPTX · PDF">
+<img src="https://img.shields.io/badge/MCP-DART%20RAG-6E56CF" alt="MCP">
+</p>
 
-## 실행
+<p align="center"><img src="docs/screenshots/deck-edit.png" width="900" alt="덱 보기와 AI 대화 패널"></p>
 
-```sh
-npm install && npx playwright install chromium
-npm i -g @anthropic-ai/claude-code
-python3 server/app.py      # http://<이 컴퓨터>:8900 — 처음 계정 admin / admin
-```
+## 주요 기능
 
-## 배포 (개인 NAS)
+- **대화로 만드는 덱** - 간단 설문, 내용 통째로 붙여넣기, 그림 · 문서(pdf · pptx · docx) 첨부 중 하나로 시작하면 Claude Code 가 바로 첫 판을 씁니다.
+- **페이지마다 묻고 고치기** - 한 페이지 수정은 바로, 여러 페이지 · 새 페이지는 계획을 보여 준 뒤 [진행]. 고친 뒤 화면을 찍어 스스로 확인하고, 사람이 [적용] 해야 반영됩니다(이전과 비교 · 되돌리기).
+- **한국 발표 자료 규칙** - 제목 · 본문 크기, 한 장 한 메시지, 출처 각주 같은 규칙(`engine/DECK.md`)을 에이전트가 지키고, 화면 점검(DeckCheck)이 넘침 · 겹침을 잡습니다.
+- **직접 편집** - 끌어 옮기기 · 크기 · 글꼴 · 도형 · 그림, 페이지 추가 · 복제 · 삭제.
+- **가져오기 · 내보내기** - 기존 PPT · PDF 를 쪽마다 원본 모양 그대로 가져오고, 완성본은 편집 가능한 PPTX · PDF 로 내보냅니다.
+- **DART 공시 RAG(선택)** - 유가증권시장 대형사 사업보고서를 BM25 + bge-m3 로 찾아, 숫자마다 공시 접수번호를 각주로 단 회사 분석 덱을 만듭니다(MCP 도구).
+- **계정 · 데모** - 계정마다 덱 저장, 관리자 전체 열람, 데모 방문자용 횟수 제한.
 
-```sh
-docker build -t dart-deck:latest . && docker compose up -d   # 데이터는 ./data (계정 · 세션 · 덱 — 커밋 금지)
-```
+## 스크린샷
 
-환경 변수: `PPT_PORT`(8900) · `PPT_DATA_DIR`(./data, 이미지에서는 /data) · `DECK_ASK_URL` · `DECK_LLM_BASE`(로컬 LLM — 선택, 비우면 Claude 개인 구독만)
+| 덱 보기 + AI 대화 | 새 발표 자료 |
+|---|---|
+| ![덱과 AI 패널](docs/screenshots/deck-edit.png) | ![새 발표 자료](docs/screenshots/deck-new.png) |
 
-
-## Fashion Lab — /fashion/
-
-2026-10-31 추가. 기존 uyai 첫 화면에서 들어가는 패션 이미지 쇼룸이다. awwwards 스킬의 Warm Editorial 방향으로 구현했다. 공개 페이지는 실제 로컬 생성 결과를 선택하고 비교하는 체험이며, 새 추론을 서버에서 실행하는 기능은 포함하지 않는다.
-
-- `web/fashion/`: HTML·CSS·JS, 비교 슬라이더, 색상/소재 선택, 착장·공개 LoRA 비교, 확대 dialog, 이미지 저장, 실제 프롬프트·실패 사례·실행 조건.
-- `server/app.py`: `/fashion` → `/fashion/` 리다이렉트와 HTML 진입만 추가. 정적 파일은 기존 `/web/` 처리 사용.
-- `web/portal.html`: 첫 화면 다섯째 카드와 메뉴로 Fashion Lab 연결(2026-10-31 맨 위 배너를 다른 네 카드와 같은 모양의 카드로 바꿈). 카드 미디어는 다른 네 카드와 같은 HyperFrames 소개 영상(`web/media/promo-fashion.mp4` 15초 · 무음, 포스터 `promo-fashion-poster.webp`)이다 — 원본 프로젝트는 `~/Documents/uygit/uyai-video/videos/uyai-fashion`(1920x1080 렌더를 웹용 720p 로).
-- `scripts/build_fashion_assets.py`: 별도 로컬 실험 저장소의 실제 샘플과 manifest를 검증하고, 픽셀이 같은 lossless WebP와 공개용 기록만 만든다. 모델·로그·실행 경로는 배포하지 않는다.
-- 디자인 방향 `docs/fashion-design.md`, 브라우저 확인 결과 `docs/fashion-verification.json`.
-
-이미지는 이미 저장돼 있어 NAS에서 GPU·추가 Python 패키지 없이 표시된다. 원본을 갱신할 때만 Pillow가 있는 Python으로 `scripts/build_fashion_assets.py --source <fashion-lab 폴더>`를 실행한다. `catalog.json`의 파일 경로·프롬프트는 이 변환 스크립트가 만든 제한된 공개 정보다.
-
-로컬 확인(격리된 데이터):
+## 빠른 시작
 
 ```bash
-PPT_HOST=127.0.0.1 PPT_PORT=18913 PPT_DATA_DIR=/private/tmp/uyai-fashion-preview python3 server/app.py
-# http://127.0.0.1:18913/fashion/
+git clone https://github.com/Nelef/dart-deck.git && cd dart-deck
+npm install && npx playwright install chromium
+npm i -g @anthropic-ai/claude-code       # 덱 작성 · 수정은 Claude Code CLI(claude -p)로 돕니다
+python3 server/app.py                     # -> http://localhost:8900 (처음 계정 admin / admin, 바로 바꾸세요)
 ```
 
-배포는 기존 `./deploy.sh`를 사용한다. HEAD의 git archive로 배포하므로 수정 파일을 커밋한 뒤 실행한다.
+로그인한 뒤 계정 설정에서 `claude setup-token` 으로 받은 내 토큰을 연결하면 바로 쓸 수 있습니다.
 
-이번처럼 `web/`와 `server/app.py`의 경로 처리만 바꾸고 의존성·engine·다른 서버 모듈을 바꾸지 않았다면 `./deploy.sh --web-only`로 배포할 수 있다. `Dockerfile.web`은 NAS의 현재 `uyai:latest` 실행 환경에 두 경로만 복사하므로 PDF 글꼴을 다시 생성하지 않는다. 의존성이나 engine을 바꾸면 기본 전체 빌드를 사용한다. 두 방식 모두 빌드 성공 후 교체하며 이전 이미지는 `uyai:prev`로 남긴다.
+**Docker** - `docker build -t dart-deck . && docker compose up -d` (데이터는 `./data` - 계정 · 세션 · 덱, 커밋하지 않음). PPTX 변환용 LibreOffice 와 한글 글꼴이 이미지에 들어갑니다.
+
+## AI 연동
+
+이 저장소에는 어떤 계정 · 토큰도 들어 있지 않습니다. 쓰는 사람이 각자 연결합니다.
+
+| 방법 | 설정 | 비고 |
+|---|---|---|
+| 내 Claude 계정 연결(기본) | 웹 화면 계정 설정에서 `claude setup-token` 으로 받은 토큰을 연결 | 계정마다 따로 저장, 그 사람의 사용량으로 돈다 |
+| 운영자 공용 토큰(선택) | `DECK_SHARED_TOKEN` · `DECK_SHARED_TOKEN_2` | 데모 방문자용. 횟수 상한 `DECK_DEMO_RUNS` · `DECK_DEMO_DAILY` |
+| 다른 모델로 이어 쓰기(선택) | `ALT_LLM_KEY` + LiteLLM(`server/litellm.example.yaml`), `GEMINI_API_KEY` | Claude Code 틀은 그대로, 모델만 바꾼다 |
+| 로컬 LLM(선택) | `DECK_LLM_BASE` · `DECK_ASK_URL` | vLLM 같은 OpenAI 호환 서버 |
+| DART RAG(선택) | `DART_API_KEY`(OpenDART 인증키) -> `python3 rag/fetch.py` · `node rag/embed.mjs` | 색인은 메모리 또는 Qdrant(`DART_QDRANT`) |
+
+여러 사람에게 공개 서비스로 운영한다면 개인 구독 대신 각 제공사의 API 이용 조건에 맞는 방식으로 연결하세요.
+
+## 프로젝트 구조
+
+| 폴더 | 무엇 |
+|---|---|
+| `server/` | Python 표준 http.server 기반 서버 - 계정 · 덱 저장(`store.py`), Claude Code 에이전트 실행(`deckagent.py`), PPTX 변환(`pptx_build.py` · `lo_convert.py`), 가져오기(`importer.py`), 대체 엔진(`alt_llm.py`) |
+| `engine/` | 덱 엔진(HTML · CSS · JS) - 페이지 틀, 편집기, 화면 점검(DeckCheck), PDF · PPTX · 썸네일 도구, 한국 발표 자료 규칙(`DECK.md`) |
+| `rag/` | DART 공시 수집 · 파싱 · 임베딩 · 검색 · 평가 · MCP 서버 |
+| `web/` | 첫 화면 · 덱 목록 · 개인 포털 화면 |
+
+## 라이선스
+
+[MIT](LICENSE). `engine/fonts/` 의 Noto Sans KR · Noto Sans Symbols · JetBrains Mono 는 SIL Open Font License 1.1, DART 공시 데이터는 OpenDART 이용 조건을 따릅니다(데이터는 저장소에 없고 `rag/fetch.py` 로 직접 받습니다).
