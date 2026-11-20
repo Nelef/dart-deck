@@ -127,6 +127,8 @@ a { color: inherit; }
 .duo-name span { font-size: 13.5px; color: var(--ink-3); line-height: 1.45; }
 .duo-name:hover b { color: var(--accent-ink); }
 .duo-row .btn { flex: none; }
+.gh { font: 600 13.5px/1 var(--sans); color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; padding: 4px 2px; }
+.gh:hover { color: var(--accent-ink); }
 .duo .btn.big { width: 100%; min-width: 0; padding: 14px 18px; font-size: clamp(15px, 1.15vw, 17px); white-space: nowrap; box-shadow: 0 10px 22px -16px oklch(19% 0.03 250 / .55); }
 /* 카드 안 사용 기술 — 알약 대신 조용한 글자 한 줄(세 개만). 올리거나 누르면 어디에 어떻게 썼는지 말풍선. 전체 목록은 모바일 목록 · 아래 구역에 */
 .duo .kws { justify-content: flex-start; gap: 2px 0; }
@@ -388,6 +390,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <nav aria-label="구역"><a href="#ppt">AI PPT</a><a href="#law">법숲</a><a href="#byori">별이 AI</a><a href="#radar">청약 레이더</a><a href="/fashion/">Fashion Lab</a><a href="#proof">기술</a><a href="#arch">구성</a></nav>
   <span class="sp"></span>
   <span class="who" id="who"></span>
+  <a class="btn sm" href="https://github.com/Nelef" target="_blank" rel="noopener" aria-label="GitHub(새 창)">GitHub</a>
   <a class="btn sm" id="aDeck" href="/deck/" hidden>발표 자료</a>
   <button class="btn sm" id="bLogin">관리자 로그인</button>
   <button class="btn sm" id="bOut" hidden>로그아웃</button>
@@ -412,13 +415,13 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-aippt-poster.webp?v=1016c" data-src="/web/media/promo-aippt.mp4?v=1016c" width="1280" height="720" aria-label="AI PPT 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 17초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="#ppt"><b><img class="blogo" src="/web/media/logo-aippt.webp" alt="">AI PPT</b><span>공시를 근거로, 말로 고치는 발표 자료</span></a>
         <div class="tech" data-svc="ppt"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="DART 사업보고서 95곳에서 먼저 찾아 그 안에서만 씁니다 — 각주에 <b>공시 접수번호</b>.">RAG</button></li><li><button class="kw" data-tip="Claude Code 에이전트가 사본을 고치고 <b>화면을 찍어 스스로 확인</b>합니다. 적용은 사람이.">AI Agent</button></li><li><button class="kw" data-tip="공시 검색 · 재무 · 장 읽기 — <b>MCP 도구 3개</b>를 에이전트가 직접 부릅니다.">MCP</button></li><li><button class="kw" data-tip="BM25 + bge-m3 순위 융합 — 공시 검색 hit@5 <b>0.36 → 0.75</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="공시 <b>43,047개 청크</b>를 Qdrant(HNSW)에 넣고 회사 이름으로 거릅니다.">Vector DB</button></li><li><button class="kw" data-tip="공시 334문항을 dev · test 로 나눠 <b>설정은 dev, 숫자는 test</b>.">LLM Eval</button></li></ul></div>
-        <div class="duo-row"><button class="btn go big deckDemo" data-demo="1" data-open="/deck/" data-label="데모 체험" aria-label="AI PPT 데모 체험" disabled>준비 중</button></div>
+        <div class="duo-row"><button class="btn go big deckDemo" data-demo="1" data-open="/deck/" data-label="데모 체험" aria-label="AI PPT 데모 체험" disabled>준비 중</button><a class="gh" href="https://github.com/Nelef/dart-deck" target="_blank" rel="noopener" aria-label="AI PPT 소스 코드(GitHub, 새 창)">GitHub 소스 ↗</a></div>
       </article>
       <article class="duo-card fade" data-svc="law" style="--fd:.72s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-law-poster.webp?v=1016c" data-src="/web/media/promo-law.mp4?v=1016c" width="1280" height="720" aria-label="법숲 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="#law"><b><img class="blogo" src="/web/media/logo-beopsoop.webp" alt="">법숲</b><span>법 조문으로 답하고, 근거 없으면 거절</span></a>
         <div class="tech" data-svc="law"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="법령 16개 · <b>2,437개 조문</b>에서 먼저 찾아 그 안에서만 답합니다.">RAG</button></li><li><button class="kw" data-tip="BM25 + bge-m3 · 질의 재작성으로 정답 조문 hit@5 <b>0.71 → 0.90</b>.">Hybrid Search</button></li><li><button class="kw" data-tip="근거가 모자랄 때만 다시 찾는 <b>적응형 흐름</b> — 쉬운 질문은 한 번에.">LangGraph</button></li><li><button class="kw" data-tip="법령 검색을 <b>MCP 서버</b>로도 내놓습니다.">MCP</button></li><li><button class="kw" data-tip="126문항 평가 · 답변 정확성 <b>30/31</b>.">LLM Eval</button></li><li><button class="kw" data-tip="조문 번호로만 인용하고 근거가 없으면 <b>거절</b> — 범위 밖 10/10.">Grounding</button></li></ul></div>
-        <div class="duo-row"><a class="btn go big" href="/law/" aria-label="법숲 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
+        <div class="duo-row"><a class="btn go big" href="/law/" aria-label="법숲 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a><a class="gh" href="https://github.com/Nelef/beopsoop" target="_blank" rel="noopener" aria-label="법숲 소스 코드(GitHub, 새 창)">GitHub 소스 ↗</a></div>
       </article>
       <article class="duo-card fade" data-svc="byori" style="--fd:.84s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-byori-poster.webp?v=1019" data-src="/web/media/promo-byori.mp4?v=1019" width="1280" height="720" aria-label="별이 AI 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
@@ -430,7 +433,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-radar-poster.webp?v=1019" data-src="/web/media/promo-radar.mp4?v=1019" width="1280" height="720" aria-label="청약 레이더 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 15초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
         <a class="duo-name" href="#radar"><b><img class="blogo" src="/web/media/logo-radar.webp" alt="">청약 레이더</b><span>청약 공고를 모아 알리고, 필요 현금까지 정리</span></a>
         <div class="tech" data-svc="radar"><ul class="kws" aria-label="사용 기술"><li><button class="kw" data-tip="청약홈 · LH · SH 게시판과 공공데이터포털 API 2종을 <b>주기적으로 모읍니다</b>.">Scheduler</button></li><li><button class="kw" data-tip="공고문 PDF 의 표를 읽어 <b>분양가 · 납부 일정</b>을 뽑습니다.">PDF Parsing</button></li><li><button class="kw" data-tip="요청할 때만 LLM 이 공고문을 읽고 <b>필요 현금 · 순위</b>를 정리합니다.">LLM Analysis</button></li><li><button class="kw" data-tip="분석 진행을 <b>SSE 로 실시간</b> 보여 줍니다.">SSE</button></li><li><button class="kw" data-tip="<b>FastAPI REST API 12개</b> · 개인 NAS Docker.">FastAPI</button></li><li><button class="kw" data-tip="새 공고 · 접수 <b>D-7 · D-1</b> 을 텔레그램으로 알립니다.">Alerts</button></li></ul></div>
-        <div class="duo-row"><a class="btn go big" href="/radar/" aria-label="청약 레이더 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
+        <div class="duo-row"><a class="btn go big" href="/radar/" aria-label="청약 레이더 데모 체험">데모 체험 <span class="ar" aria-hidden="true">→</span></a><a class="gh" href="https://github.com/Nelef/chungyak-radar" target="_blank" rel="noopener" aria-label="청약 레이더 소스 코드(GitHub, 새 창)">GitHub 소스 ↗</a></div>
       </article>
       <article class="duo-card fade" data-svc="fashion" style="--fd:1.08s">
         <div class="frame duo-media"><video muted playsinline loop preload="none" poster="/web/media/promo-fashion-poster.webp?v=1101d" data-src="/web/media/promo-fashion.mp4?v=1101d" width="1280" height="720" aria-label="Fashion Lab 소개 영상"></video><div class="bar2"><span class="cap">소개 영상 · 20초</span><button class="pp" aria-label="일시 정지"><svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg></button></div></div>
@@ -453,7 +456,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <h2><img class="svc-logo" src="/web/media/logo-aippt.webp" alt="" width="84" height="84">AI PPT</h2>
         <p class="sub">전자공시(DART) 사업보고서를 근거로 발표 자료를 만듭니다. 말로 부탁하면 에이전트가 사본을 고친 뒤 화면을 찍어 스스로 확인합니다. 바꿀지는 사람이 정합니다.</p>
       </div>
-      <div class="acts"><button class="btn go deckDemo" data-demo="1" data-open="/deck/" disabled>준비 중</button></div>
+      <div class="acts"><a class="btn" href="https://github.com/Nelef/dart-deck" target="_blank" rel="noopener">GitHub <span class="ar" aria-hidden="true">↗</span></a><button class="btn go deckDemo" data-demo="1" data-open="/deck/" disabled>준비 중</button></div>
     </div>
     <div class="svc-b">
       <ol class="steps rv" id="pptSteps" style="--k:1">
@@ -484,7 +487,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <h2><img class="svc-logo" src="/web/media/logo-beopsoop.webp" alt="" width="84" height="84">법숲</h2>
         <p class="sub">일상의 법적 질문을 법령 조문으로 답합니다. 일상어를 법령 용어로 바꿔 찾고 조문 번호로 인용합니다. 근거가 없으면 답하지 않습니다.</p>
       </div>
-      <div class="acts"><a class="btn go" href="/law/">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
+      <div class="acts"><a class="btn" href="https://github.com/Nelef/beopsoop" target="_blank" rel="noopener">GitHub <span class="ar" aria-hidden="true">↗</span></a><a class="btn go" href="/law/">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
     </div>
     <div class="svc-b flip">
       <div class="frame rv" style="--k:1">
@@ -554,7 +557,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <h2><img class="svc-logo" src="/web/media/logo-radar.webp" alt="" width="84" height="84">청약 레이더</h2>
         <p class="sub">서울 · 경기 청약 공고를 여러 게시판과 공공 API에서 모아 새 공고와 접수 일정을 알립니다. 요청하면 AI가 공고문을 읽어 필요한 현금과 납부 일정을 정리합니다. 데모는 개인 메모와 조건을 뺀 사본 데이터로 열려 있습니다(수집, 알림, AI 분석은 꺼 둠).</p>
       </div>
-      <div class="acts"><a class="btn go" href="/radar/">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
+      <div class="acts"><a class="btn" href="https://github.com/Nelef/chungyak-radar" target="_blank" rel="noopener">GitHub <span class="ar" aria-hidden="true">↗</span></a><a class="btn go" href="/radar/">데모 체험 <span class="ar" aria-hidden="true">→</span></a></div>
     </div>
     <div class="svc-b flip">
       <div class="frame rv" style="--k:1">
@@ -659,7 +662,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       </div>
     </div>
     <p class="foot rv" style="--k:2">개인 프로젝트 · 데모 세션과 그 안에서 고친 자료는 몇 시간 뒤 지워집니다 · AI 답변은 참고용입니다.</p>
-    <p class="foot more rv" style="--k:3">그 밖의 작업: <a href="https://snakedome.com" target="_blank" rel="noopener">Snake Dome</a> - Cloudflare Workers, Durable Objects 로 만든 1:1 실시간 스네이크 대전 게임</p>
+    <p class="foot more rv" style="--k:3">그 밖의 작업: <a href="https://nelef.github.io/foldlab/" target="_blank" rel="noopener">Fold/Lab</a> - Three.js 로 폴더블 폰을 접고 펴 보는 3D 실험실(<a href="https://github.com/Nelef/foldlab" target="_blank" rel="noopener">GitHub</a>) · <a href="https://snakedome.com" target="_blank" rel="noopener">Snake Dome</a> - Cloudflare Workers, Durable Objects 로 만든 1:1 실시간 스네이크 대전 게임</p>
   </div></section>
   <p class="err wrap" id="err"></p>
 </main>
@@ -674,7 +677,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   </div>
 </div>
 
-<footer><div class="wrap"><span>uyai · 개인 프로젝트 데모</span><span>공시: OpenDART · 법령: 국가법령정보센터</span></div></footer>
+<footer><div class="wrap"><span>uyai · 개인 프로젝트 데모 · <a href="https://github.com/Nelef" target="_blank" rel="noopener">GitHub</a></span><span>공시: OpenDART · 법령: 국가법령정보센터</span></div></footer>
 
 <script>
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
